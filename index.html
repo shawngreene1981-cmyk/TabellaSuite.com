@@ -68,7 +68,7 @@ footer{padding:36px 0 48px;border-top:1px solid var(--line);font-size:.88rem;col
  <div>
   <div class="cap">For antique malls &amp; the people who fill them</div>
   <h1>Write it once. <em>Scan it</em> forever.</h1>
-  <p class="lede">Most antique malls still run on handwritten tags that someone retypes into a spreadsheet. It is slow, full of typos, and tells the owner almost nothing. Tabella puts a scannable tag on every item, so a sale is one beep, and the booth, the mall and the books all agree.</p>
+  <p class="lede">Most antique malls still run on handwritten tags that someone retypes into a spreadsheet. It is slow, full of typos, and tells the owner almost nothing. Tabella puts a scannable tag on every item, so a sale is one beep, and the booth, the mall and the books all agree. It starts with the antiquer, then gives the mall the insight it has never had.</p>
   <a class="btn" href="#early">Request early access</a><a class="btn ghost" href="#how">See how it works</a>
  </div>
  <div class="tagwrap" aria-hidden="true">
@@ -93,11 +93,11 @@ footer{padding:36px 0 48px;border-top:1px solid var(--line);font-size:.88rem;col
 
 <section id="products"><div class="cap">Two products, one system</div>
 <h2>Built for both sides of the booth.</h2>
-<p class="sub">An antiquer prints tags. The mall scans them. Because they speak the same language, nothing is typed twice.</p>
+<p class="sub">An antiquer prints tags. The mall scans them. Because they speak the same language, nothing is typed twice. Most mall software is built for the mall alone; Tabella starts with the person who finds, prices and tags the inventory.</p>
 <div class="cols2">
  <div class="card"><div class="cap">For antiquers and booth owners</div><h3>Tabella</h3><p>Photograph an item and get a draft description, category, and a rarity and trend badge. Print a sheet of tags with QR codes. Track what each item cost, what it sold for and what you kept.</p>
   <ul><li>Photo to listing, with suggested descriptions</li><li>Printable QR price tags, 24 to a sheet</li><li>Sourcing, profit and mileage in one place</li><li>A report card on your booth, and a year-end tax summary</li><li>A season planner for what to source and when to mark down</li></ul></div>
- <div class="card"><div class="cap">For malls</div><h3>Tabella Suite</h3><p>A register that reads the tags, and the reports an owner actually needs. A scan credits the right booth at the right price, with no retyping.</p>
+ <div class="card"><div class="cap">For malls</div><h3>Tabella Suite</h3><p>A register that reads the tags, and the insight an owner rarely gets: who the hot and slow booths are, when shoppers come, and what they want. A scan credits the right booth at the right price, with no retyping.</p>
   <ul><li>Fast register with scanner, typed fallback and undo</li><li>Vendor statements and monthly balances</li><li>Foot-traffic heat map and hot-vendor alerts</li><li>Slow and stale booth reports, with space reclaimed</li><li>A shared loyalty punch card, funded from commission</li><li>A catalog, shopper wish lists and sold-price comps</li></ul></div>
 </div></section>
 
@@ -112,19 +112,21 @@ footer{padding:36px 0 48px;border-top:1px solid var(--line);font-size:.88rem;col
 
 <section id="honest"><div class="cap">Where we are</div>
 <h2>Early, and built with a real booth.</h2>
-<p class="sub">Tabella started at a real flea-market booth, because its makers were tired of tagging by hand. The tools work and are being tested on live inventory. Malls and booth owners in the first group will shape what is built next. We are not claiming customers we do not have yet.</p></section>
+<p class="sub">Tabella started at a real flea-market booth, because its makers were tired of tagging by hand. The tools work and are being tested on live inventory. Malls and booth owners in the first group will shape what is built next, including how Tabella should work alongside the register a mall already uses. We are not claiming customers we do not have yet.</p></section>
 
 <section id="early" class="band"><div class="cap">Early access</div>
 <h2>Tell us about your mall or booth.</h2>
 <p class="sub">We will write back personally. No spam, and no sharing your details.</p>
 <form id="f">
+ <label style="position:absolute;left:-9999px" aria-hidden="true">Leave this empty<input name="website" tabindex="-1" autocomplete="off"></label>
  <label>Your name<input name="name" required autocomplete="name"></label>
  <label>Email<input name="email" type="email" required autocomplete="email"></label>
  <label>I am a<select name="role"><option>Booth owner or antiquer</option><option>Mall owner or manager</option><option>Both</option><option>Something else</option></select></label>
  <label>Mall or booth name and town<input name="where" autocomplete="off"></label>
+ <label>What register or software do you use now, if any?<input name="software" autocomplete="off"></label>
  <button class="btn" type="submit">Request early access</button>
  <div id="msg" role="status"></div>
- <div class="note">Opens your email app with the details filled in. If nothing opens, write to <span id="addr"></span>.</div>
+ <div class="note">We use this only to reply to you.</div>
 </form></section>
 </main>
 
@@ -132,12 +134,17 @@ footer{padding:36px 0 48px;border-top:1px solid var(--line);font-size:.88rem;col
 </div>
 <script>
 (function(){
-var TO='hello@tabellasuite.com';
+var ENDPOINT='https://formspree.io/f/xrpqelgl';
 document.getElementById('y').textContent=new Date().getFullYear();
-document.getElementById('addr').textContent=TO;
-document.getElementById('f').addEventListener('submit',function(e){e.preventDefault();var d=new FormData(e.target),b=['Name: '+d.get('name'),'Email: '+d.get('email'),'Role: '+d.get('role'),'Mall or booth: '+d.get('where')].join('\n');
- location.href='mailto:'+TO+'?subject='+encodeURIComponent('Tabella early access')+'&body='+encodeURIComponent(b);
- document.getElementById('msg').textContent='Thank you. Your email app should open with your request ready to send.'});
+var f=document.getElementById('f'),msg=document.getElementById('msg'),btn=f.querySelector('button');
+f.addEventListener('submit',function(e){
+ e.preventDefault();
+ if(f.website&&f.website.value)return; // honeypot
+ btn.disabled=true;msg.textContent='Sending...';
+ fetch(ENDPOINT,{method:'POST',headers:{'Accept':'application/json'},body:new FormData(f)})
+ .then(function(r){if(!r.ok)throw new Error('bad');f.reset();msg.textContent='Thank you. We will write back personally.'})
+ .catch(function(){msg.textContent='That did not send. Please try again in a moment.'})
+ .then(function(){btn.disabled=false})});
 })();
 </script>
 </body>

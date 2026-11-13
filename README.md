@@ -4,4 +4,4 @@ Marketing site for Tabella (booth app) and Tabella Suite (mall software). Static
 
 - `index.html` is the whole site.
 - `CNAME` points GitHub Pages at the custom domain.
-- The early-access form opens the visitor's email app addressed to `hello@tabellasuite.com`. Replace it with a hosted form endpoint when one exists.
+- The early-access form posts to Formspree (endpoint in the script at the bottom of `index.html`). The honeypot field `website` blocks basic bots.
