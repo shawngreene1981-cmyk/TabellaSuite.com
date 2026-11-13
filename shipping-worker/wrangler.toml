@@ -1,0 +1,10 @@
+name = "tabella-shipping"
+main = "worker.js"
+compatibility_date = "2026-11-01"
+
+[vars]
+ALLOWED_ORIGINS = "https://tabellasuite.com,https://www.tabellasuite.com"
+SHOW_TEST_PAGE = "true"
+
+# SHIPPO_API_KEY is a secret. Set it in the Cloudflare dashboard
+# (Worker > Settings > Variables and Secrets), never in this file.
