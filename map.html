@@ -5,6 +5,13 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Mall map | Tabella</title>
 <meta name="description" content="Antique malls and vintage shops on Tabella's Preferred Buyer road trips, with what each one is best for.">
+<link rel="canonical" href="https://tabellasuite.com/map.html">
+<meta property="og:type" content="website"><meta property="og:site_name" content="Tabella">
+<meta property="og:title" content="The Tabella mall map">
+<meta property="og:description" content="Antique malls and vintage shops from our road trips, with what each one is best for.">
+<meta property="og:url" content="https://tabellasuite.com/map.html"><meta property="og:image" content="https://tabellasuite.com/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Inter:wght@400;500;600&display=swap">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
@@ -17,9 +24,9 @@ a{color:var(--terra)}
 .w{max-width:1040px;margin:0 auto}
 h1,h2,h3{font-family:'Cormorant Garamond',Georgia,serif;font-weight:600;line-height:1.1;margin:0;text-wrap:balance}
 .cap{font-family:Cinzel,'Times New Roman',serif;letter-spacing:.18em;text-transform:uppercase;font-size:.78rem;color:var(--gold);font-weight:600}
-header{display:flex;justify-content:space-between;align-items:center;padding:22px 0}
+
 .logo{font-family:Cinzel,serif;font-weight:600;letter-spacing:.22em;font-size:1.05rem;text-decoration:none;color:var(--ink)}
-nav a{font-size:.9rem;margin-left:20px;text-decoration:none;color:var(--muted)}nav a:hover,nav a[aria-current]{color:var(--ink)}
+header.top{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:20px 0;flex-wrap:wrap}nav.main{display:flex;flex-wrap:wrap;gap:4px 18px;align-items:center}nav.main a{font-size:.92rem;text-decoration:none;color:var(--muted);padding:6px 0}nav.main a:hover,nav.main a[aria-current]{color:var(--ink)}nav.main a.cta{color:var(--terra-ink);background:var(--terra);padding:7px 14px;border-radius:6px;font-weight:600}@media(max-width:640px){nav.main a.opt{display:none}}
 h1{font-size:clamp(2.4rem,5.6vw,4rem);margin:10px 0 14px}
 .lede{font-size:1.12rem;color:var(--muted);max-width:38em;margin:0 0 22px}
 a:focus-visible,button:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
@@ -56,7 +63,7 @@ footer{padding:36px 0 48px;border-top:1px solid var(--line);margin-top:48px;font
 </head>
 <body>
 <div class="w">
-<header><a class="logo" href="./">TABELLA</a><nav><a href="./">Home</a><a href="map.html" aria-current="page">Mall map</a><a href="./#early">Early access</a></nav></header>
+<header class="top"><a class="logo" href="./">TABELLA</a><nav class="main" aria-label="Main"><a class="opt" href="./#shoppers">Shoppers</a><a class="opt" href="./#dealers">Dealers</a><a class="opt" href="./#malls">Malls</a><a href="map.html" aria-current="page">Mall map</a><a class="opt" href="pricing.html">Pricing</a><a class="cta" href="./#early">Early access</a></nav></header>
 
 <main>
 <div class="cap">Preferred Buyer road trips</div>
@@ -84,7 +91,7 @@ footer{padding:36px 0 48px;border-top:1px solid var(--line);margin-top:48px;font
 </section>
 </main>
 
-<footer><span>&copy; <span id="y"></span> Tabella Suite</span><span>Map data &copy; OpenStreetMap contributors. Pins are placed by town.</span></footer>
+<footer><span>&copy; <span id="y"></span> Tabella Suite &middot; <a href="mailto:contact@tabellasuite.com">contact@tabellasuite.com</a> &middot; Map data &copy; OpenStreetMap contributors. Pins are placed by town.</span><span><a href="pricing.html">Pricing</a> &middot; <a href="privacy.html">Privacy</a></span></footer>
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
