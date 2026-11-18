@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Mall map | Tabella</title>
+<meta name="description" content="Antique malls and vintage shops on Tabella's Preferred Buyer road trips, with what each one is best for.">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Inter:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+<style>
+:root{--bg:#F4EFE6;--bg2:#EBE4D6;--ink:#231F1A;--muted:#6A6259;--line:#D5CCBA;--terra:#9A4A2E;--terra-ink:#FFF8F0;--gold:#A8842F;--card:#FBF8F2;--focus:#2F6FA8;--green:#3F6B45;--grey:#8C8478}
+@media (prefers-color-scheme:dark){:root{--bg:#1A1714;--bg2:#221E1A;--ink:#EFE8DB;--muted:#A89F90;--line:#3A342D;--terra:#D98A66;--terra-ink:#1A1714;--gold:#D2B15E;--card:#25211C;--focus:#7FB8E6;--green:#8DBE8F;--grey:#9C9486}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:17px/1.6 Inter,system-ui,sans-serif;padding-left:max(20px,env(safe-area-inset-left,0px));padding-right:max(20px,env(safe-area-inset-right,0px))}
+a{color:var(--terra)}
+.w{max-width:1040px;margin:0 auto}
+h1,h2,h3{font-family:'Cormorant Garamond',Georgia,serif;font-weight:600;line-height:1.1;margin:0;text-wrap:balance}
+.cap{font-family:Cinzel,'Times New Roman',serif;letter-spacing:.18em;text-transform:uppercase;font-size:.78rem;color:var(--gold);font-weight:600}
+header{display:flex;justify-content:space-between;align-items:center;padding:22px 0}
+.logo{font-family:Cinzel,serif;font-weight:600;letter-spacing:.22em;font-size:1.05rem;text-decoration:none;color:var(--ink)}
+nav a{font-size:.9rem;margin-left:20px;text-decoration:none;color:var(--muted)}nav a:hover,nav a[aria-current]{color:var(--ink)}
+h1{font-size:clamp(2.4rem,5.6vw,4rem);margin:10px 0 14px}
+.lede{font-size:1.12rem;color:var(--muted);max-width:38em;margin:0 0 22px}
+a:focus-visible,button:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.legend{display:flex;flex-wrap:wrap;gap:8px 22px;align-items:center;margin:0 0 14px;font-size:.9rem;color:var(--muted)}
+.dot{display:inline-block;width:12px;height:12px;border-radius:50%;margin-right:7px;vertical-align:-1px;border:2px solid var(--card)}
+.dot.v{background:var(--green)}.dot.r{background:var(--grey)}
+.filters button{font:500 .85rem Inter,sans-serif;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:99px;padding:6px 14px;min-height:36px;cursor:pointer;margin-right:6px}
+.filters button[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+#map{height:min(62vh,560px);border:1px solid var(--line);border-radius:10px;background:var(--bg2);z-index:0}
+.leaflet-container{font:inherit}
+.leaflet-popup-content{margin:12px 14px;line-height:1.45}
+.leaflet-popup-content h3{font-size:1.3rem;margin:0 0 2px}
+.pop-where{font-size:.82rem;color:#6A6259;margin:0 0 6px}
+.pop-best{margin:0}
+.pin{width:16px;height:16px;border-radius:50%;border:2px solid #FBF8F2;box-shadow:0 1px 4px rgba(0,0,0,.45)}
+.pin.v{background:#3F6B45}.pin.r{background:#8C8478;width:12px;height:12px}
+section{padding:48px 0;border-top:1px solid var(--line);margin-top:40px}
+section h2{font-size:clamp(1.8rem,4vw,2.6rem);margin:8px 0 18px}
+.list{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;list-style:none;margin:0;padding:0}
+@media(max-width:720px){.list{grid-template-columns:1fr}}
+.list li{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px 18px}
+.list h3{font-size:1.35rem}
+.list .where{font-size:.85rem;color:var(--muted);margin:2px 0 6px}
+.list p{margin:0}
+.list button{all:unset;cursor:pointer}.list button:hover h3{color:var(--terra)}
+.list button:focus-visible{outline:2px solid var(--focus);outline-offset:4px;border-radius:4px}
+.plain{columns:2;column-gap:28px;margin:0;padding:0;list-style:none;color:var(--muted);font-size:.95rem}
+@media(max-width:560px){.plain{columns:1}}
+.plain li{break-inside:avoid;padding:3px 0}.plain b{color:var(--ink);font-weight:500}
+.claim{background:var(--bg2);border-radius:10px;padding:22px 24px;margin-top:8px}
+.claim p{margin:0}
+footer{padding:36px 0 48px;border-top:1px solid var(--line);margin-top:48px;font-size:.88rem;color:var(--muted);display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px}
+</style>
+</head>
+<body>
+<div class="w">
+<header><a class="logo" href="./">TABELLA</a><nav><a href="./">Home</a><a href="map.html" aria-current="page">Mall map</a><a href="./#early">Early access</a></nav></header>
+
+<main>
+<div class="cap">Preferred Buyer road trips</div>
+<h1>The mall map</h1>
+<p class="lede">Every antique mall and vintage shop on our road trips. We shop each one as regular buyers, then share what it is best for. Green pins are shops we have visited; grey pins are on our route.</p>
+
+<div class="legend">
+ <span><span class="dot v"></span><span id="nv">13</span> visited</span>
+ <span><span class="dot r"></span><span id="nr">26</span> on our route</span>
+ <span class="filters" role="group" aria-label="Show"><button type="button" data-f="all" aria-pressed="true">All</button><button type="button" data-f="v" aria-pressed="false">Visited</button></span>
+</div>
+<div id="map" role="region" aria-label="Map of malls"></div>
+
+<section>
+<div class="cap">Visited</div>
+<h2>What each shop is best for</h2>
+<ul class="list" id="visited"></ul>
+</section>
+
+<section>
+<div class="cap">On our route</div>
+<h2>Shops we have not visited yet</h2>
+<ul class="plain" id="route"></ul>
+<div class="claim" style="margin-top:28px"><p><b>Is this your shop?</b> Your listing on Tabella is free. Write to <a href="mailto:contact@tabellasuite.com">contact@tabellasuite.com</a> to claim it, correct it, or ask us to take it down.</p></div>
+</section>
+</main>
+
+<footer><span>&copy; <span id="y"></span> Tabella Suite</span><span>Map data &copy; OpenStreetMap contributors. Pins are placed by town.</span></footer>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+<script>
+(function(){
+// Pins sit at the town, not the street address. s: v = visited, r = on our route.
+var T={
+ 'Paducah, KY':[37.0834,-88.6000],'Eddyville, KY':[37.0945,-88.0803],'Clarksville, TN':[36.5298,-87.3595],
+ 'Nashville, TN':[36.1180,-86.7620],'Goodlettsville, TN':[36.3231,-86.7133],'Greenbrier, TN':[36.4273,-86.8044],
+ 'Lebanon, TN':[36.2081,-86.2911],'Cookeville, TN':[36.1628,-85.5016],'Crossville, TN':[35.9489,-85.0269],
+ 'Knoxville, TN':[35.9606,-83.9207],'Boone, NC':[36.2168,-81.6746],'Foscoe, NC':[36.1640,-81.7600],
+ 'Blowing Rock, NC':[36.1351,-81.6779],'Hudson, NC':[35.8482,-81.4901],'Hickory, NC':[35.7332,-81.3412],
+ 'Charlotte, NC':[35.1500,-80.8760],'Concord, NC':[35.4088,-80.5795],'Indian Trail, NC':[35.0768,-80.6692],
+ 'Monroe, NC':[34.9854,-80.5495]
+};
+var M=[
+ ['Miss Lucille’s Marketplace','Clarksville, TN','v','Time spent browsing and hunting. Huge, with a café inside; you can spend hours here.'],
+ ['Antiques on 231','Lebanon, TN','v','Finding something specific: collectible glass, brass, lighting and mid-century pieces, beautifully shown.'],
+ ['Cloud 9 Antiques & Such','Lebanon, TN','v','Glassware, figurines and collectibles, in a house full of rooms and old charm.'],
+ ['Ms. Rhonda’s Antiques and More','Greenbrier, TN','v','Pottery and shelving, with fun, well-decorated booths and good prices.'],
+ ['Charity thrift store, South Cookeville','Cookeville, TN','v','Nautical decor and baskets, with a delightful staff.'],
+ ['Appalachian Antique Mall','Boone, NC','v','Pyrex, china patterns and brass, across two floors to hunt through.'],
+ ['Antiques on Howard','Boone, NC','v','Vintage clothes, handmade birdhouses and vintage cameras.'],
+ ['Front Porch Antique Market','Foscoe, NC','v','Stoneware crocks, blue bottles, flow blue and lustreware, with friendly staff.'],
+ ['Antiques Main','Blowing Rock, NC','v','Bargains in a big barn on two levels, plus a book shop.'],
+ ['The Depot at Gibson Mill','Concord, NC','v','A bit of everything, in stalls that go on forever. They hand you a map.'],
+ ['Antebellum Marketplace','Indian Trail, NC','v','Glass vases, costume jewelry and decor, in boutique-style stalls.'],
+ ['A Hidden Treasure','Monroe, NC','v','Knickknacks and trinkets, in quaint rows of stall shelves.'],
+ ['Affordable Treasures','Paducah, KY','v','Hunting ceramics. Real finds for the patient digger.'],
+ ['Paducah Antique Mall','Paducah, KY','r'],['Antique Galleria','Paducah, KY','r'],['Red Door Antique Mall','Eddyville, KY','r'],
+ ['The Shoppes at Sango','Clarksville, TN','r'],['Second Chances Antiques & Treasures','Clarksville, TN','r'],['Kraft Street Antique Market','Clarksville, TN','r'],
+ ['GasLamp Antiques & Decorating Mall','Nashville, TN','r'],['GasLamp Too','Nashville, TN','r'],['Goodlettsville Antique Mall','Goodlettsville, TN','r'],
+ ['Cookeville Antique Mall','Cookeville, TN','r'],['Judd’s Antique Mall','Cookeville, TN','r'],['Antique Village Mall','Crossville, TN','r'],
+ ['Rocking Horse Antique Gallery','Crossville, TN','r'],['West End Antiques','Knoxville, TN','r'],['Four Seasons','Knoxville, TN','r'],
+ ['Bearden Antique Mall','Knoxville, TN','r'],['Bargain Hunters Antique & Flea Market Mall','Knoxville, TN','r'],
+ ['The Persnickety Peacock','Boone, NC','r'],['Anna Banana’s','Boone, NC','r'],['Thrift Smith Vintage','Boone, NC','r'],
+ ['Moomies Folk N Flea','Boone, NC','r'],['Hidden Valley Antique Mall','Boone, NC','r'],['Antique Corner Mall','Hudson, NC','r'],
+ ['Hickory Antiques Mall','Hickory, NC','r'],['Sleepy Poet Antique Mall','Charlotte, NC','r'],['Peddler’s Marketplace','Indian Trail, NC','r']
+];
+function esc(s){return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
+document.getElementById('y').textContent=new Date().getFullYear();
+var nv=0,nr=0,vis=document.getElementById('visited'),rt=document.getElementById('route');
+M.forEach(function(m,i){
+ if(m[2]==='v'){nv++;var li=document.createElement('li');
+  li.innerHTML='<button type="button" data-i="'+i+'"><h3>'+esc(m[0])+'</h3></button><div class="where">'+esc(m[1])+'</div><p><b>Best for:</b> '+esc(m[3])+'</p>';vis.appendChild(li)}
+ else{nr++;var r=document.createElement('li');r.innerHTML='<b>'+esc(m[0])+'</b> · '+esc(m[1]);rt.appendChild(r)}
+});
+document.getElementById('nv').textContent=nv;document.getElementById('nr').textContent=nr;
+if(!window.L){document.getElementById('map').innerHTML='<p style="padding:20px;color:var(--muted)">The map could not load. Every shop is listed below.</p>';return}
+var map=L.map('map',{scrollWheelZoom:false});
+L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:17,attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'}).addTo(map);
+var seen={},markers=[],bounds=[];
+M.forEach(function(m,i){
+ var c=T[m[1]],n=seen[m[1]]=(seen[m[1]]||0)+1,a=n*2.4,d=n>1?0.012*Math.sqrt(n):0;
+ var ll=[c[0]+d*Math.sin(a),c[1]+d*1.25*Math.cos(a)];
+ var icon=L.divIcon({className:'',html:'<div class="pin '+m[2]+'"></div>',iconSize:m[2]==='v'?[16,16]:[12,12]});
+ var html='<h3>'+esc(m[0])+'</h3><p class="pop-where">'+esc(m[1])+(m[2]==='v'?' · Visited':' · On our route')+'</p>'+(m[3]?'<p class="pop-best"><b>Best for:</b> '+esc(m[3])+'</p>':'');
+ var mk=L.marker(ll,{icon:icon,title:m[0],zIndexOffset:m[2]==='v'?500:0}).bindPopup(html);
+ mk._s=m[2];markers[i]=mk;mk.addTo(map);bounds.push(ll);
+});
+map.fitBounds(bounds,{padding:[24,24]});
+vis.addEventListener('click',function(e){var b=e.target.closest('button[data-i]');if(!b)return;var mk=markers[b.getAttribute('data-i')];
+ document.getElementById('map').scrollIntoView({behavior:'smooth',block:'center'});map.setView(mk.getLatLng(),11);mk.openPopup()});
+document.querySelector('.filters').addEventListener('click',function(e){var b=e.target.closest('button');if(!b)return;var f=b.getAttribute('data-f');
+ this.querySelectorAll('button').forEach(function(x){x.setAttribute('aria-pressed',x===b?'true':'false')});
+ markers.forEach(function(mk){if(f==='all'||mk._s===f){mk.addTo(map)}else{map.removeLayer(mk)}})});
+})();
+</script>
+</body>
+</html>
