@@ -1,10 +1,12 @@
 // Tabella shipping service (Cloudflare Worker).
-// Holds the Shippo API key on the server and answers rate requests from Tabella pages.
+// Holds the Shippo and Stripe keys on the server. Answers shipping rate requests and runs Tabella payments (see stripe.js).
 //
 // Secrets and settings (set in the Cloudflare dashboard, never in this file):
 //   SHIPPO_API_KEY   required. Use the shippo_test_... key while testing.
 //   ALLOWED_ORIGINS  optional. Comma-separated sites allowed to call this service.
 //   SHOW_TEST_PAGE   optional. "true" shows a small test form at "/". Turn it off before using a live key.
+
+import { handleStripe, stripeMode } from './stripe.js';
 
 const SHIPPO = 'https://api.goshippo.com';
 const DEFAULT_ORIGINS = 'https://tabellasuite.com,https://www.tabellasuite.com';
@@ -17,8 +19,11 @@ export default {
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
 
     if (url.pathname === '/health') {
-      return json({ ok: true, key: env.SHIPPO_API_KEY ? (isTestKey(env) ? 'test' : 'live') : 'missing' }, 200, cors);
+      return json({ ok: true, key: env.SHIPPO_API_KEY ? (isTestKey(env) ? 'test' : 'live') : 'missing', stripe: stripeMode(env) }, 200, cors);
     }
+
+    const paid = await handleStripe(request, env, url, json, cors);
+    if (paid) return paid;
 
     if (url.pathname === '/' && request.method === 'GET') {
       if (String(env.SHOW_TEST_PAGE).toLowerCase() !== 'true') return new Response('Tabella shipping service', { headers: cors });
@@ -48,7 +53,7 @@ function isTestKey(env) { return String(env.SHIPPO_API_KEY || '').startsWith('sh
 function corsHeaders(request, env) {
   const origin = request.headers.get('Origin') || '';
   const allowed = String(env.ALLOWED_ORIGINS || DEFAULT_ORIGINS).split(',').map(s => s.trim()).filter(Boolean);
-  const h = { 'Access-Control-Allow-Methods': 'POST, GET, OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type', 'Vary': 'Origin' };
+  const h = { 'Access-Control-Allow-Methods': 'POST, GET, OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type, Stripe-Signature', 'Vary': 'Origin' };
   if (allowed.includes(origin)) h['Access-Control-Allow-Origin'] = origin;
   return h;
 }
