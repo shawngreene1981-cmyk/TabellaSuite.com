@@ -58,7 +58,7 @@ th{font-size:.82rem;letter-spacing:.04em;color:var(--muted);font-weight:600}
 .prose{max-width:44em}.prose h2{font-size:1.8rem;margin:34px 0 8px}.prose p,.prose li{color:var(--ink)}
 /* example listing card in the hero */
 .phone{justify-self:center;width:min(330px,92%);background:var(--card);border:1px solid var(--line);border-radius:28px;padding:14px;box-shadow:0 24px 50px -28px rgba(0,0,0,.5)}
-.phone .ph{aspect-ratio:4/3;border-radius:16px;background:linear-gradient(160deg,#EDE3D1,#D9C9AE);display:grid;place-items:center}
+.phone .ph{aspect-ratio:10/9;border-radius:16px;overflow:hidden;background:#EDEDEB}.phone .ph img{width:100%;height:100%;object-fit:cover;display:block}
 .phone .meta{padding:14px 6px 4px}
 .phone .row{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
 .phone .t{font-family:'Cormorant Garamond',serif;font-size:1.45rem;font-weight:600;line-height:1.1}
