@@ -8,3 +8,9 @@ SHOW_TEST_PAGE = "true"
 
 # SHIPPO_API_KEY is a secret. Set it in the Cloudflare dashboard
 # (Worker > Settings > Variables and Secrets), never in this file.
+
+# Settings for branch preview builds (Cloudflare runs `wrangler preview` on non-main branches).
+# Previews get no secrets, so payments and rates stay off there.
+[previews.vars]
+ALLOWED_ORIGINS = "https://tabellasuite.com,https://www.tabellasuite.com"
+SHOW_TEST_PAGE = "true"
