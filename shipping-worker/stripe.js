@@ -41,12 +41,16 @@ export async function handleStripe(request, env, url, json, cors) {
       const role = b.role === 'mall' ? 'mall' : 'dealer';
       const email = clean(b.email, 120), name = clean(b.name, 80);
       if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return json({ error: 'Enter a valid email.' }, 400, cors);
-      const acct = await stripe(env, 'POST', '/accounts', {
-        type: 'express', country: 'US', email,
-        'capabilities[transfers][requested]': 'true',
-        'business_profile[name]': name || undefined,
-        'business_profile[product_description]': role === 'mall' ? 'Antique mall' : 'Antique and vintage dealer',
-        'metadata[role]': role, 'metadata[name]': name, 'metadata[booth]': clean(b.booth, 20) || undefined
+      // Accounts v2: a "recipient" that Tabella pays out to, with Stripe's Express dashboard.
+      const meta = { role, name };
+      if (clean(b.booth, 20)) meta.booth = clean(b.booth, 20);
+      const acct = await stripeV2(env, 'POST', '/v2/core/accounts', {
+        display_name: name || email, contact_email: email,
+        identity: { country: 'US' },
+        dashboard: 'express',
+        defaults: { responsibilities: { fees_collector: 'application', losses_collector: 'application' } },
+        configuration: { recipient: { capabilities: { stripe_balance: { stripe_transfers: { requested: true } } } } },
+        metadata: meta
       });
       const link = await onboardingLink(env, acct.id, b.returnUrl);
       return json({ account: acct.id, onboardingUrl: link.url, testMode: mode === 'test' }, 200, cors);
@@ -62,10 +66,12 @@ export async function handleStripe(request, env, url, json, cors) {
     if (p === '/pay/account-status' && request.method === 'GET') {
       const id = url.searchParams.get('account') || '';
       if (!/^acct_[A-Za-z0-9]+$/.test(id)) return json({ error: 'Missing account.' }, 400, cors);
-      const a = await stripe(env, 'GET', '/accounts/' + id);
-      return json({ account: a.id, ready: !!(a.charges_enabled || a.payouts_enabled) && !!a.details_submitted,
-        detailsSubmitted: !!a.details_submitted, payoutsEnabled: !!a.payouts_enabled,
-        needs: (a.requirements && a.requirements.currently_due) || [] }, 200, cors);
+      const a = await stripeV2(env, 'GET', '/v2/core/accounts/' + id + '?include=configuration.recipient&include=requirements');
+      const cap = (((((a.configuration || {}).recipient || {}).capabilities || {}).stripe_balance || {}).stripe_transfers || {});
+      const needs = ((a.requirements && a.requirements.entries) || [])
+        .filter(e => !e.minimum_deadline || e.minimum_deadline.status === 'currently_due' || e.minimum_deadline.status === 'past_due')
+        .map(e => e.description || (e.reference && e.reference.resource) || 'information').slice(0, 10);
+      return json({ account: a.id, ready: cap.status === 'active', transfers: cap.status || 'unknown', needs }, 200, cors);
     }
 
     if (p === '/pay/checkout' && request.method === 'POST') {
@@ -173,7 +179,8 @@ export async function verifySignature(raw, header, secret, nowSec) {
 async function onboardingLink(env, account, returnUrl) {
   const site = String(env.SITE_URL || 'https://tabellasuite.com').replace(/\/$/, '');
   const back = safeUrl(returnUrl, site) || site + '/';
-  return stripe(env, 'POST', '/account_links', { account, type: 'account_onboarding', return_url: back, refresh_url: back });
+  return stripeV2(env, 'POST', '/v2/core/account_links', { account,
+    use_case: { type: 'account_onboarding', account_onboarding: { configurations: ['recipient'], return_url: back, refresh_url: back } } });
 }
 
 async function stripe(env, method, path, fields, idem) {
@@ -185,6 +192,16 @@ async function stripe(env, method, path, fields, idem) {
   }
   if (idem) headers['Idempotency-Key'] = idem;
   const res = await fetch(API + path, { method, headers, body: bodyStr });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) { const e = new Error('Stripe said: ' + ((data.error && data.error.message) || res.status)); e.status = 502; throw e; }
+  return data;
+}
+
+const V2_VERSION = '2026-11-18.endive';
+async function stripeV2(env, method, path, obj) {
+  const headers = { Authorization: 'Bearer ' + env.STRIPE_SECRET_KEY, 'Stripe-Version': V2_VERSION };
+  if (obj) headers['Content-Type'] = 'application/json';
+  const res = await fetch('https://api.stripe.com' + path, { method, headers, body: obj ? JSON.stringify(obj) : undefined });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) { const e = new Error('Stripe said: ' + ((data.error && data.error.message) || res.status)); e.status = 502; throw e; }
   return data;
