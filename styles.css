@@ -69,3 +69,5 @@ th{font-size:.82rem;letter-spacing:.04em;color:var(--muted);font-weight:600}
 .phone .b span{text-align:center;font-size:.88rem;font-weight:600;padding:10px;border-radius:10px;border:1px solid var(--line)}
 .phone .b span.on{background:var(--terra);color:var(--terra-ink);border-color:var(--terra)}
 .phone .ex{text-align:center;font-size:.75rem;color:var(--muted);margin-top:10px}
+
+.soon{display:inline-block;font-size:.68rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;border:1px solid var(--line);color:var(--muted);padding:2px 8px;border-radius:99px;vertical-align:2px;margin-left:4px;font-family:Inter,sans-serif}

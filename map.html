@@ -63,12 +63,12 @@ footer{padding:36px 0 48px;border-top:1px solid var(--line);margin-top:48px;font
 </head>
 <body>
 <div class="w">
-<header class="top"><a class="logo" href="./">TABELLA</a><nav class="main" aria-label="Main"><a class="opt" href="./#shoppers">Shoppers</a><a class="opt" href="./#dealers">Dealers</a><a class="opt" href="./#malls">Malls</a><a href="map.html" aria-current="page">Mall map</a><a class="opt" href="pricing.html">Pricing</a><a class="cta" href="./#early">Early access</a></nav></header>
+<header class="top"><a class="logo" href="./">TABELLA</a><nav class="main" aria-label="Main"><a class="opt" href="./#shoppers">Shoppers</a><a class="opt" href="./#dealers">Dealers</a><a class="opt" href="./#malls">Malls</a><a href="map.html" aria-current="page">Mall map</a><a class="opt" href="road-trip-1.html">Road trips</a><a class="opt" href="pricing.html">Pricing</a><a class="cta" href="./#early">Early access</a></nav></header>
 
 <main>
 <div class="cap">Preferred Buyer road trips</div>
 <h1>The mall map</h1>
-<p class="lede">Every antique mall and vintage shop on our road trips. We shop each one as regular buyers, then share what it is best for. Green pins are shops we have visited; grey pins are on our route.</p>
+<p class="lede">Every antique mall and vintage shop on our road trips (read <a href="road-trip-1.html">Road Trip No. 1</a>). We shop each one as regular buyers, then share what it is best for. Green pins are shops we have visited; grey pins are on our route.</p>
 
 <div class="legend">
  <span><span class="dot v"></span><span id="nv">13</span> visited</span>
@@ -131,12 +131,13 @@ var M=[
  ['Moomies Folk N Flea','Boone, NC','r'],['Hidden Valley Antique Mall','Boone, NC','r'],['Antique Corner Mall','Hudson, NC','r'],
  ['Hickory Antiques Mall','Hickory, NC','r'],['Sleepy Poet Antique Mall','Charlotte, NC','r'],['Peddler’s Marketplace','Indian Trail, NC','r']
 ];
+var LISTING={'Cloud 9 Antiques & Such':'shops/cloud-9-antiques-and-such-lebanon-tn.html'};
 function esc(s){return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
 document.getElementById('y').textContent=new Date().getFullYear();
 var nv=0,nr=0,vis=document.getElementById('visited'),rt=document.getElementById('route');
 M.forEach(function(m,i){
  if(m[2]==='v'){nv++;var li=document.createElement('li');
-  li.innerHTML='<button type="button" data-i="'+i+'"><h3>'+esc(m[0])+'</h3></button><div class="where">'+esc(m[1])+'</div><p><b>Best for:</b> '+esc(m[3])+'</p>';vis.appendChild(li)}
+  li.innerHTML='<button type="button" data-i="'+i+'"><h3>'+esc(m[0])+'</h3></button><div class="where">'+esc(m[1])+'</div><p><b>Best for:</b> '+esc(m[3])+'</p>'+(LISTING[m[0]]?'<p style="margin-top:8px"><a href="'+LISTING[m[0]]+'">See the listing &rarr;</a></p>':'');vis.appendChild(li)}
  else{nr++;var r=document.createElement('li');r.innerHTML='<b>'+esc(m[0])+'</b> · '+esc(m[1]);rt.appendChild(r)}
 });
 document.getElementById('nv').textContent=nv;document.getElementById('nr').textContent=nr;
@@ -148,7 +149,7 @@ M.forEach(function(m,i){
  var c=T[m[1]],n=seen[m[1]]=(seen[m[1]]||0)+1,a=n*2.4,d=n>1?0.012*Math.sqrt(n):0;
  var ll=[c[0]+d*Math.sin(a),c[1]+d*1.25*Math.cos(a)];
  var icon=L.divIcon({className:'',html:'<div class="pin '+m[2]+'"></div>',iconSize:m[2]==='v'?[16,16]:[12,12]});
- var html='<h3>'+esc(m[0])+'</h3><p class="pop-where">'+esc(m[1])+(m[2]==='v'?' · Visited':' · On our route')+'</p>'+(m[3]?'<p class="pop-best"><b>Best for:</b> '+esc(m[3])+'</p>':'');
+ var html='<h3>'+esc(m[0])+'</h3><p class="pop-where">'+esc(m[1])+(m[2]==='v'?' · Visited':' · On our route')+'</p>'+(m[3]?'<p class="pop-best"><b>Best for:</b> '+esc(m[3])+'</p>':'')+(LISTING[m[0]]?'<p style="margin:6px 0 0"><a href="'+LISTING[m[0]]+'">See the listing</a></p>':'');
  var mk=L.marker(ll,{icon:icon,title:m[0],zIndexOffset:m[2]==='v'?500:0}).bindPopup(html);
  mk._s=m[2];markers[i]=mk;mk.addTo(map);bounds.push(ll);
 });
