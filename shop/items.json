@@ -171,6 +171,15 @@
    "shippable": false
   },
   {
+   "id": "SH-0039",
+   "title": "Glass cat decanter",
+   "category": "Glassware",
+   "price": 28.0,
+   "dealer": "shantiques",
+   "photo": "img/SH-0039.jpg",
+   "shippable": false
+  },
+  {
    "id": "SH-0040",
    "title": "House trinket shelf (decor shown sold separately)",
    "category": "Decor",
@@ -198,12 +207,39 @@
    "shippable": false
   },
   {
+   "id": "SH-0051",
+   "title": "Fine China of Japan Jacqueline gravy boat",
+   "category": "Glassware",
+   "price": 18.0,
+   "dealer": "shantiques",
+   "photo": "img/SH-0051.jpg",
+   "shippable": false
+  },
+  {
    "id": "SH-0052",
    "title": "Owl trivet",
    "category": "Decor",
    "price": 15.0,
    "dealer": "shantiques",
    "photo": "img/SH-0052.jpg",
+   "shippable": false
+  },
+  {
+   "id": "SH-0053",
+   "title": "Fine China Japan Jacqueline large platter",
+   "category": "Glassware",
+   "price": 28.0,
+   "dealer": "shantiques",
+   "photo": "img/SH-0053.jpg",
+   "shippable": false
+  },
+  {
+   "id": "SH-0054",
+   "title": "Fine China Japan Jacqueline serving dish",
+   "category": "Glassware",
+   "price": 22.0,
+   "dealer": "shantiques",
+   "photo": "img/SH-0054.jpg",
    "shippable": false
   },
   {
@@ -231,6 +267,51 @@
    "price": 30.0,
    "dealer": "shantiques",
    "photo": "img/SH-0057.jpg",
+   "shippable": false
+  },
+  {
+   "id": "SH-0085",
+   "title": "Hand painted basin from 1945",
+   "category": "Decor",
+   "price": 35.0,
+   "dealer": "shantiques",
+   "photo": "img/SH-0085.jpg",
+   "shippable": false
+  },
+  {
+   "id": "SH-0086",
+   "title": "Fenton hobnail bowl",
+   "category": "Glassware",
+   "price": 32.0,
+   "dealer": "shantiques",
+   "photo": "img/SH-0086.jpg",
+   "shippable": false
+  },
+  {
+   "id": "SH-0087",
+   "title": "Fenton hobnail basket small",
+   "category": "Glassware",
+   "price": 45.0,
+   "dealer": "shantiques",
+   "photo": "img/SH-0087.jpg",
+   "shippable": false
+  },
+  {
+   "id": "SH-0088",
+   "title": "Hand painted wood duck",
+   "category": "Decor",
+   "price": 38.0,
+   "dealer": "shantiques",
+   "photo": "img/SH-0088.jpg",
+   "shippable": false
+  },
+  {
+   "id": "SH-0089",
+   "title": "Haegar Boy Planter",
+   "category": "Decor",
+   "price": 28.0,
+   "dealer": "shantiques",
+   "photo": "img/SH-0089.jpg",
    "shippable": false
   },
   {
