@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Verify your shop | Tabella</title>
+<meta name="robots" content="noindex">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Inter:wght@400;500;600&display=swap">
+<style>
+
+:root{--bg:#F4EFE6;--bg2:#EBE4D6;--ink:#231F1A;--muted:#6A6259;--line:#D5CCBA;--terra:#9A4A2E;--terra-ink:#FFF8F0;--gold:#A8842F;--card:#FBF8F2;--focus:#2F6FA8;--green:#3F6B45;--grey:#8C8478}
+@media (prefers-color-scheme:dark){:root{--bg:#1A1714;--bg2:#221E1A;--ink:#EFE8DB;--muted:#A89F90;--line:#3A342D;--terra:#D98A66;--terra-ink:#1A1714;--gold:#D2B15E;--card:#25211C;--focus:#7FB8E6;--green:#8DBE8F;--grey:#9C9486}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:17px/1.6 Inter,system-ui,sans-serif;padding-left:max(20px,env(safe-area-inset-left,0px));padding-right:max(20px,env(safe-area-inset-right,0px))}
+a{color:var(--terra)}
+.w{max-width:1040px;margin:0 auto}
+h1,h2,h3{font-family:'Cormorant Garamond',Georgia,serif;font-weight:600;line-height:1.1;margin:0;text-wrap:balance}
+.cap{font-family:Cinzel,'Times New Roman',serif;letter-spacing:.18em;text-transform:uppercase;font-size:.78rem;color:var(--gold);font-weight:600}
+
+.logo{font-family:Cinzel,serif;font-weight:600;letter-spacing:.22em;font-size:1.05rem;text-decoration:none;color:var(--ink)}
+header.top{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:20px 0;flex-wrap:wrap}nav.main{display:flex;flex-wrap:wrap;gap:4px 18px;align-items:center}nav.main a{font-size:.92rem;text-decoration:none;color:var(--muted);padding:6px 0}nav.main a:hover,nav.main a[aria-current]{color:var(--ink)}nav.main a.cta{color:var(--terra-ink);background:var(--terra);padding:7px 14px;border-radius:6px;font-weight:600}@media(max-width:640px){nav.main a.opt{display:none}}
+h1{font-size:clamp(2.4rem,5.6vw,4rem);margin:10px 0 14px}
+.lede{font-size:1.12rem;color:var(--muted);max-width:38em;margin:0 0 22px}
+a:focus-visible,button:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.pop-add{margin:8px 0 0;font-size:.85rem}.pop-hint{display:none;margin:6px 0 0;font-size:.75rem;color:var(--muted)}.pinned .pop-hint{display:block}
+
+.test{background:var(--gold);color:#1A1714;font-weight:600;font-size:.9rem;padding:9px 14px;border-radius:8px;margin:0 0 18px}
+.bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;margin:0 0 18px}
+.chips button{font:500 .85rem Inter,sans-serif;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:99px;padding:6px 14px;min-height:36px;cursor:pointer;margin:0 6px 6px 0}
+.chips button[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px;list-style:none;margin:0;padding:0}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:hidden;display:flex;flex-direction:column}
+.card button.open{all:unset;cursor:pointer;display:block}
+.card button.open:focus-visible{outline:2px solid var(--focus);outline-offset:-2px}
+.ph{aspect-ratio:1/1;background:var(--bg2);overflow:hidden}.ph img{width:100%;height:100%;object-fit:cover;display:block}
+.cb{padding:12px 14px 14px;display:flex;flex-direction:column;gap:4px;flex:1}
+.cb h3{font-size:1.2rem}
+.meta{font-size:.82rem;color:var(--muted)}
+.price{font-weight:600;font-size:1.05rem}
+.btn{font:600 .92rem Inter,sans-serif;border:0;border-radius:8px;padding:10px 16px;min-height:44px;cursor:pointer;background:var(--terra);color:var(--terra-ink)}
+.btn.sec{background:var(--card);color:var(--ink);border:1px solid var(--line)}
+.btn[disabled]{opacity:.55;cursor:not-allowed}
+.soonb{display:inline-block;align-self:flex-start;font-size:.75rem;font-weight:600;color:var(--muted);border:1px solid var(--line);border-radius:99px;padding:2px 9px}
+.cartbtn{position:sticky;top:10px;z-index:5}
+dialog{border:0;border-radius:14px;padding:0;max-height:92vh;overflow:auto;max-width:min(560px,94vw);width:100%;background:var(--card);color:var(--ink);box-shadow:0 20px 60px rgba(0,0,0,.35)}
+dialog::backdrop{background:rgba(20,16,12,.55)}
+.dlg{padding:18px 20px 20px}
+.dlg img{width:100%;border-radius:8px;max-height:60vh;object-fit:contain;background:var(--bg2)}
+.x{float:right;background:none;border:0;font-size:1.6rem;line-height:1;cursor:pointer;color:var(--muted);min-width:44px;min-height:44px}
+.rm{background:none;border:0;color:var(--terra);font:500 .85rem Inter,sans-serif;cursor:pointer;min-height:36px;text-decoration:underline}
+label{display:block;font-size:.85rem;margin:8px 0 2px}
+input{font:inherit;width:100%;padding:9px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)}
+.row2{display:grid;grid-template-columns:2fr 1fr 1fr;gap:8px}
+.line{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid var(--line)}
+.rate{display:flex;gap:10px;align-items:center;border:1px solid var(--line);border-radius:8px;padding:9px 12px;margin:6px 0;cursor:pointer}
+.rate input{width:auto}
+.msg{border-radius:8px;padding:10px 12px;margin:10px 0;font-size:.92rem}.msg.err{background:#F6E2DC;color:#7A2A17}.msg.ok{background:#E3EEDF;color:#264B2B}
+.empty{color:var(--muted);padding:20px 0}
+footer{padding:36px 0 48px;border-top:1px solid var(--line);margin-top:48px;font-size:.88rem;color:var(--muted);display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px}
+.tabs{display:flex;gap:6px;margin:6px 0 12px}
+.tabs button{font:600 .92rem Inter,sans-serif;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:99px;padding:8px 16px;min-height:40px;cursor:pointer}
+.tabs button[aria-selected="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px 18px;max-width:560px}
+#setup{max-width:none}
+.step{display:flex;gap:12px;align-items:center;padding:10px 0;border-top:1px solid var(--line)}
+.step .dot{width:22px;height:22px;border-radius:50%;border:2px solid var(--line);flex:none}
+.step.done .dot{background:var(--green);border-color:var(--green);box-shadow:inset 0 0 0 4px var(--card)}
+.row3{display:grid;grid-template-columns:2fr 1fr 1fr;gap:8px}
+#dims.row3{grid-template-columns:1fr 1fr 1fr;margin-top:8px}
+#dims[hidden]{display:none}
+.items{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+.it .itb{all:unset;box-sizing:border-box;cursor:pointer;display:flex;gap:12px;align-items:center;width:100%;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px}
+.it .itb:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.it img{width:72px;height:72px;object-fit:cover;border-radius:8px;background:var(--bg2);flex:none}
+.itt{display:flex;flex-direction:column;gap:3px;min-width:0}
+.pill{align-self:flex-start;font-size:.75rem;font-weight:600;border-radius:99px;padding:2px 9px;border:1px solid var(--line)}
+.pill.ok{background:#E3EEDF;color:#264B2B;border-color:#C9DEC2}.pill.warn{background:#FBF0D9;color:#6B4A10;border-color:#EBD7A8}.pill.sold{background:var(--ink);color:var(--bg);border-color:var(--ink)}.pill.off{color:var(--muted)}
+.photo{position:relative;border:2px dashed var(--line);border-radius:10px;min-height:170px;display:flex;align-items:center;justify-content:center;text-align:center;overflow:hidden;background:var(--bg)}
+.photo input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.photo img{max-height:260px;width:100%;object-fit:contain}
+#photoEmpty{display:flex;flex-direction:column;gap:4px;padding:20px}
+.money{display:flex;align-items:center;border:1px solid var(--line);border-radius:8px;background:var(--bg);padding-left:10px}.money input{border:0;background:transparent}
+select{font:inherit;width:100%;padding:9px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)}
+fieldset{border:1px solid var(--line);border-radius:10px;margin:12px 0 4px;padding:6px 12px 12px}legend{font-weight:600;padding:0 4px}
+.lbl{font-size:.85rem;margin:8px 0 4px}
+.boxsz{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.boxsz button{font:600 .9rem Inter,sans-serif;padding:8px 2px;min-height:52px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px}
+.boxsz button small{font-weight:400;font-size:.7rem;opacity:.75}
+.boxsz button[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.check{display:flex;gap:10px;align-items:center;margin:12px 0 0;font-size:.95rem}.check input{width:20px;height:20px}
+.row2{grid-template-columns:1fr 1fr}
+#photoEmpty[hidden],.photo img[hidden]{display:none}
+dialog{max-height:calc(100dvh - 24px);max-height:calc(100vh - 24px)}
+@supports (height:100dvh){dialog{max-height:calc(100dvh - 24px)}}
+@media(max-width:600px){dialog{max-width:100vw;width:100vw;margin:0;border-radius:0;height:100dvh;max-height:100dvh}}
+.dlg{padding-bottom:0}
+.dlgfoot{position:sticky;bottom:0;background:var(--card);display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:12px 0 calc(12px + env(safe-area-inset-bottom,0px));margin-top:12px;border-top:1px solid var(--line);z-index:2}
+.dlgfoot:has(#soldBtn[hidden]) #saveBtn{grid-column:1/-1}
+.scan{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-top:8px;display:grid;gap:4px;background:var(--bg)}
+.linkbtn{background:none;border:0;padding:0;color:var(--terra);font:500 .92rem Inter,sans-serif;text-decoration:underline;cursor:pointer;min-height:32px}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-bottom:12px}
+.stats div{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:2px}
+.stats b{font-size:1.25rem}
+#salesBar[hidden],#invBar[hidden]{display:none}
+
+.tabs button[aria-checked="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+textarea{font:inherit;width:100%;padding:9px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);resize:vertical}
+#cf[hidden],#done[hidden]{display:none}
+#cf,#done{max-width:620px}
+</style>
+</head>
+<body>
+<div class="w">
+<header class="top"><a class="logo" href="../">TABELLA</a><nav class="main" aria-label="Main"><a class="opt" href="../#shoppers">Shoppers</a><a class="opt" href="../#dealers">Dealers</a><a class="opt" href="../#malls">Malls</a><a href="../shop/">Shop</a><a href="../map.html">Mall map</a><a class="opt" href="../road-trip-1.html">Road trips</a><a class="opt" href="../pricing.html">Pricing</a><a class="cta" href="../#early">Early access</a></nav></header>
+<main>
+<div class="cap">For shop owners</div>
+<h1 id="h">Verify your shop</h1>
+<p class="lede" id="lede">Confirm your listing on the Tabella mall map and add your website, free. We check every request with the shop before it shows as verified, usually within two business days.</p>
+
+<form id="cf" class="panel" novalidate>
+ <fieldset><legend>Your shop</legend>
+  <label for="sName">Shop name</label><input id="sName" maxlength="90" autocomplete="organization">
+  <label for="sTown">Town, with state</label><input id="sTown" maxlength="60" placeholder="Nixa, MO">
+  <label for="sAddr">Street address <span class="meta" id="addrNote">optional</span></label><input id="sAddr" maxlength="140" autocomplete="street-address" placeholder="423 W South St">
+  <label for="sWeb">Shop website <span class="meta">shown on the map</span></label><input id="sWeb" maxlength="200" inputmode="url" placeholder="yourshop.com">
+  <label for="sPhone">Shop phone <span class="meta">optional, shown on the map</span></label><input id="sPhone" maxlength="30" inputmode="tel">
+ </fieldset>
+ <fieldset><legend>You</legend>
+  <label for="oName">Your name</label><input id="oName" maxlength="80" autocomplete="name">
+  <label for="oRole">Your role</label><select id="oRole"><option>Owner</option><option>Manager</option><option>Staff</option><option>Booth dealer</option><option>Other</option></select>
+  <label for="oEmail">Email <span class="meta">private, so we can reply</span></label><input id="oEmail" type="email" maxlength="120" autocomplete="email">
+  <label for="oPhone">Your phone <span class="meta">optional, private</span></label><input id="oPhone" maxlength="30" inputmode="tel" autocomplete="tel">
+  <label for="note">Anything we should know? <span class="meta">optional</span></label><textarea id="note" rows="3" maxlength="600" placeholder="Hours, booth openings, a correction..."></textarea>
+ </fieldset>
+ <label style="position:absolute;left:-9999px" aria-hidden="true">Leave this empty<input id="hp" tabindex="-1" autocomplete="off"></label>
+ <button class="btn" type="submit" id="go" style="width:100%;margin-top:14px">Send for verification</button>
+ <div id="m" aria-live="polite"></div>
+ <p class="meta" style="margin:12px 0 0">Your email and phone are only used to confirm the listing with you. See our <a href="../privacy.html">privacy page</a>.</p>
+</form>
+<div id="done" class="panel" hidden>
+ <h2 style="font-size:1.6rem;margin:0 0 6px">Thank you</h2>
+ <p style="margin:0">We will check with the shop and email you when your listing shows as verified. Questions? Write to contact@tabellasuite.com.</p>
+ <p style="margin:14px 0 0"><a href="../map.html">Back to the mall map</a></p>
+</div>
+</main>
+<footer><span>&copy; <span id="y"></span> Tabella Suite &middot; <a href="mailto:contact@tabellasuite.com">contact@tabellasuite.com</a></span><span><a href="../pricing.html">Pricing</a> &middot; <a href="../privacy.html">Privacy</a></span></footer>
+</div>
+
+<script>
+(function(){
+var API='https://tabella-shipping.shawn-greene1981.workers.dev',$=function(i){return document.getElementById(i)};
+function esc(t){return String(t==null?'':t).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
+function msg(t,bad){$('m').innerHTML=t?'<div class="msg '+(bad?'err':'ok')+'">'+esc(t)+'</div>':''}
+var q=new URLSearchParams(location.search),T={id:q.get('id')||'',lat:q.get('lat'),lon:q.get('lon')};
+$('sName').value=q.get('name')||'';$('sTown').value=q.get('town')||'';$('sAddr').value=q.get('addr')||'';
+var isNew=!T.id;
+if(isNew){$('h').textContent='Add your shop';$('lede').textContent='Put your antique mall or shop on the Tabella mall map, free. We check every request with the shop before it is added, usually within two business days.';$('addrNote').textContent='needed to place your pin';$('go').textContent='Send to add my shop'}
+else if($('sName').value){$('sName').readOnly=true;$('lede').innerHTML='Confirm <b>'+esc($('sName').value)+'</b> on the Tabella mall map and add your website, free. We check every request with the shop before it shows as verified, usually within two business days.'}
+$('cf').onsubmit=function(e){e.preventDefault();var b=$('go');
+  var town=$('sTown').value.trim().replace(/\s*,\s*/,', ').replace(/, ([a-z]{2})$/i,function(_,s){return ', '+s.toUpperCase()});
+  var body={hp:$('hp').value,target:{id:T.id,name:$('sName').value,town:town,addr:$('sAddr').value,lat:T.lat,lon:T.lon},
+    owner:{name:$('oName').value,role:$('oRole').value,email:$('oEmail').value,phone:$('oPhone').value},website:$('sWeb').value,shopPhone:$('sPhone').value,note:$('note').value};
+  b.disabled=true;msg('');
+  fetch(API+'/trip/claim',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(function(r){return r.json().then(function(d){if(!r.ok)throw new Error(d.error||'That did not send.');return d})})
+  .then(function(){$('cf').hidden=true;$('done').hidden=false;scrollTo(0,0)}).catch(function(err){msg(err.message,1)}).then(function(){b.disabled=false})};
+var y=$('y');if(y)y.textContent=new Date().getFullYear();
+})();
+</script>
+</body>
+</html>

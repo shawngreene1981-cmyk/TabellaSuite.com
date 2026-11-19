@@ -24,6 +24,7 @@ header.top{display:flex;justify-content:space-between;align-items:center;gap:16p
 h1{font-size:clamp(2.4rem,5.6vw,4rem);margin:10px 0 14px}
 .lede{font-size:1.12rem;color:var(--muted);max-width:38em;margin:0 0 22px}
 a:focus-visible,button:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.pop-add{margin:8px 0 0;font-size:.85rem}.pop-hint{display:none;margin:6px 0 0;font-size:.75rem;color:var(--muted)}.pinned .pop-hint{display:block}
 
 .test{background:var(--gold);color:#1A1714;font-weight:600;font-size:.9rem;padding:9px 14px;border-radius:8px;margin:0 0 18px}
 .bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;margin:0 0 18px}
@@ -106,7 +107,7 @@ dialog{max-height:calc(100dvh - 24px);max-height:calc(100vh - 24px)}
 
 .tabs button[aria-checked="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
 textarea{font:inherit;width:100%;padding:9px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);resize:vertical}
-#newRow[hidden],#visRow[hidden],#keyForm[hidden],#shopForm[hidden],#recent[hidden]{display:none}
+#newRow[hidden],#visRow[hidden],#keyForm[hidden],#shopForm[hidden],#recent[hidden],#claims[hidden]{display:none}
 #shopForm,#keyForm{max-width:620px}
 </style>
 </head>
@@ -146,6 +147,13 @@ textarea{font:inherit;width:100%;padding:9px 10px;border:1px solid var(--line);b
  <button class="btn" id="saveBtn" type="submit" style="width:100%;margin-top:14px">Save to the map</button>
  <div id="saveMsg" aria-live="polite"></div>
 </form>
+
+<section id="claims" hidden style="margin-top:26px">
+ <h2 style="font-size:1.5rem">Listing claims <span class="meta" id="claimCount"></span></h2>
+ <p class="meta" style="margin:0 0 10px">Shop owners asking to verify a listing or add their shop. Call the shop's public number or check their website before you approve.</p>
+ <ul class="items" id="claimList"></ul>
+ <details style="margin-top:12px"><summary class="meta" style="cursor:pointer">Past decisions</summary><ul class="items" id="claimPast" style="margin-top:8px"></ul></details>
+</section>
 
 <section id="recent" hidden style="margin-top:26px">
  <h2 style="font-size:1.5rem">Your saved notes</h2>
@@ -200,8 +208,23 @@ $('shopForm').onsubmit=function(e){e.preventDefault();var v=$('fShop').value,bod
 $('keyForm').onsubmit=function(e){e.preventDefault();key=$('kIn').value.trim();if(!key)return;
   call('/trip/check',{}).then(function(){try{localStorage.setItem('tabAdmin',key)}catch(e){}start()}).catch(function(err){key='';msg('keyMsg',err.message,1)})};
 $('forget').onclick=function(){try{localStorage.removeItem('tabAdmin')}catch(e){}location.reload()};
+function drawClaims(list){var pend=list.filter(function(c){return c.status==='pending'}),past=list.filter(function(c){return c.status!=='pending'});
+  $('claims').hidden=!list.length;$('claimCount').textContent=pend.length?'('+pend.length+' waiting)':'';
+  $('claimList').innerHTML=pend.length?pend.map(function(c){var t=c.target,o=c.owner;return '<li class="panel" style="max-width:none" data-claim="'+c.id+'"><b>'+esc(t.name)+'</b> · '+esc(t.town)+(t.id==='new'?' <span class="pill warn">New shop</span>':'')+
+    '<div class="meta">'+esc(t.addr||'')+'</div><div style="margin-top:8px">'+esc(o.name)+(o.role?' ('+esc(o.role)+')':'')+' · <a href="mailto:'+esc(o.email)+'">'+esc(o.email)+'</a>'+(o.phone?' · '+esc(o.phone):'')+'</div>'+
+    (c.shopPhone?'<div class="meta">Shop phone: '+esc(c.shopPhone)+'</div>':'')+(c.note?'<div class="meta">Note: '+esc(c.note)+'</div>':'')+
+    '<label>Website to show</label><input data-web value="'+esc(c.website||'')+'" placeholder="none">'+
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px"><button type="button" class="btn" data-act="approve" data-mail="1">Approve and email owner</button><button type="button" class="btn sec" data-act="approve">Approve, no email</button><button type="button" class="btn sec" data-act="decline">Decline</button></div><div data-msg aria-live="polite"></div></li>'}).join(''):'<li class="empty">Nothing waiting.</li>';
+  $('claimPast').innerHTML=past.map(function(c){return '<li class="meta">'+esc(c.target.name)+', '+esc(c.target.town)+' · '+esc(c.status)+' '+new Date(c.decided||c.created).toLocaleDateString()+'</li>'}).join('')}
+function loadClaims(){call('/trip/claims').then(function(d){drawClaims(d.claims||[])}).catch(function(){})}
+$('claimList').onclick=function(e){var b=e.target.closest('[data-act]');if(!b)return;var li=b.closest('[data-claim]'),id=li.getAttribute('data-claim'),m=li.querySelector('[data-msg]');
+  var body={action:b.getAttribute('data-act'),emailOwner:!!b.getAttribute('data-mail'),website:li.querySelector('[data-web]').value};
+  if(body.action==='approve'&&body.emailOwner&&!confirm('Approve and email the owner that their listing is verified?'))return;
+  [].forEach.call(li.querySelectorAll('button'),function(x){x.disabled=true});
+  call('/trip/claims/'+id,body).then(function(d){if(d.shop){SAVED=SAVED.filter(function(s){return s.id!==d.shop.id}).concat([d.shop]);fillSelect();drawSaved()}loadClaims()})
+  .catch(function(err){m.innerHTML='<div class="msg err">'+esc(err.message)+'</div>';[].forEach.call(li.querySelectorAll('button'),function(x){x.disabled=false})})};
 function start(){$('keyForm').hidden=true;$('shopForm').hidden=false;
-  Promise.all([loadBase(),call('/trip/shops').then(function(d){SAVED=d.shops||[]})]).then(function(){fillSelect();drawSaved()}).catch(function(err){msg('saveMsg','Could not load the shop list: '+err.message,1)})}
+  Promise.all([loadBase(),call('/trip/shops').then(function(d){SAVED=d.shops||[]})]).then(function(){fillSelect();drawSaved();loadClaims()}).catch(function(err){msg('saveMsg','Could not load the shop list: '+err.message,1)})}
 document.getElementById('y')&&(document.getElementById('y').textContent=new Date().getFullYear());
 if(key)start();else $('keyForm').hidden=false;
 })();

@@ -85,3 +85,6 @@ export function resetEmail(link) {
       '<p style="font-size:14px;color:#6A6259">If you didn’t ask for this, ignore this email. Your password stays the same.</p>'),
     text: 'Reset your Tabella password (link works for one hour):\n' + link + '\n\nIf you did not ask for this, ignore this email.' };
 }
+
+// A short plain note in the Tabella email style. Paragraphs are trusted HTML built by the caller (escape user text first).
+export function noteEmail(title, paras) { return wrap(title, paras.filter(Boolean).map(p => '<p style="margin:0 0 12px">' + p + '</p>').join('')); }

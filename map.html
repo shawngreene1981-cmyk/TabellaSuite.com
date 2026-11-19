@@ -60,6 +60,36 @@ section h2{font-size:clamp(1.8rem,4vw,2.6rem);margin:8px 0 18px}
 .claim{background:var(--bg2);border-radius:10px;padding:22px 24px;margin-top:8px}
 .claim p{margin:0}
 footer{padding:36px 0 48px;border-top:1px solid var(--line);margin-top:48px;font-size:.88rem;color:var(--muted);display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px}
+
+.finder{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px 18px;margin:0 0 16px}
+.finder .tabs{display:flex;gap:6px;margin:0 0 12px;flex-wrap:wrap}
+.finder .tabs button{font:600 .9rem Inter,sans-serif;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:99px;padding:7px 16px;min-height:40px;cursor:pointer}
+.finder .tabs button[aria-selected="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end}
+.row label{display:flex;flex-direction:column;gap:3px;font-size:.82rem;color:var(--muted);flex:1 1 200px}
+.row label.sm{flex:0 0 130px}
+.row input,.row select{font:inherit;font-size:1rem;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:9px 10px;min-height:44px;width:100%}
+.b{font:600 .95rem Inter,sans-serif;border-radius:8px;padding:10px 18px;min-height:44px;cursor:pointer;border:1px solid var(--terra);background:var(--terra);color:var(--terra-ink)}
+.b.sec{background:var(--card);color:var(--ink);border-color:var(--line)}
+.b:disabled{opacity:.6;cursor:wait}
+#fMsg{font-size:.9rem;margin:10px 0 0;color:var(--muted)}#fMsg.err{color:#A3361B}
+[hidden]{display:none!important}
+.dot.o{background:var(--card);border:2px solid var(--terra)}.dot.ok{background:var(--gold)}
+.pin.o{background:#FBF8F2;border:2px solid #9A4A2E;width:11px;height:11px}
+.pin.ok{background:#A8842F;width:16px;height:16px}
+.pin.stop{outline:3px solid rgba(47,111,168,.55)}
+.badge{display:inline-block;font-size:.72rem;font-weight:600;background:#F3E7C4;color:#5E4710;border-radius:99px;padding:1px 8px;margin-left:4px;vertical-align:2px}
+.pop-src{font-size:.75rem;color:#6A6259;margin:6px 0 0}
+#trip{margin-top:18px}
+#trip h2{font-size:clamp(1.6rem,3.6vw,2.2rem);margin:4px 0 6px}
+.stops{list-style:none;margin:12px 0;padding:0;display:grid;gap:8px}
+.stops li{display:flex;gap:10px;align-items:flex-start;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.stops input{width:22px;height:22px;margin-top:2px;flex:none}
+.stops .mi{font-size:.8rem;color:var(--muted);white-space:nowrap;margin-left:auto;text-align:right}
+.stops b{font-weight:600}.stops .sub{font-size:.85rem;color:var(--muted)}
+.stops button.nm{all:unset;cursor:pointer}.stops button.nm:hover b{color:var(--terra)}
+.tripbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;position:sticky;bottom:0;background:var(--bg);padding:10px 0;border-top:1px solid var(--line)}
+#zoomHint{font-size:.85rem;color:var(--muted);margin:8px 0 0}
 </style>
 </head>
 <body>
@@ -67,17 +97,42 @@ footer{padding:36px 0 48px;border-top:1px solid var(--line);margin-top:48px;font
 <header class="top"><a class="logo" href="./">TABELLA</a><nav class="main" aria-label="Main"><a class="opt" href="./#shoppers">Shoppers</a><a class="opt" href="./#dealers">Dealers</a><a class="opt" href="./#malls">Malls</a><a href="shop/">Shop</a><a href="map.html" aria-current="page">Mall map</a><a class="opt" href="road-trip-1.html">Road trips</a><a class="opt" href="pricing.html">Pricing</a><a class="cta" href="./#early">Early access</a></nav></header>
 
 <main>
-<div class="cap">Preferred Buyer road trips</div>
+<div class="cap">Antique malls near you and on your way</div>
 <h1>The mall map</h1>
-<p class="lede">Every antique mall and vintage shop on our road trips (read <a href="road-trip-1.html">Road Trip No. 1</a>). We shop each one as regular buyers, then share what it is best for. Green pins are shops we have visited; grey pins are on our route, including our next trip: <a href="#springfield" id="sgfLink">Springfield, Missouri and the Ozarks</a>.</p>
+<p class="lede">Find antique malls anywhere in the US, or plan a road trip from one place to another and see every shop along the way. Green pins are shops we have visited and written up; gold pins are verified by the shop itself.</p>
+
+<div class="finder">
+ <div class="tabs" role="tablist"><button type="button" role="tab" id="tFind" aria-selected="true">Find shops</button><button type="button" role="tab" id="tTrip" aria-selected="false">Plan a road trip</button></div>
+ <form id="findForm" class="row" novalidate>
+  <label>Town, address or ZIP<input id="q" autocomplete="address-level2" placeholder="Nixa, MO"></label>
+  <button class="b" type="submit">Find</button><button class="b sec" type="button" id="nearBtn">Near me</button>
+ </form>
+ <form id="tripForm" class="row" novalidate hidden>
+  <label>Starting from<input id="from" placeholder="Springfield, MO"></label>
+  <label>Going to<input id="to" placeholder="Knoxville, TN"></label>
+  <label class="sm">Shops within<select id="mi"><option value="5">5 miles</option><option value="10" selected>10 miles</option><option value="20">20 miles</option><option value="30">30 miles</option></select></label>
+  <button class="b" type="submit" id="tripBtn">Plan trip</button>
+ </form>
+ <p id="fMsg" aria-live="polite"></p>
+</div>
 
 <div class="legend">
  <span><span class="dot v"></span><span id="nv">12</span> visited</span>
- <span><span class="dot r"></span><span id="nr">43</span> on our route</span>
- <span class="filters" role="group" aria-label="Area" id="areas"><button type="button" data-a="all" aria-pressed="true">Everywhere</button><button type="button" data-a="se" aria-pressed="false">Kentucky to the Carolinas</button><button type="button" data-a="mo" aria-pressed="false">Springfield, Missouri</button></span>
- <span class="filters" role="group" aria-label="Show" id="shows"><button type="button" data-f="all" aria-pressed="true">All</button><button type="button" data-f="v" aria-pressed="false">Visited</button></span>
+ <span><span class="dot ok"></span>Verified by the shop</span>
+ <span><span class="dot r"></span>On our route</span>
+ <span><span class="dot o"></span>Other antique shops</span>
+ <span class="filters" role="group" aria-label="Area" id="areas"><button type="button" data-a="all" aria-pressed="true">Our trips</button><button type="button" data-a="se" aria-pressed="false">Kentucky to the Carolinas</button><button type="button" data-a="mo" aria-pressed="false">Springfield, Missouri</button></span>
 </div>
-<div id="map" role="region" aria-label="Map of malls"></div>
+<div id="map" role="region" aria-label="Map of antique malls"></div>
+<p id="zoomHint">Zoom in on any area, or search above, to see every antique shop there.</p>
+
+<div id="trip" hidden>
+ <div class="cap" id="tripCap">Your road trip</div>
+ <h2 id="tripH"></h2>
+ <p class="lede" style="margin:0" id="tripSub"></p>
+ <ul class="stops" id="stops"></ul>
+ <div class="tripbar"><a class="b" id="gmaps" target="_blank" rel="noopener">Open my stops in Google Maps</a><button class="b sec" type="button" id="share">Copy a link to this trip</button><span class="sub" id="pickMsg" style="font-size:.85rem;color:var(--muted)"></span></div>
+</div>
 
 <section>
 <div class="cap">Visited</div>
@@ -89,17 +144,18 @@ footer{padding:36px 0 48px;border-top:1px solid var(--line);margin-top:48px;font
 <div class="cap">On our route</div>
 <h2>Shops we have not visited yet</h2>
 <ul class="plain" id="route"></ul>
-<div class="claim" style="margin-top:28px"><p><b>Is this your shop?</b> Your listing on Tabella is free. Write to <a href="mailto:contact@tabellasuite.com">contact@tabellasuite.com</a> to claim it, correct it, or ask us to take it down.</p></div>
+<div class="claim" style="margin-top:28px"><p><b>Is this your shop?</b> Your listing on Tabella is free. Find it on the map and choose <b>Verify this shop</b> to confirm it and add your website. Not on the map? <a href="claim/">Add your shop</a>.</p></div>
 </section>
 </main>
 
-<footer><span>&copy; <span id="y"></span> Tabella Suite &middot; <a href="mailto:contact@tabellasuite.com">contact@tabellasuite.com</a> &middot; Map data &copy; OpenStreetMap contributors. Pins are placed by town.</span><span><a href="pricing.html">Pricing</a> &middot; <a href="privacy.html">Privacy</a></span></footer>
+<footer><span>&copy; <span id="y"></span> Tabella Suite &middot; <a href="mailto:contact@tabellasuite.com">contact@tabellasuite.com</a> &middot; Map and shop data &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors. Routes by OSRM. Shops from OpenStreetMap are not checked by us; call ahead.</span><span><a href="shop/">Shop</a> &middot; <a href="dealer/">Dealer sign-in</a> &middot; <a href="pricing.html">Pricing</a> &middot; <a href="privacy.html">Privacy</a></span></footer>
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
 <script>
 (function(){
-// Pins sit at the town, not the street address. s: v = visited, r = on our route.
+var API='https://tabella-shipping.shawn-greene1981.workers.dev';
+// Our own trip shops. Pins sit at the town until we learn the exact spot. s: v = visited, r = on our route.
 var T={
  'Paducah, KY':[37.0834,-88.6000],'Eddyville, KY':[37.0945,-88.0803],'Clarksville, TN':[36.5298,-87.3595],
  'Nashville, TN':[36.1180,-86.7620],'Goodlettsville, TN':[36.3231,-86.7133],'Greenbrier, TN':[36.4273,-86.8044],
@@ -141,59 +197,132 @@ var M=[
  ['Ozark Antiques & Collectibles','Ozark, MO','r'],['The BARN Flea Market','Ozark, MO','r'],['Sweetpea’s Vintage & More','Ozark, MO','r']
 ];
 var LISTING={"Miss Lucille\u2019s Marketplace": "shops/miss-lucilles-marketplace-clarksville-tn.html", "Antiques on 231": "shops/antiques-on-231-lebanon-tn.html", "Cloud 9 Antiques & Such": "shops/cloud-9-antiques-and-such-lebanon-tn.html", "Ms. Rhonda\u2019s Antiques and More": "shops/ms-rhondas-antiques-and-more-greenbrier-tn.html", "Appalachian Antique Mall": "shops/appalachian-antique-mall-boone-nc.html", "Antiques on Howard": "shops/antiques-on-howard-boone-nc.html", "Front Porch Antique Market": "shops/front-porch-antique-market-foscoe-nc.html", "Antiques Main": "shops/antiques-main-blowing-rock-nc.html", "The Depot at Gibson Mill": "shops/the-depot-at-gibson-mill-concord-nc.html", "Antebellum Marketplace": "shops/antebellum-marketplace-indian-trail-nc.html", "A Hidden Treasure": "shops/a-hidden-treasure-monroe-nc.html", "Affordable Treasures": "shops/affordable-treasures-paducah-ky.html"};
-function esc(s){return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
-document.getElementById('y').textContent=new Date().getFullYear();
-// Notes saved from tabellasuite.com/trip/ (visited, best for, new shops) are merged in here.
-function addUrl(m){return './?shop='+encodeURIComponent(m[0]+', '+m[1])+'#early'}
+var $=function(i){return document.getElementById(i)};
+function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
 function slug(t){return t.toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,120)}
-function merge(list){var ix={};M.forEach(function(m,i){ix[slug(m[0]+' '+m[1])]=i});
- (list||[]).forEach(function(e){var i=ix[e.id];if(e.ll&&!T[e.town])T[e.town]=e.ll;if(!T[e.town])return;
-  if(i==null){if(e.s!=='x')M.push([e.name,e.town,e.s,e.best||''])}else{M[i]=[e.name,e.town,e.s,e.best||M[i][3]||'']}});
- M=M.filter(function(m){return m[2]!=='x'})}
-var done=false;function go(list){if(done)return;done=true;try{merge(list)}catch(e){}draw()}
-fetch('https://tabella-shipping.shawn-greene1981.workers.dev/trip/shops').then(function(r){return r.json()}).then(function(d){go(d.shops)}).catch(function(){go([])});
-setTimeout(function(){go([])},3000);
-function draw(){
+function core(n){return n.toLowerCase().normalize('NFKD').replace(/&/g,' and ').replace(/[^a-z0-9 ]+/g,' ').split(/\s+/).filter(function(w){return w&&!/^(the|and|antiques?|mall|market(place)?|vintage|co|llc|inc|shoppes?|shops?|store|of|at)$/.test(w)}).join(' ')}
+function hav(a,b){var R=3958.8,r=Math.PI/180,x=(b[0]-a[0])*r,y=(b[1]-a[1])*r,h=Math.sin(x/2)*Math.sin(x/2)+Math.cos(a[0]*r)*Math.cos(b[0]*r)*Math.sin(y/2)*Math.sin(y/2);return 2*R*Math.asin(Math.sqrt(h))}
+function host(u){return String(u||'').replace(/^https?:\/\//,'').replace(/\/$/,'')}
+function claimUrl(p){var q={id:p.id,name:p.name,town:p.town||'',addr:/\d/.test(p.addr||'')?p.addr:''};if(p.exact){q.lat=p.ll[0];q.lon=p.ll[1]}
+  return 'claim/?'+Object.keys(q).filter(function(k){return q[k]!==''&&q[k]!=null}).map(function(k){return k+'='+encodeURIComponent(q[k])}).join('&')}
+function dirUrl(p){return 'https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(p.name+' '+(p.addr||p.town||p.ll.join(',')))}
+$('y').textContent=new Date().getFullYear();
 
-var nv=0,nr=0,vis=document.getElementById('visited'),rt=document.getElementById('route');
-M.forEach(function(m,i){
- if(m[2]==='v'){nv++;var li=document.createElement('li');
-  li.innerHTML='<button type="button" data-i="'+i+'"><h3>'+esc(m[0])+'</h3></button><div class="where">'+esc(m[1])+'</div><p><b>Best for:</b> '+esc(m[3])+'</p>'+(LISTING[m[0]]?'<p style="margin-top:8px"><a href="'+LISTING[m[0]]+'">See the listing &rarr;</a></p>':'');vis.appendChild(li)}
- else{nr++;var r=document.createElement('li');r.innerHTML='<b>'+esc(m[0])+'</b> · '+esc(m[1]);rt.appendChild(r)}
-});
-document.getElementById('nv').textContent=nv;document.getElementById('nr').textContent=nr;
-if(!window.L){document.getElementById('map').innerHTML='<p style="padding:20px;color:var(--muted)">The map could not load. Every shop is listed below.</p>';return}
-var map=L.map('map',{scrollWheelZoom:false});
-L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:17,attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'}).addTo(map);
-var seen={},markers=[],bounds=[],pinned=null;
-function pin(mk){pinned=null;map.closePopup();mk._pop.options.autoPan=true;map.openPopup(mk._pop);pinned=mk;mk._pop.getElement()&&mk._pop.getElement().classList.add('pinned');mk._pop.options.autoPan=false}
-map.on('popupclose',function(e){if(pinned&&e.popup===pinned._pop){var el=e.popup.getElement();el&&el.classList.remove('pinned');pinned=null}});
-M.forEach(function(m,i){
- var c=T[m[1]],n=seen[m[1]]=(seen[m[1]]||0)+1,a=n*2.4,d=n>1?0.012*Math.sqrt(n):0;
- var ll=[c[0]+d*Math.sin(a),c[1]+d*1.25*Math.cos(a)];
- var icon=L.divIcon({className:'',html:'<div class="pin '+m[2]+'"></div>',iconSize:m[2]==='v'?[16,16]:[12,12]});
- var go=LISTING[m[0]]||addUrl(m),html='<h3>'+esc(m[0])+'</h3><p class="pop-where">'+esc(m[1])+(m[2]==='v'?' · Visited':' · On our route')+'</p>'+(m[3]?'<p class="pop-best"><b>Best for:</b> '+esc(m[3])+'</p>':'')+
-  (LISTING[m[0]]?'<p style="margin:6px 0 0"><a href="'+LISTING[m[0]]+'">See the listing &rarr;</a></p>':'')+
-  '<p class="pop-add"><a href="'+addUrl(m)+'">Is this your shop? Add it to Tabella</a></p><p class="pop-hint">Click the pin again to '+(LISTING[m[0]]?'open the listing':'add this shop')+'.</p>';
- var mk=L.marker(ll,{icon:icon,title:m[0],keyboard:true,zIndexOffset:m[2]==='v'?500:0});
- mk._pop=L.popup({autoPan:false,closeButton:true,offset:[0,-4]}).setLatLng(ll).setContent(html);mk._go=go;
- mk.on('mouseover',function(){if(!pinned)map.openPopup(mk._pop)});
- mk.on('mouseout',function(){if(!pinned)map.closePopup(mk._pop)});
- mk.on('click',function(){if(pinned===mk){location.href=mk._go;return}pin(mk)});
- mk._s=m[2];markers[i]=mk;mk.addTo(map);bounds.push(ll);
-});
-map.fitBounds(bounds,{padding:[24,24]});
-function area(a){var b=[];M.forEach(function(m,i){var mo=/, MO$/.test(m[1]);if(a==='all'||(a==='mo')===mo)b.push(markers[i].getLatLng())});if(b.length)map.fitBounds(b,{padding:[30,30],maxZoom:11})}
-document.getElementById('areas').addEventListener('click',function(e){var b=e.target.closest('button');if(!b)return;
- this.querySelectorAll('button').forEach(function(x){x.setAttribute('aria-pressed',x===b?'true':'false')});area(b.getAttribute('data-a'))});
-window.addEventListener('hashchange',function(){if(/springfield/i.test(location.hash)){var mb=document.querySelector('#areas [data-a=mo]');if(mb)mb.click();document.getElementById('map').scrollIntoView({block:'center'})}});
-if(/springfield|ozarks|mo$/i.test(location.hash)){var mb=document.querySelector('#areas [data-a=mo]');if(mb)mb.click()}
-vis.addEventListener('click',function(e){var b=e.target.closest('button[data-i]');if(!b)return;var mk=markers[b.getAttribute('data-i')];
- document.getElementById('map').scrollIntoView({behavior:'smooth',block:'center'});map.setView(mk.getLatLng(),11);pin(mk)});
-document.getElementById('shows').addEventListener('click',function(e){var b=e.target.closest('button');if(!b)return;var f=b.getAttribute('data-f');
- this.querySelectorAll('button').forEach(function(x){x.setAttribute('aria-pressed',x===b?'true':'false')});
- markers.forEach(function(mk){if(f==='all'||mk._s===f){mk.addTo(map)}else{map.removeLayer(mk)}})});
-}
+// ---------- every place on the map lives in P, keyed by id
+var P={},OUR=[];
+M.forEach(function(m){var id=slug(m[0]+' '+m[1]);if(!T[m[1]])return;P[id]={id:id,name:m[0],town:m[1],s:m[2],best:m[3]||'',ll:T[m[1]].slice(),ours:true,listing:LISTING[m[0]]||''};OUR.push(id)});
+function applySaved(list){(list||[]).forEach(function(e){var p=P[e.id];
+  if(e.ll&&!T[e.town])T[e.town]=e.ll;
+  if(!p){if(e.s==='x')return;var ll=e.ll||T[e.town];if(!ll)return;p=P[e.id]={id:e.id,name:e.name,town:e.town,s:e.s,best:e.best||'',ll:ll.slice(),exact:!!e.ll,ours:e.s!=='o',listing:''};if(p.ours)OUR.push(e.id)}
+  if(e.s==='x'){p.hidden=true;return}
+  p.s=e.s||p.s;if(e.best)p.best=e.best;if(e.verified){p.verified=true;p.website=e.website||'';p.phone=e.phone||''}if(e.addr)p.addr=e.addr;
+  if(e.ll&&e.s==='o'){p.ll=e.ll.slice();p.exact=true}if(e.osm)p.osm=e.osm})}
+
+// ---------- drawing the lists for our trips
+function drawLists(){var vis=$('visited'),rt=$('route'),nv=0;vis.innerHTML='';rt.innerHTML='';
+  OUR.forEach(function(id){var p=P[id];if(!p||p.hidden)return;
+    if(p.s==='v'){nv++;var li=document.createElement('li');li.innerHTML='<button type="button" data-id="'+id+'"><h3>'+esc(p.name)+(p.verified?' <span class="badge">Verified</span>':'')+'</h3></button><div class="where">'+esc(p.town)+'</div><p><b>Best for:</b> '+esc(p.best)+'</p>'+(p.listing?'<p style="margin-top:8px"><a href="'+p.listing+'">See the listing &rarr;</a></p>':'');vis.appendChild(li)}
+    else if(p.s==='r'){var r=document.createElement('li');r.innerHTML='<b>'+esc(p.name)+'</b> · '+esc(p.town);rt.appendChild(r)}});
+  $('nv').textContent=nv}
+
+if(!window.L){$('map').innerHTML='<p style="padding:20px;color:var(--muted)">The map could not load. Our shops are listed below.</p>';}
+var map=window.L?L.map('map',{scrollWheelZoom:false}):null,pinned=null,stopIds={};
+if(map)L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:18,attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'}).addTo(map);
+function kind(p){return p.verified?'ok':p.ours?p.s:'o'}
+function popHtml(p){var k=kind(p),where=p.addr||p.town||'';
+  return '<h3>'+esc(p.name)+(p.verified?' <span class="badge">Verified</span>':'')+'</h3><p class="pop-where">'+esc(where)+(p.s==='v'?' · Visited':p.s==='r'?' · On our route':'')+'</p>'+
+  (p.best?'<p class="pop-best"><b>Best for:</b> '+esc(p.best)+'</p>':'')+(p.hours?'<p class="pop-best" style="font-size:.85rem"><b>Hours:</b> '+esc(p.hours)+'</p>':'')+
+  (p.listing?'<p style="margin:6px 0 0"><a href="'+p.listing+'">See our write-up &rarr;</a></p>':'')+
+  (p.website?'<p style="margin:6px 0 0"><a href="'+esc(p.website)+'" target="_blank" rel="noopener nofollow ugc">'+esc(host(p.website))+'</a>'+(p.phone?' · '+esc(p.phone):'')+'</p>':'')+
+  '<p style="margin:6px 0 0;font-size:.85rem"><a href="'+dirUrl(p)+'" target="_blank" rel="noopener">Directions</a></p>'+
+  (!p.verified?'<p class="pop-add"><a href="'+claimUrl(p)+'">Is this your shop? Verify it and add your website</a></p>':'')+
+  (k==='o'?'<p class="pop-src">From OpenStreetMap. Not checked by Tabella yet.</p>':'')+
+  '<p class="pop-hint">Click the pin again to '+(p.listing?'open our write-up':p.website?'visit their website':'get directions')+'.</p>'}
+function goUrl(p){return p.listing||p.website||dirUrl(p)}
+function pin(mk){pinned=null;map.closePopup();mk._pop.setContent(popHtml(mk._p));mk._pop.options.autoPan=true;map.openPopup(mk._pop);pinned=mk;var el=mk._pop.getElement();el&&el.classList.add('pinned');mk._pop.options.autoPan=false}
+if(map)map.on('popupclose',function(e){if(pinned&&e.popup===pinned._pop){var el=e.popup.getElement();el&&el.classList.remove('pinned');pinned=null}});
+function place(p){if(!map||p.hidden)return;var k=kind(p),sz=k==='o'?[11,11]:k==='r'?[12,12]:[16,16];
+  var icon=L.divIcon({className:'',html:'<div class="pin '+k+(stopIds[p.id]?' stop':'')+'"></div>',iconSize:sz});
+  if(p.mk){p.mk.setIcon(icon);p.mk.setLatLng(p.ll);return}
+  var mk=L.marker(p.ll,{icon:icon,title:p.name,keyboard:true,zIndexOffset:k==='o'?0:k==='r'?200:500});
+  mk._p=p;mk._pop=L.popup({autoPan:false,offset:[0,-4]}).setLatLng(p.ll).setContent(popHtml(p));
+  mk.on('mouseover',function(){if(!pinned){mk._pop.setLatLng(mk.getLatLng()).setContent(popHtml(p));map.openPopup(mk._pop)}});
+  mk.on('mouseout',function(){if(!pinned)map.closePopup(mk._pop)});
+  mk.on('click',function(){if(pinned===mk){window.open(goUrl(p),p.listing?'_self':'_blank');return}mk._pop.setLatLng(mk.getLatLng());pin(mk)});
+  p.mk=mk;mk.addTo(map)}
+function spread(){var seen={};OUR.forEach(function(id){var p=P[id];if(!p||p.exact||p.hidden)return;var n=seen[p.town]=(seen[p.town]||0)+1,a=n*2.4,d=n>1?0.012*Math.sqrt(n):0,c=T[p.town];p.ll=[c[0]+d*Math.sin(a),c[1]+d*1.25*Math.cos(a)]})}
+// An OpenStreetMap shop that is one of ours moves our pin to the exact spot instead of adding a second pin.
+function addOsm(list){(list||[]).forEach(function(s){if(P[s.id]||osmSeen[s.id])return;osmSeen[s.id]=1;
+  for(var id in P){var p=P[id];if(p.osm===s.id||(!p.exact&&p.name&&core(p.name)&&core(p.name)===core(s.name)&&hav(p.ll,[s.lat,s.lon])<25)){p.ll=[s.lat,s.lon];p.exact=true;p.addr=p.addr||s.addr;p.hours=s.hours;p.osm=s.id;place(p);return}}
+  var p={id:s.id,name:s.name,town:s.town,addr:s.addr,hours:s.hours,ll:[s.lat,s.lon],exact:true,s:'o',ours:false,listing:''};P[s.id]=p;place(p)})}
+var osmSeen={};
+
+// ---------- load every shop in the area being looked at (half-degree squares, cached by the server)
+var cells={},busy=0;
+function loadView(){if(!map)return;var z=map.getZoom();$('zoomHint').hidden=z>=9;if(z<9)return;
+  var b=map.getBounds(),s=Math.floor(b.getSouth()*2)/2,w=Math.floor(b.getWest()*2)/2,n=b.getNorth(),e=b.getEast(),list=[];
+  for(var la=s;la<n;la+=0.5)for(var lo=w;lo<e;lo+=0.5)list.push([la,lo]);
+  if(list.length>12)return;
+  list.forEach(function(c){var k=c.join(',');if(cells[k])return;cells[k]=1;busy++;
+    fetch(API+'/places/area?lat='+c[0]+'&lon='+c[1]).then(function(r){return r.json()}).then(function(d){if(d.shops)addOsm(d.shops);else cells[k]=0})
+    .catch(function(){cells[k]=0}).then(function(){busy--})})}
+if(map)map.on('moveend',loadView);
+
+// ---------- search and near me
+function msg(t,bad){$('fMsg').textContent=t||'';$('fMsg').className=bad?'err':''}
+function tab(trip){$('tFind').setAttribute('aria-selected',!trip);$('tTrip').setAttribute('aria-selected',trip);$('findForm').hidden=trip;$('tripForm').hidden=!trip;msg('')}
+$('tFind').onclick=function(){tab(false)};$('tTrip').onclick=function(){tab(true)};
+function getJson(r){return r.json().then(function(d){if(!r.ok)throw new Error(d.error||'Something went wrong.');return d})}
+$('findForm').onsubmit=function(e){e.preventDefault();var q=$('q').value.trim();if(!q)return;msg('Looking…');
+  fetch(API+'/places/geocode?q='+encodeURIComponent(q)).then(getJson).then(function(g){msg('Showing antique shops around '+g.name+'. Tap a pin for details.');map.setView([g.lat,g.lon],11)}).catch(function(err){msg(err.message,1)})};
+$('nearBtn').onclick=function(){if(!navigator.geolocation){msg('Your browser cannot share your location. Type your town instead.',1);return}msg('Finding you…');
+  navigator.geolocation.getCurrentPosition(function(p){msg('Showing antique shops near you.');map.setView([p.coords.latitude,p.coords.longitude],11)},function(){msg('We could not get your location. Type your town instead.',1)},{timeout:10000,maximumAge:600000})};
+
+// ---------- plan a road trip
+var routeLine=null,TRIP=null;
+function nearLine(ll,line){var best=Infinity,at=0;for(var i=0;i<line.length;i++){var d=hav(ll,line[i]);if(d<best){best=d;at=i}}return[best,at]}
+$('tripForm').onsubmit=function(e){e.preventDefault();var f=$('from').value.trim(),t=$('to').value.trim(),mi=$('mi').value;if(!f||!t){msg('Add where you are starting and where you are going.',1);return}
+  plan(f,t,mi)};
+function plan(f,t,mi){var btn=$('tripBtn');btn.disabled=true;btn.textContent='Planning…';msg('Finding your route and the shops along it. This can take a few seconds.');
+  fetch(API+'/places/route',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({from:f,to:t,miles:Number(mi)})}).then(getJson).then(function(d){
+    TRIP=d;addOsm(d.shops);
+    var line=d.line,cum=[0];for(var i=1;i<line.length;i++)cum[i]=cum[i-1]+hav(line[i-1],line[i]);var sc=cum[cum.length-1]?d.distanceMi/cum[cum.length-1]:1;
+    var ids={};d.shops.forEach(function(s){var p=P[s.id]||Object.keys(P).map(function(k){return P[k]}).filter(function(p){return p.osm===s.id})[0];if(p){p.along=s.along;p.off=s.off;ids[p.id]=1}});
+    Object.keys(P).forEach(function(k){var p=P[k];if(ids[k]||p.hidden||!(p.ours||p.verified))return;var r=nearLine(p.ll,line);if(r[0]<=Number(mi)+(p.exact?0:3)){p.along=Math.round(cum[r[1]]*sc);p.off=Math.round(r[0]*10)/10;ids[k]=1}});
+    var stops=Object.keys(ids).map(function(k){return P[k]}).sort(function(a,b){return a.along-b.along});
+    stopIds={};stops.forEach(function(p){if(p.ours&&p.s==='v'||p.verified)stopIds[p.id]=1});
+    if(routeLine)map.removeLayer(routeLine);routeLine=L.polyline(line,{color:'#2F6FA8',weight:5,opacity:.75}).addTo(map);map.fitBounds(routeLine.getBounds(),{padding:[24,24]});
+    Object.keys(P).forEach(function(k){place(P[k])});
+    drawTrip(stops);msg('');
+    try{history.replaceState(null,'','?from='+encodeURIComponent(f)+'&to='+encodeURIComponent(t)+'&mi='+mi+'#trip')}catch(e){}
+  }).catch(function(err){msg(err.message,1)}).then(function(){btn.disabled=false;btn.textContent='Plan trip'})}
+function drawTrip(stops){$('trip').hidden=false;var d=TRIP;
+  $('tripH').textContent=stops.length+' antique shop'+(stops.length===1?'':'s')+' between '+d.from.name+' and '+d.to.name;
+  $('tripSub').textContent='About '+d.distanceMi+' miles and '+d.hours+' hours of driving, with shops within '+d.miles+' miles of the road. Tick the ones you want to stop at.';
+  $('stops').innerHTML=stops.length?stops.map(function(p){return '<li><input type="checkbox" data-stop="'+esc(p.id)+'"'+(stopIds[p.id]?' checked':'')+' aria-label="Stop at '+esc(p.name)+'"><div><button type="button" class="nm" data-show="'+esc(p.id)+'"><b>'+esc(p.name)+'</b>'+(p.verified?' <span class="badge">Verified</span>':'')+(p.s==='v'?' <span class="badge" style="background:#DDEBDD;color:#264B2B">We visited</span>':'')+'</button><div class="sub">'+esc(p.addr||p.town||'')+(p.best?' · '+esc(p.best):'')+'</div></div><span class="mi">mile '+p.along+'<br>'+(p.off<1?'on the way':p.off+' mi off')+'</span></li>'}).join(''):'<li>No antique shops found near this route. Try a wider distance.</li>';
+  updateLink()}
+function updateLink(){var picked=[].slice.call(document.querySelectorAll('[data-stop]:checked')).map(function(c){return P[c.getAttribute('data-stop')]});
+  var w=picked.slice(0,9).map(function(p){return p.exact?p.ll.join(','):p.name+' '+p.town});
+  $('gmaps').href='https://www.google.com/maps/dir/?api=1&origin='+encodeURIComponent(TRIP.from.name)+'&destination='+encodeURIComponent(TRIP.to.name)+(w.length?'&waypoints='+encodeURIComponent(w.join('|')):'')+'&travelmode=driving';
+  $('pickMsg').textContent=picked.length?picked.length+' stop'+(picked.length===1?'':'s')+' picked'+(picked.length>9?'. Google Maps takes 9 at a time, so the first 9 are included.':''):'Pick stops to add them to the directions.'}
+$('stops').addEventListener('change',function(e){var c=e.target.closest('[data-stop]');if(!c)return;var id=c.getAttribute('data-stop');if(c.checked)stopIds[id]=1;else delete stopIds[id];place(P[id]);updateLink()});
+$('stops').addEventListener('click',function(e){var b=e.target.closest('[data-show]');if(!b)return;var p=P[b.getAttribute('data-show')];if(p&&p.mk){$('map').scrollIntoView({behavior:'smooth',block:'center'});map.setView(p.ll,13);pin(p.mk)}});
+$('share').onclick=function(){var u=location.href;(navigator.clipboard?navigator.clipboard.writeText(u):Promise.reject()).then(function(){$('pickMsg').textContent='Link copied.'}).catch(function(){prompt('Copy this link:',u)})};
+
+// ---------- areas and our lists
+function area(a){var b=[];OUR.forEach(function(id){var p=P[id];if(!p||p.hidden)return;var mo=/, MO$/.test(p.town);if(a==='all'||(a==='mo')===mo)b.push(p.ll)});if(b.length&&map)map.fitBounds(b,{padding:[30,30],maxZoom:11})}
+$('areas').addEventListener('click',function(e){var b=e.target.closest('button');if(!b)return;this.querySelectorAll('button').forEach(function(x){x.setAttribute('aria-pressed',x===b?'true':'false')});area(b.getAttribute('data-a'))});
+$('visited').addEventListener('click',function(e){var b=e.target.closest('button[data-id]');if(!b||!map)return;var p=P[b.getAttribute('data-id')];$('map').scrollIntoView({behavior:'smooth',block:'center'});map.setView(p.ll,12);pin(p.mk)});
+
+var started=false;
+function start(list){if(started)return;started=true;try{applySaved(list)}catch(e){}spread();drawLists();
+  if(!map)return;Object.keys(P).forEach(function(k){place(P[k])});area('all');
+  var q=new URLSearchParams(location.search);
+  if(q.get('from')&&q.get('to')){tab(true);$('from').value=q.get('from');$('to').value=q.get('to');if(q.get('mi'))$('mi').value=q.get('mi');plan(q.get('from'),q.get('to'),$('mi').value)}
+  else if(/springfield/i.test(location.hash)){$('areas').querySelector('[data-a=mo]').click()}
+  window.addEventListener('hashchange',function(){if(/springfield/i.test(location.hash))$('areas').querySelector('[data-a=mo]').click()})}
+fetch(API+'/trip/shops').then(function(r){return r.json()}).then(function(d){start(d.shops)}).catch(function(){start([])});
+setTimeout(function(){start([])},3000);
 })();
 </script>
 </body>
