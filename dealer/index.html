@@ -99,6 +99,10 @@ dialog{max-height:calc(100dvh - 24px);max-height:calc(100vh - 24px)}
 .dlgfoot:has(#soldBtn[hidden]) #saveBtn{grid-column:1/-1}
 .scan{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-top:8px;display:grid;gap:4px;background:var(--bg)}
 .linkbtn{background:none;border:0;padding:0;color:var(--terra);font:500 .92rem Inter,sans-serif;text-decoration:underline;cursor:pointer;min-height:32px}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-bottom:12px}
+.stats div{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:2px}
+.stats b{font-size:1.25rem}
+#salesBar[hidden],#invBar[hidden]{display:none}
 </style>
 </head>
 <body>
@@ -161,8 +165,10 @@ dialog{max-height:calc(100dvh - 24px);max-height:calc(100vh - 24px)}
   </form>
  </details>
 
- <div class="bar" style="margin-top:22px"><h2 style="font-size:1.7rem">Your items <span class="meta" id="count"></span></h2><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn sec" type="button" id="csvBtn">Download spreadsheet</button><button class="btn" type="button" id="addBtn">Add an item</button></div></div>
- <ul class="items" id="items"><li class="empty">Loading...</li></ul>
+ <div class="tabs" role="tablist" id="viewTabs" style="margin-top:22px"><button type="button" role="tab" id="tabInv" aria-selected="true">Inventory <span id="count"></span></button><button type="button" role="tab" id="tabSales" aria-selected="false">Sales <span id="salesCount"></span></button></div>
+<div class="bar" id="invBar"><h2 style="font-size:1.7rem">Inventory</h2><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn sec" type="button" id="csvBtn">Download spreadsheet</button><button class="btn" type="button" id="addBtn">Add an item</button></div></div>
+<div id="salesBar" hidden><h2 style="font-size:1.7rem;margin:0 0 8px">Sales</h2><div class="stats" id="salesStats"></div></div>
+<ul class="items" id="items"><li class="empty">Loading...</li></ul>
 </section>
 
 <dialog id="itemDlg" aria-labelledby="itH"><form class="dlg" id="itemForm" novalidate>
@@ -237,9 +243,18 @@ function alertMsg(t){var p=$('setup');var m=document.createElement('div');m.clas
 function why(it){if(it.status==='sold')return it.shippedAt?['ok','Shipped']:it.order?['sold','Sold: print the shipping label']:['sold','Sold'];if(!it.online)return['off','Not listed'];if(!(it.price>0))return['warn','Add a price to list it'];
   var miss=[];if(!(it.weightLb&&it.box))miss.push('ship size');if(!me.hasShipFrom)miss.push('ship-from address');if(!me.payouts)miss.push('payouts');
   return miss.length?['warn','Listed. To sell online, add '+miss.join(', ')]:['ok','Listed and ready to sell']}
-function drawItems(){var u=$('items');$('count').textContent=items.length?'('+items.length+')':'';
-  if(!items.length){u.innerHTML='<li class="empty">No items yet. Tap <b>Add an item</b> to list your first piece.</li>';return}
-  u.innerHTML=items.map(function(it){var w=why(it);return '<li class="it"><button type="button" class="itb" data-edit="'+it.id+'"><img src="'+API+'/img/'+esc(it.photos[0])+'" alt="" loading="lazy" width="72" height="72"><span class="itt"><b>'+esc(it.title)+'</b><span class="meta">'+it.id+(it.price>0?' &middot; '+fm(it.price):'')+'</span><span class="pill '+w[0]+'">'+esc(w[1])+'</span></span></button></li>'}).join('')}
+var view='inv';
+function card(it){var w=why(it);return '<li class="it"><button type="button" class="itb" data-edit="'+it.id+'"><img src="'+API+'/img/'+esc(it.photos[0])+'" alt="" loading="lazy" width="72" height="72"><span class="itt"><b>'+esc(it.title)+'</b><span class="meta">'+it.id+(it.price>0?' &middot; '+fm(it.price):'')+(it.status==='sold'&&it.soldAt?' &middot; sold '+new Date(it.soldAt).toLocaleDateString():'')+'</span><span class="pill '+w[0]+'">'+esc(w[1])+'</span></span></button></li>'}
+function drawItems(){var u=$('items'),inv=items.filter(function(i){return i.status!=='sold'}),sold=items.filter(function(i){return i.status==='sold'});
+  var toShip=sold.filter(function(i){return i.order&&!i.shippedAt}).length;
+  $('count').textContent=inv.length?'('+inv.length+')':'';$('salesCount').textContent=sold.length?'('+sold.length+')'+(toShip?' · '+toShip+' to ship':''):'';
+  $('tabInv').setAttribute('aria-selected',view==='inv');$('tabSales').setAttribute('aria-selected',view==='sales');$('invBar').hidden=view!=='inv';$('salesBar').hidden=view!=='sales';
+  if(view==='sales'){sold.sort(function(x,y){var a=(x.order&&!x.shippedAt)?1:0,b=(y.order&&!y.shippedAt)?1:0;return b-a||(y.soldAt||0)-(x.soldAt||0)});
+    var tot=0,prof=0,known=0;sold.forEach(function(i){var p=+i.price||0;tot+=p;if(i.paid!=null&&i.paid!==''){prof+=p*0.91-(+i.paid);known++}});
+    $('salesStats').innerHTML='<div><span class="meta">Items sold</span><b>'+sold.length+'</b></div><div><span class="meta">Sales</span><b>'+fm(tot)+'</b></div><div><span class="meta">Your share after 9%</span><b>'+fm(tot*0.91)+'</b></div><div><span class="meta">To ship</span><b>'+toShip+'</b></div>'+(known?'<div><span class="meta">Profit'+(known<sold.length?' ('+known+' with cost)':'')+'</span><b>'+fm(prof)+'</b></div>':'');
+    u.innerHTML=sold.length?sold.map(card).join(''):'<li class="empty">No sales yet. When something sells, it moves here with the ship-to address and a label button.</li>';return}
+  u.innerHTML=inv.length?inv.map(card).join(''):(items.length?'<li class="empty">Everything has sold. Tap <b>Add an item</b> to list more.</li>':'<li class="empty">No items yet. Tap <b>Add an item</b> to list your first piece.</li>')}
+$('tabInv').onclick=function(){view='inv';drawItems()};$('tabSales').onclick=function(){view='sales';drawItems()};
 async function loadItems(){try{var d=await api('/app/items');items=d.items;drawItems()}catch(e){$('items').innerHTML='<li class="empty">'+esc(e.message)+'</li>'}}
 $('items').addEventListener('click',function(e){var b=e.target.closest('[data-edit]');if(b)openItem(items.filter(function(i){return i.id===b.getAttribute('data-edit')})[0])});
 $('addBtn').onclick=function(){openItem(null)};
