@@ -142,6 +142,17 @@ var M=[
 var LISTING={"Miss Lucille\u2019s Marketplace": "shops/miss-lucilles-marketplace-clarksville-tn.html", "Antiques on 231": "shops/antiques-on-231-lebanon-tn.html", "Cloud 9 Antiques & Such": "shops/cloud-9-antiques-and-such-lebanon-tn.html", "Ms. Rhonda\u2019s Antiques and More": "shops/ms-rhondas-antiques-and-more-greenbrier-tn.html", "Appalachian Antique Mall": "shops/appalachian-antique-mall-boone-nc.html", "Antiques on Howard": "shops/antiques-on-howard-boone-nc.html", "Front Porch Antique Market": "shops/front-porch-antique-market-foscoe-nc.html", "Antiques Main": "shops/antiques-main-blowing-rock-nc.html", "The Depot at Gibson Mill": "shops/the-depot-at-gibson-mill-concord-nc.html", "Antebellum Marketplace": "shops/antebellum-marketplace-indian-trail-nc.html", "A Hidden Treasure": "shops/a-hidden-treasure-monroe-nc.html", "Affordable Treasures": "shops/affordable-treasures-paducah-ky.html"};
 function esc(s){return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
 document.getElementById('y').textContent=new Date().getFullYear();
+// Notes saved from tabellasuite.com/trip/ (visited, best for, new shops) are merged in here.
+function slug(t){return t.toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,120)}
+function merge(list){var ix={};M.forEach(function(m,i){ix[slug(m[0]+' '+m[1])]=i});
+ (list||[]).forEach(function(e){var i=ix[e.id];if(e.ll&&!T[e.town])T[e.town]=e.ll;if(!T[e.town])return;
+  if(i==null){if(e.s!=='x')M.push([e.name,e.town,e.s,e.best||''])}else{M[i]=[e.name,e.town,e.s,e.best||M[i][3]||'']}});
+ M=M.filter(function(m){return m[2]!=='x'})}
+var done=false;function go(list){if(done)return;done=true;try{merge(list)}catch(e){}draw()}
+fetch('https://tabella-shipping.shawn-greene1981.workers.dev/trip/shops').then(function(r){return r.json()}).then(function(d){go(d.shops)}).catch(function(){go([])});
+setTimeout(function(){go([])},3000);
+function draw(){
+
 var nv=0,nr=0,vis=document.getElementById('visited'),rt=document.getElementById('route');
 M.forEach(function(m,i){
  if(m[2]==='v'){nv++;var li=document.createElement('li');
@@ -172,6 +183,7 @@ vis.addEventListener('click',function(e){var b=e.target.closest('button[data-i]'
 document.getElementById('shows').addEventListener('click',function(e){var b=e.target.closest('button');if(!b)return;var f=b.getAttribute('data-f');
  this.querySelectorAll('button').forEach(function(x){x.setAttribute('aria-pressed',x===b?'true':'false')});
  markers.forEach(function(mk){if(f==='all'||mk._s===f){mk.addTo(map)}else{map.removeLayer(mk)}})});
+}
 })();
 </script>
 </body>

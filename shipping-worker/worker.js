@@ -9,6 +9,7 @@
 import { handleStripe, stripeMode } from './stripe.js';
 import { handleShop } from './shop.js';
 import { handleApp } from './app.js';
+import { handleTrips } from './trips.js';
 
 const SHIPPO = 'https://api.goshippo.com';
 const DEFAULT_ORIGINS = 'https://tabellasuite.com,https://www.tabellasuite.com';
@@ -29,6 +30,9 @@ export default {
 
     const app = await handleApp(request, env, url, json, cors, (path, method, body) => shippo(env, path, method, body));
     if (app) return app;
+
+    const trip = await handleTrips(request, env, url, json, cors);
+    if (trip) return trip;
 
     const shop = await handleShop(request, env, url, json, cors, (path, method, body) => shippo(env, path, method, body));
     if (shop) return shop;

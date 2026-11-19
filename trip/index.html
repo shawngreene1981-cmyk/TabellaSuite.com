@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Road trip notes | Tabella</title>
+<meta name="robots" content="noindex">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Inter:wght@400;500;600&display=swap">
+<style>
+
+:root{--bg:#F4EFE6;--bg2:#EBE4D6;--ink:#231F1A;--muted:#6A6259;--line:#D5CCBA;--terra:#9A4A2E;--terra-ink:#FFF8F0;--gold:#A8842F;--card:#FBF8F2;--focus:#2F6FA8;--green:#3F6B45;--grey:#8C8478}
+@media (prefers-color-scheme:dark){:root{--bg:#1A1714;--bg2:#221E1A;--ink:#EFE8DB;--muted:#A89F90;--line:#3A342D;--terra:#D98A66;--terra-ink:#1A1714;--gold:#D2B15E;--card:#25211C;--focus:#7FB8E6;--green:#8DBE8F;--grey:#9C9486}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:17px/1.6 Inter,system-ui,sans-serif;padding-left:max(20px,env(safe-area-inset-left,0px));padding-right:max(20px,env(safe-area-inset-right,0px))}
+a{color:var(--terra)}
+.w{max-width:1040px;margin:0 auto}
+h1,h2,h3{font-family:'Cormorant Garamond',Georgia,serif;font-weight:600;line-height:1.1;margin:0;text-wrap:balance}
+.cap{font-family:Cinzel,'Times New Roman',serif;letter-spacing:.18em;text-transform:uppercase;font-size:.78rem;color:var(--gold);font-weight:600}
+
+.logo{font-family:Cinzel,serif;font-weight:600;letter-spacing:.22em;font-size:1.05rem;text-decoration:none;color:var(--ink)}
+header.top{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:20px 0;flex-wrap:wrap}nav.main{display:flex;flex-wrap:wrap;gap:4px 18px;align-items:center}nav.main a{font-size:.92rem;text-decoration:none;color:var(--muted);padding:6px 0}nav.main a:hover,nav.main a[aria-current]{color:var(--ink)}nav.main a.cta{color:var(--terra-ink);background:var(--terra);padding:7px 14px;border-radius:6px;font-weight:600}@media(max-width:640px){nav.main a.opt{display:none}}
+h1{font-size:clamp(2.4rem,5.6vw,4rem);margin:10px 0 14px}
+.lede{font-size:1.12rem;color:var(--muted);max-width:38em;margin:0 0 22px}
+a:focus-visible,button:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+
+.test{background:var(--gold);color:#1A1714;font-weight:600;font-size:.9rem;padding:9px 14px;border-radius:8px;margin:0 0 18px}
+.bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;margin:0 0 18px}
+.chips button{font:500 .85rem Inter,sans-serif;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:99px;padding:6px 14px;min-height:36px;cursor:pointer;margin:0 6px 6px 0}
+.chips button[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px;list-style:none;margin:0;padding:0}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:hidden;display:flex;flex-direction:column}
+.card button.open{all:unset;cursor:pointer;display:block}
+.card button.open:focus-visible{outline:2px solid var(--focus);outline-offset:-2px}
+.ph{aspect-ratio:1/1;background:var(--bg2);overflow:hidden}.ph img{width:100%;height:100%;object-fit:cover;display:block}
+.cb{padding:12px 14px 14px;display:flex;flex-direction:column;gap:4px;flex:1}
+.cb h3{font-size:1.2rem}
+.meta{font-size:.82rem;color:var(--muted)}
+.price{font-weight:600;font-size:1.05rem}
+.btn{font:600 .92rem Inter,sans-serif;border:0;border-radius:8px;padding:10px 16px;min-height:44px;cursor:pointer;background:var(--terra);color:var(--terra-ink)}
+.btn.sec{background:var(--card);color:var(--ink);border:1px solid var(--line)}
+.btn[disabled]{opacity:.55;cursor:not-allowed}
+.soonb{display:inline-block;align-self:flex-start;font-size:.75rem;font-weight:600;color:var(--muted);border:1px solid var(--line);border-radius:99px;padding:2px 9px}
+.cartbtn{position:sticky;top:10px;z-index:5}
+dialog{border:0;border-radius:14px;padding:0;max-height:92vh;overflow:auto;max-width:min(560px,94vw);width:100%;background:var(--card);color:var(--ink);box-shadow:0 20px 60px rgba(0,0,0,.35)}
+dialog::backdrop{background:rgba(20,16,12,.55)}
+.dlg{padding:18px 20px 20px}
+.dlg img{width:100%;border-radius:8px;max-height:60vh;object-fit:contain;background:var(--bg2)}
+.x{float:right;background:none;border:0;font-size:1.6rem;line-height:1;cursor:pointer;color:var(--muted);min-width:44px;min-height:44px}
+.rm{background:none;border:0;color:var(--terra);font:500 .85rem Inter,sans-serif;cursor:pointer;min-height:36px;text-decoration:underline}
+label{display:block;font-size:.85rem;margin:8px 0 2px}
+input{font:inherit;width:100%;padding:9px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)}
+.row2{display:grid;grid-template-columns:2fr 1fr 1fr;gap:8px}
+.line{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid var(--line)}
+.rate{display:flex;gap:10px;align-items:center;border:1px solid var(--line);border-radius:8px;padding:9px 12px;margin:6px 0;cursor:pointer}
+.rate input{width:auto}
+.msg{border-radius:8px;padding:10px 12px;margin:10px 0;font-size:.92rem}.msg.err{background:#F6E2DC;color:#7A2A17}.msg.ok{background:#E3EEDF;color:#264B2B}
+.empty{color:var(--muted);padding:20px 0}
+footer{padding:36px 0 48px;border-top:1px solid var(--line);margin-top:48px;font-size:.88rem;color:var(--muted);display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px}
+.tabs{display:flex;gap:6px;margin:6px 0 12px}
+.tabs button{font:600 .92rem Inter,sans-serif;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:99px;padding:8px 16px;min-height:40px;cursor:pointer}
+.tabs button[aria-selected="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px 18px;max-width:560px}
+#setup{max-width:none}
+.step{display:flex;gap:12px;align-items:center;padding:10px 0;border-top:1px solid var(--line)}
+.step .dot{width:22px;height:22px;border-radius:50%;border:2px solid var(--line);flex:none}
+.step.done .dot{background:var(--green);border-color:var(--green);box-shadow:inset 0 0 0 4px var(--card)}
+.row3{display:grid;grid-template-columns:2fr 1fr 1fr;gap:8px}
+#dims.row3{grid-template-columns:1fr 1fr 1fr;margin-top:8px}
+#dims[hidden]{display:none}
+.items{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+.it .itb{all:unset;box-sizing:border-box;cursor:pointer;display:flex;gap:12px;align-items:center;width:100%;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px}
+.it .itb:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.it img{width:72px;height:72px;object-fit:cover;border-radius:8px;background:var(--bg2);flex:none}
+.itt{display:flex;flex-direction:column;gap:3px;min-width:0}
+.pill{align-self:flex-start;font-size:.75rem;font-weight:600;border-radius:99px;padding:2px 9px;border:1px solid var(--line)}
+.pill.ok{background:#E3EEDF;color:#264B2B;border-color:#C9DEC2}.pill.warn{background:#FBF0D9;color:#6B4A10;border-color:#EBD7A8}.pill.sold{background:var(--ink);color:var(--bg);border-color:var(--ink)}.pill.off{color:var(--muted)}
+.photo{position:relative;border:2px dashed var(--line);border-radius:10px;min-height:170px;display:flex;align-items:center;justify-content:center;text-align:center;overflow:hidden;background:var(--bg)}
+.photo input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.photo img{max-height:260px;width:100%;object-fit:contain}
+#photoEmpty{display:flex;flex-direction:column;gap:4px;padding:20px}
+.money{display:flex;align-items:center;border:1px solid var(--line);border-radius:8px;background:var(--bg);padding-left:10px}.money input{border:0;background:transparent}
+select{font:inherit;width:100%;padding:9px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)}
+fieldset{border:1px solid var(--line);border-radius:10px;margin:12px 0 4px;padding:6px 12px 12px}legend{font-weight:600;padding:0 4px}
+.lbl{font-size:.85rem;margin:8px 0 4px}
+.boxsz{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.boxsz button{font:600 .9rem Inter,sans-serif;padding:8px 2px;min-height:52px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px}
+.boxsz button small{font-weight:400;font-size:.7rem;opacity:.75}
+.boxsz button[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.check{display:flex;gap:10px;align-items:center;margin:12px 0 0;font-size:.95rem}.check input{width:20px;height:20px}
+.row2{grid-template-columns:1fr 1fr}
+#photoEmpty[hidden],.photo img[hidden]{display:none}
+dialog{max-height:calc(100dvh - 24px);max-height:calc(100vh - 24px)}
+@supports (height:100dvh){dialog{max-height:calc(100dvh - 24px)}}
+@media(max-width:600px){dialog{max-width:100vw;width:100vw;margin:0;border-radius:0;height:100dvh;max-height:100dvh}}
+.dlg{padding-bottom:0}
+.dlgfoot{position:sticky;bottom:0;background:var(--card);display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:12px 0 calc(12px + env(safe-area-inset-bottom,0px));margin-top:12px;border-top:1px solid var(--line);z-index:2}
+.dlgfoot:has(#soldBtn[hidden]) #saveBtn{grid-column:1/-1}
+.scan{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-top:8px;display:grid;gap:4px;background:var(--bg)}
+.linkbtn{background:none;border:0;padding:0;color:var(--terra);font:500 .92rem Inter,sans-serif;text-decoration:underline;cursor:pointer;min-height:32px}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-bottom:12px}
+.stats div{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:2px}
+.stats b{font-size:1.25rem}
+#salesBar[hidden],#invBar[hidden]{display:none}
+
+.tabs button[aria-checked="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+textarea{font:inherit;width:100%;padding:9px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);resize:vertical}
+#newRow[hidden],#visRow[hidden],#keyForm[hidden],#shopForm[hidden],#recent[hidden]{display:none}
+#shopForm,#keyForm{max-width:620px}
+</style>
+</head>
+<body>
+<div class="w">
+<header class="top"><a class="logo" href="../">TABELLA</a><nav class="main" aria-label="Main"><a class="opt" href="../#shoppers">Shoppers</a><a class="opt" href="../#dealers">Dealers</a><a class="opt" href="../#malls">Malls</a><a href="../shop/">Shop</a><a href="../map.html">Mall map</a><a class="opt" href="../road-trip-1.html">Road trips</a><a class="opt" href="../pricing.html">Pricing</a><a class="cta" href="../#early">Early access</a></nav></header>
+<main>
+<div class="cap">Road trip notes</div>
+<h1>Update the mall map</h1>
+<p class="lede">Pick a shop, say whether you have visited, and write what it is best for. Saving updates <a href="../map.html">the mall map</a> right away.</p>
+
+<form id="keyForm" class="panel" hidden novalidate>
+ <label for="kIn">Your Tabella admin key</label><input id="kIn" type="password" autocomplete="current-password">
+ <p class="meta">You only enter this once on each device.</p>
+ <button class="btn" type="submit" style="width:100%;margin-top:12px">Continue</button><div id="keyMsg" aria-live="polite"></div>
+</form>
+
+<form id="shopForm" class="panel" hidden novalidate>
+ <label for="fShop">Shop</label>
+ <select id="fShop"><option value="">Choose a shop…</option></select>
+ <div id="newRow" hidden>
+  <label for="fName">Shop name</label><input id="fName" autocomplete="off">
+  <label for="fTown">Town, with state</label><input id="fTown" placeholder="Nixa, MO" autocomplete="off">
+ </div>
+ <div class="lbl">Status</div>
+ <div class="tabs" role="radiogroup" aria-label="Status" id="sGroup">
+  <button type="button" role="radio" data-s="v" aria-checked="false">Visited</button>
+  <button type="button" role="radio" data-s="r" aria-checked="true">On our route</button>
+  <button type="button" role="radio" data-s="x" aria-checked="false">Hide from map</button>
+ </div>
+ <div id="visRow" hidden>
+  <label for="fDate">Date visited</label><input id="fDate" type="date">
+ </div>
+ <label for="fBest">Best for <span class="meta">one or two sentences, shown on the map</span></label>
+ <textarea id="fBest" rows="3" maxlength="300" placeholder="Glassware and mid-century pieces, with fair prices."></textarea>
+ <div class="meta" id="bestCount"></div>
+ <button class="btn" id="saveBtn" type="submit" style="width:100%;margin-top:14px">Save to the map</button>
+ <div id="saveMsg" aria-live="polite"></div>
+</form>
+
+<section id="recent" hidden style="margin-top:26px">
+ <h2 style="font-size:1.5rem">Your saved notes</h2>
+ <ul class="items" id="saved"></ul>
+ <p style="margin-top:16px"><button type="button" class="linkbtn" id="forget">Sign out on this device</button></p>
+</section>
+</main>
+<footer><span>&copy; <span id="y"></span> Tabella Suite &middot; <a href="mailto:contact@tabellasuite.com">contact@tabellasuite.com</a></span><span><a href="../pricing.html">Pricing</a> &middot; <a href="../privacy.html">Privacy</a></span></footer>
+</div>
+
+<script>
+(function(){
+var API='https://tabella-shipping.shawn-greene1981.workers.dev',$=function(i){return document.getElementById(i)};
+function esc(t){return String(t==null?'':t).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
+function msg(id,t,bad){$(id).innerHTML=t?'<div class="msg '+(bad?'err':'ok')+'">'+esc(t)+'</div>':''}
+function slug(t){return t.toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,120)}
+var key='';try{key=localStorage.getItem('tabAdmin')||''}catch(e){}
+var BASE=[],TOWNS={},SAVED=[],st='r';
+function call(path,body){return fetch(API+path,{method:body?'POST':'GET',headers:Object.assign({'Content-Type':'application/json'},key?{Authorization:'Bearer '+key}:{}),body:body?JSON.stringify(body):undefined})
+  .then(function(r){return r.json().then(function(d){if(!r.ok)throw new Error(d.error||'Something went wrong.');return d})})}
+function setS(s){st=s;[].forEach.call($('sGroup').children,function(b){b.setAttribute('aria-checked',b.getAttribute('data-s')===s)});$('visRow').hidden=s!=='v';
+  if(s==='v'&&!$('fDate').value)$('fDate').value=new Date().toISOString().slice(0,10)}
+$('sGroup').onclick=function(e){var b=e.target.closest('[data-s]');if(b)setS(b.getAttribute('data-s'))};
+// The shop list comes from the mall map page itself, so there is only one list to keep.
+function loadBase(){return fetch('../map.html',{cache:'no-store'}).then(function(r){return r.text()}).then(function(t){
+  var m=t.match(/var T=(\{[\s\S]*?\});/),l=t.match(/var M=(\[[\s\S]*?\]);/);
+  TOWNS=Function('return '+m[1])();BASE=Function('return '+l[1])()})}
+function allShops(){var map={};BASE.forEach(function(m){map[slug(m[0]+' '+m[1])]={id:slug(m[0]+' '+m[1]),name:m[0],town:m[1],s:m[2],best:m[3]||''}});
+  SAVED.forEach(function(e){map[e.id]=Object.assign({},map[e.id]||{},e)});return Object.keys(map).map(function(k){return map[k]})}
+function fillSelect(keep){var list=allShops().sort(function(a,b){return a.town.split(', ')[1]===b.town.split(', ')[1]?(a.town+a.name).localeCompare(b.town+b.name):a.town.split(', ')[1].localeCompare(b.town.split(', ')[1])});
+  var groups={};list.forEach(function(x){(groups[x.town]=groups[x.town]||[]).push(x)});
+  $('fShop').innerHTML='<option value="">Choose a shop…</option><option value="__new">+ Add a shop that is not listed</option>'+Object.keys(groups).map(function(t){return '<optgroup label="'+esc(t)+'">'+groups[t].map(function(x){
+    return '<option value="'+x.id+'">'+esc(x.name)+(x.s==='v'?' ✓':x.s==='x'?' (hidden)':'')+'</option>'}).join('')+'</optgroup>'}).join('');
+  if(keep)$('fShop').value=keep}
+$('fShop').onchange=function(){var v=this.value;$('newRow').hidden=v!=='__new';msg('saveMsg','');
+  if(v==='__new'){$('fName').value='';$('fTown').value='';$('fBest').value='';setS('v');$('fName').focus();count();return}
+  var x=allShops().filter(function(s){return s.id===v})[0];if(!x)return;$('fBest').value=x.best||'';$('fDate').value=x.visited||'';setS(x.s||'r');count()};
+function count(){var n=$('fBest').value.length;$('bestCount').textContent=n?n+' of 300 characters':''}
+$('fBest').oninput=count;
+function drawSaved(){$('recent').hidden=!SAVED.length;$('saved').innerHTML=SAVED.slice().sort(function(a,b){return b.updated-a.updated}).map(function(e){
+  return '<li class="it"><button type="button" class="itb" data-id="'+e.id+'"><span class="itt"><b>'+esc(e.name)+'</b><span class="meta">'+esc(e.town)+(e.visited?' · visited '+esc(e.visited):'')+'</span><span class="pill '+(e.s==='v'?'ok':e.s==='x'?'off':'warn')+'">'+(e.s==='v'?'Visited':e.s==='x'?'Hidden from map':'On our route')+'</span>'+(e.best?'<span class="meta">'+esc(e.best)+'</span>':'')+'</span></button></li>'}).join('')}
+$('saved').onclick=function(e){var b=e.target.closest('[data-id]');if(!b)return;$('fShop').value=b.getAttribute('data-id');$('fShop').onchange();$('shopForm').scrollIntoView({behavior:'smooth'})};
+$('shopForm').onsubmit=function(e){e.preventDefault();var v=$('fShop').value,body;
+  if(!v){msg('saveMsg','Choose a shop first.',1);return}
+  if(v==='__new'){var t=$('fTown').value.trim().replace(/\s*,\s*/,', ');t=t.replace(/, ([a-z]{2})$/i,function(_,s){return ', '+s.toUpperCase()}).replace(/(^|[\s-])([a-z])/g,function(_,a,c){return a+c.toUpperCase()});
+    body={name:$('fName').value,town:t,known:!!TOWNS[t]}}
+  else{var x=allShops().filter(function(s){return s.id===v})[0];body={name:x.name,town:x.town,known:true}}
+  body.s=st;body.best=$('fBest').value;body.visited=st==='v'?$('fDate').value:'';
+  var btn=$('saveBtn');btn.disabled=true;btn.textContent='Saving…';
+  call('/trip/shops',body).then(function(d){SAVED=SAVED.filter(function(s){return s.id!==d.shop.id}).concat([d.shop]);fillSelect(d.shop.id);$('newRow').hidden=true;drawSaved();
+    msg('saveMsg','Saved. '+d.shop.name+' is updated on the mall map.')}).catch(function(err){msg('saveMsg',err.message,1)}).then(function(){btn.disabled=false;btn.textContent='Save to the map'})};
+$('keyForm').onsubmit=function(e){e.preventDefault();key=$('kIn').value.trim();if(!key)return;
+  call('/trip/check',{}).then(function(){try{localStorage.setItem('tabAdmin',key)}catch(e){}start()}).catch(function(err){key='';msg('keyMsg',err.message,1)})};
+$('forget').onclick=function(){try{localStorage.removeItem('tabAdmin')}catch(e){}location.reload()};
+function start(){$('keyForm').hidden=true;$('shopForm').hidden=false;
+  Promise.all([loadBase(),call('/trip/shops').then(function(d){SAVED=d.shops||[]})]).then(function(){fillSelect();drawSaved()}).catch(function(err){msg('saveMsg','Could not load the shop list: '+err.message,1)})}
+document.getElementById('y')&&(document.getElementById('y').textContent=new Date().getFullYear());
+if(key)start();else $('keyForm').hidden=false;
+})();
+</script>
+</body>
+</html>
