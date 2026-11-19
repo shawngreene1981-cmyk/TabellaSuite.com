@@ -205,7 +205,9 @@ var LISTING={"Miss Lucille\u2019s Marketplace": "shops/miss-lucilles-marketplace
 var $=function(i){return document.getElementById(i)};
 function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
 function slug(t){return t.toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,120)}
-function core(n){return n.toLowerCase().normalize('NFKD').replace(/&/g,' and ').replace(/[^a-z0-9 ]+/g,' ').split(/\s+/).filter(function(w){return w&&!/^(the|and|antiques?|mall|market(place)?|vintage|co|llc|inc|shoppes?|shops?|store|of|at)$/.test(w)}).join(' ')}
+function core(n){return n.toLowerCase().normalize('NFKD').replace(/['\u2019]/g,'').replace(/&/g,' and ').replace(/[^a-z0-9 ]+/g,' ').split(/\s+/).filter(function(w){return w&&!/^(the|and|antiques?|mall|market(place)?|vintage|co|llc|inc|shoppes?|shops?|store|of|at)$/.test(w)}).join(' ')}
+// Same shop if every word of the shorter name is in the longer one ("Mikes Unique" = "Mike's Unique Collectable & Antique Flea Market").
+function same(a,b){if(!a||!b)return false;if(a===b)return true;var x=a.split(' '),y=b.split(' ');if(x.length>y.length){var t=x;x=y;y=t}if(x.length<2&&x[0].length<6)return false;return x.every(function(w){return y.indexOf(w)>=0})}
 function hav(a,b){var R=3958.8,r=Math.PI/180,x=(b[0]-a[0])*r,y=(b[1]-a[1])*r,h=Math.sin(x/2)*Math.sin(x/2)+Math.cos(a[0]*r)*Math.cos(b[0]*r)*Math.sin(y/2)*Math.sin(y/2);return 2*R*Math.asin(Math.sqrt(h))}
 function host(u){return String(u||'').replace(/^https?:\/\//,'').replace(/\/$/,'')}
 function claimUrl(p){var q={id:p.id,name:p.name,town:p.town||'',addr:/\d/.test(p.addr||'')?p.addr:''};if(p.exact){q.lat=p.ll[0];q.lon=p.ll[1]}
@@ -272,7 +274,7 @@ var VER=[];
 function addOsm(list){var batch=[],cand=OUR.concat(VER);(list||[]).forEach(function(s){var p=P[s.id];
   if(p){if(s.addr){p.addr=s.addr;p.hours=s.hours;if(s.town)p.town=s.town}return}
   if(osmSeen[s.id]){var q=P[osmSeen[s.id]];if(q&&s.addr){q.addr=q.addr||s.addr;q.hours=s.hours}return}
-  var sc=null;for(var i=0;i<cand.length;i++){p=P[cand[i]];if(!p)continue;if(p._c==null)p._c=core(p.name);if(p.osm===s.id||(!p.exact&&p._c&&p._c===(sc==null?(sc=core(s.name)):sc)&&hav(p.ll,[s.lat,s.lon])<25)){osmSeen[s.id]=p.id;p.ll=[s.lat,s.lon];p.exact=true;p.addr=p.addr||s.addr;p.hours=s.hours;p.osm=s.id;place(p);return}}
+  var sc=null;for(var i=0;i<cand.length;i++){p=P[cand[i]];if(!p)continue;if(p._c==null)p._c=core(p.name);if(p.osm===s.id||(!p.exact&&p._c&&same(p._c,sc==null?(sc=core(s.name)):sc)&&hav(p.ll,[s.lat,s.lon])<25)){osmSeen[s.id]=p.id;p.ll=[s.lat,s.lon];p.exact=true;p.addr=p.addr||s.addr;p.hours=s.hours;p.osm=s.id;place(p);return}}
   osmSeen[s.id]=s.id;p={id:s.id,name:s.name,town:s.town,addr:s.addr,hours:s.hours,ll:[s.lat,s.lon],exact:true,s:'o',ours:false,listing:''};P[s.id]=p;place(p,batch)});
   if(batch.length)cl.addLayers(batch)}
 var osmSeen={};
