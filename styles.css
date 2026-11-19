@@ -71,3 +71,20 @@ th{font-size:.82rem;letter-spacing:.04em;color:var(--muted);font-weight:600}
 .phone .ex{text-align:center;font-size:.75rem;color:var(--muted);margin-top:10px}
 
 .soon{display:inline-block;font-size:.68rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;border:1px solid var(--line);color:var(--muted);padding:2px 8px;border-radius:99px;vertical-align:2px;margin-left:4px;font-family:Inter,sans-serif}
+
+/* homepage picture board: pieces from the shop */
+.board-wrap{justify-self:stretch}
+.board{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.board .tile{position:relative;display:block;aspect-ratio:1;border-radius:14px;overflow:hidden;background:#EDEDEB;box-shadow:0 14px 30px -22px rgba(0,0,0,.55);text-decoration:none;color:#fff}
+.board .tile:nth-child(1){grid-column:span 2;grid-row:span 2}
+.board .tile img{width:100%;height:100%;object-fit:cover;display:block;transition:opacity .45s ease,transform 4s ease}
+.board .tile:hover img{transform:scale(1.04)}
+.board .tile.swap img,.board .tile.swap .cap2{opacity:0}
+.board .cap2{position:absolute;left:0;right:0;bottom:0;padding:22px 10px 8px;display:flex;justify-content:space-between;gap:8px;align-items:flex-end;background:linear-gradient(transparent,rgba(20,16,12,.78));font-size:.8rem;line-height:1.2;transition:opacity .45s ease}
+.board .cap2 b{font-weight:600;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.board .cap2 i{font-style:normal;font-family:'Cormorant Garamond',serif;font-weight:600;font-size:1.15rem;white-space:nowrap}
+.board .tile:nth-child(1) .cap2{font-size:.95rem;padding:30px 14px 12px}
+.board .tile:focus-visible{outline:3px solid var(--terra);outline-offset:2px}
+.board-foot{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:10px;font-size:.88rem;color:var(--muted)}
+.board-foot a{color:var(--terra);font-weight:600}
+@media(max-width:600px){.board .tile:not(:nth-child(1)) .cap2{display:none}}

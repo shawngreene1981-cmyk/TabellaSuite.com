@@ -62,7 +62,7 @@ footer{padding:36px 0 48px;border-top:1px solid var(--line);margin-top:48px;font
 </head>
 <body>
 <div class="w">
-<header class="top"><a class="logo" href="../">TABELLA</a><nav class="main" aria-label="Main"><a class="opt" href="../#shoppers">Shoppers</a><a class="opt" href="../#dealers">Dealers</a><a class="opt" href="../#malls">Malls</a><a href="../shop/" aria-current="page">Shop</a><a href="../map.html">Mall map</a><a class="opt" href="../road-trip-1.html">Road trips</a><a class="opt" href="../pricing.html">Pricing</a><a class="cta" href="../#early">Early access</a></nav></header>
+<header class="top"><a class="logo" href="../">TABELLA</a><nav class="main" aria-label="Main"><a class="opt" href="../#shoppers">Shoppers</a><a class="opt" href="../#dealers">Dealers</a><a class="opt" href="../#malls">Malls</a><a href="../shop/">Shop</a><a href="../map.html">Mall map</a><a class="opt" href="../road-trip-1.html">Road trips</a><a class="opt" href="../pricing.html">Pricing</a><a class="cta" href="../#early">Early access</a></nav></header>
 <main>
 <p class="test" role="note">Test shop. Payments run in Stripe's sandbox: no real money moves. Pay with test card 4242 4242 4242 4242, any future date, any security code.</p>
 <div class="cap">Shop</div>
@@ -155,7 +155,7 @@ $('payBtn').onclick=async function(){var b=this;if(!rate)return;b.disabled=true;
   catch(err){say(err.message,1);b.disabled=false;b.textContent='Go to secure checkout'}};
 if(/canceled=/.test(location.search))$('canceled').innerHTML='<div class="msg ok">Checkout canceled. Your cart is still here.</div>';
 Promise.all([fetch(API+'/shop/catalog').then(function(r){if(!r.ok)throw 0;return r.json()}).catch(function(){return fetch('items.json',{cache:'no-cache'}).then(function(r){return r.json()})}),fetch(API+'/shop/status').then(function(r){return r.json()}).catch(function(){return{sold:[],held:[]}})])
- .then(function(a){CAT=a[0];(a[1].sold||[]).concat(a[1].held||[]).forEach(function(id){GONE[id]=1});draw()})
+ .then(function(a){CAT=a[0];(a[1].sold||[]).concat(a[1].held||[]).forEach(function(id){GONE[id]=1});draw();var h=decodeURIComponent((location.hash||'').slice(1));if(h&&item(h)&&!GONE[h])openItem(h)})
  .catch(function(){$('grid').innerHTML='<li class="empty">The shop could not load. Refresh to try again.</li>'});
 })();
 </script>

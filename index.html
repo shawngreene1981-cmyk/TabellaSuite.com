@@ -16,7 +16,7 @@
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Inter:wght@400;500;600&display=swap">
-<link rel="stylesheet" href="styles.css?v=3">
+<link rel="stylesheet" href="styles.css?v=4">
 </head>
 <body>
 <a class="skip" href="#top">Skip to content</a>
@@ -32,14 +32,9 @@
   <p class="lede">See what's on the shelves before you drive. Buy it now and pick it up at the mall, or have it shipped. And find the shops that are worth the trip.</p>
   <div class="btns"><a class="btn" href="map.html">See the mall map</a><a class="btn ghost" href="#early">Get early access</a></div>
  </div>
- <div class="phone" aria-hidden="true">
-  <div class="ph"><img src="img/milk-glass-basket.jpg" width="900" height="810" style="width:100%;height:100%;object-fit:cover;display:block" alt="White hobnail milk glass basket with a ruffled rim and tall handle"></div>
-  <div class="meta">
-   <div class="row"><span class="t">Hobnail milk glass basket</span><span class="p">$80</span></div>
-   <div class="s">Shantiques &middot; Glassware</div>
-   <div class="b"><span class="on">Buy now</span><span>Make an offer</span></div>
-   <div class="ex">A real piece from our own inventory</div>
-  </div>
+ <div class="board-wrap">
+  <div class="board" id="board" aria-label="Pieces in the Tabella shop right now"><a class="tile" href="shop/#SH-0001"><img src="shop/img/SH-0001.jpg" alt="" loading="eager" width="450" height="450"><span class="cap2"><b>Wood and iron vintage church hanging window</b><i>$60</i></span></a><a class="tile" href="shop/#SH-0002"><img src="shop/img/SH-0002.jpg" alt="" loading="eager" width="450" height="450"><span class="cap2"><b>Bamboo chest with brass fitting</b><i>$15</i></span></a><a class="tile" href="shop/#SH-0003"><img src="shop/img/SH-0003.jpg" alt="" loading="eager" width="450" height="450"><span class="cap2"><b>Oak stool or bench</b><i>$25</i></span></a><a class="tile" href="shop/#SH-0011"><img src="shop/img/SH-0011.jpg" alt="" loading="eager" width="450" height="450"><span class="cap2"><b>Potted terrarium bird bath miniature</b><i>$15</i></span></a><a class="tile" href="shop/#SH-0026"><img src="shop/img/SH-0026.jpg" alt="" loading="eager" width="450" height="450"><span class="cap2"><b>Lantern</b><i>$58</i></span></a><a class="tile" href="shop/#SH-0027"><img src="shop/img/SH-0027.jpg" alt="" loading="eager" width="450" height="450"><span class="cap2"><b>Oil lantern</b><i>$30</i></span></a></div>
+  <div class="board-foot"><span>Real pieces in the Tabella shop right now</span><a href="shop/">Browse the shop &rarr;</a></div>
  </div>
 </div>
 
@@ -143,6 +138,28 @@ f.addEventListener('submit',function(e){
  .then(function(r){if(!r.ok)throw new Error('bad');f.reset();msg.textContent='Thank you. We will write back personally.'})
  .catch(function(){msg.textContent='That did not send. Please try again, or write to contact@tabellasuite.com.'})
  .then(function(){btn.disabled=false})});
+})();
+</script>
+<script>
+(function(){
+var board=document.getElementById('board');if(!board)return;
+var API='https://tabella-shipping.shawn-greene1981.workers.dev';
+function esc(t){return String(t==null?'':t).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
+function money(n){n=Number(n);return '$'+(n%1?n.toFixed(2):n.toFixed(0))}
+function shuffle(a){for(var i=a.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1)),t=a[i];a[i]=a[j];a[j]=t}return a}
+function load(){return fetch(API+'/shop/catalog').then(function(r){if(!r.ok)throw 0;return r.json()}).catch(function(){
+  return fetch('shop/items.json').then(function(r){return r.json()}).then(function(d){d.items.forEach(function(i){i.photo='shop/'+i.photo});return d})})}
+Promise.all([load(),fetch(API+'/shop/status').then(function(r){return r.json()}).catch(function(){return{}})]).then(function(a){
+  var gone={};(a[1].sold||[]).concat(a[1].held||[]).forEach(function(id){gone[id]=1});
+  var items=shuffle((a[0].items||[]).filter(function(i){return i.photo&&i.price>0&&!gone[i.id]}));
+  if(items.length<6)return;
+  var tiles=[].slice.call(board.querySelectorAll('.tile')),next=0;
+  function fill(t,i){t.href='shop/#'+encodeURIComponent(i.id);t.querySelector('img').src=i.photo;t.querySelector('.cap2').innerHTML='<b>'+esc(i.title)+'</b><i>'+money(i.price)+'</i>'}
+  tiles.forEach(function(t){fill(t,items[next++])});
+  if(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches)return;
+  var last=-1;setInterval(function(){if(document.hidden)return;
+    var k;do{k=Math.floor(Math.random()*tiles.length)}while(k===last&&tiles.length>1);last=k;
+    var t=tiles[k],i=items[next++%items.length],pre=new Image();pre.onload=function(){t.classList.add('swap');setTimeout(function(){fill(t,i);t.classList.remove('swap')},450)};pre.src=i.photo},2800)})
 })();
 </script>
 </body>
