@@ -232,6 +232,30 @@
    "dealer": "shantiques",
    "photo": "img/SH-0057.jpg",
    "shippable": false
+  },
+  {
+   "id": "SH-0090",
+   "title": "Glazed pottery planter modeled as two fawns beside a textured bush on a rocky base, tan and brown glaze, impressed mark on base appears to read 'McCoy'",
+   "category": "Decor",
+   "price": 38.0,
+   "dealer": "shantiques",
+   "photo": "img/SH-0090.jpg",
+   "shippable": false
+  },
+  {
+   "id": "SH-0091",
+   "title": "Indian Brass flower etched bowl",
+   "category": "Decor",
+   "price": 38.0,
+   "dealer": "shantiques",
+   "photo": "img/SH-0091.jpg",
+   "shippable": true,
+   "weightLb": 1.2,
+   "box": [
+    8.0,
+    6.0,
+    4.0
+   ]
   }
  ]
 }
