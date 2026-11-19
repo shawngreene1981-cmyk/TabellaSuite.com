@@ -9,7 +9,7 @@
 //   CATALOG_URL       optional; defaults to https://tabellasuite.com/shop/items.json
 
 import { buildOrder, createCheckoutSession, stripeMode, stripeApi } from './stripe.js';
-import { dealerListings, dealerItem, markDealerItemSold, markDealerItemAvailable, shantiquesMoved, ITEM_ID } from './app.js';
+import { dealerListings, dealerItem, markDealerItemSold, markDealerItemAvailable, payoutsOk, shantiquesMoved, ITEM_ID } from './app.js';
 import { sendEmail, buyerReceipt, dealerAlert, opsEmail } from './mail.js';
 
 const HOLD_SECONDS = 35 * 60; // Stripe checkout pages last 30 minutes minimum; hold a little longer.
@@ -217,7 +217,7 @@ async function pickItems(env, cat, ids) {
       // Dealer-app item: everything comes from the server record, never the browser.
       if (!x || x.item.status !== 'available' || !x.item.online || !(x.item.price > 0)) return { error: 'An item in your cart is no longer listed.' };
       const d = x.dealer;
-      if (!(x.item.weightLb && x.item.box && d.payoutsReady && d.stripeAccount && d.shipFrom)) return { error: x.item.title + ' can\u2019t ship yet.' };
+      if (!(x.item.weightLb && x.item.box && payoutsOk(env, d) && d.shipFrom)) return { error: x.item.title + ' can\u2019t ship yet.' };
       it = { id, title: x.item.title, price: x.item.price, dealer: d.id, shippable: true, weightLb: x.item.weightLb, box: x.item.box, account: d.stripeAccount, shipFrom: Object.assign({ country: 'US', name: d.name }, d.shipFrom) };
     } else {
       it = (cat.items || []).find(x => x.id === id);

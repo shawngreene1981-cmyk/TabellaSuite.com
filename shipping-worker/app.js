@@ -9,7 +9,7 @@
 //   img:<key>               photo bytes (JPEG)
 //   rl:<email>              failed sign-in counter
 
-import { createRecipient, recipientLink, recipientReady } from './stripe.js';
+import { createRecipient, recipientLink, recipientReady, stripeMode } from './stripe.js';
 import { sendEmail, resetEmail, shippedEmail } from './mail.js';
 
 const SESSION_TTL = 60 * 60 * 24 * 30;
@@ -205,6 +205,7 @@ async function session(env, request) {
   const id = await env.TABELLA.get('sess:' + t);
   if (!id) return null;
   const dealer = JSON.parse(await env.TABELLA.get('dealer:' + id) || 'null');
+  if (dealer) await payoutMode(env, dealer);
   return dealer ? { token: t, dealer } : null;
 }
 async function updateDealer(env, d, b) {
@@ -303,7 +304,7 @@ async function newItemId(env) {
 async function listing(env, d, it) {
   const show = it.online && it.status === 'available' && it.price > 0 && it.photos.length;
   if (!show) { await env.TABELLA.delete('pub:' + it.id); return; }
-  const ships = !!(it.weightLb && it.box && d.payoutsReady && d.shipFrom && d.shipFrom.zip);
+  const ships = !!(it.weightLb && it.box && payoutsOk(env, d) && d.shipFrom && d.shipFrom.zip);
   await env.TABELLA.put('pub:' + it.id, '', { metadata: { t: it.title.slice(0, 120), p: it.price, c: it.category || 'Other', d: d.id, n: d.name.slice(0, 60), ph: it.photos[0], s: ships ? 1 : 0 } });
 }
 async function refreshListings(env, d) { for (const it of await listItems(env, d.id)) await listing(env, d, it); }
@@ -424,10 +425,20 @@ async function scan(env, d, b) {
 }
 
 // ---------- payouts (Stripe Connect) ----------
+// A payout account belongs to one Stripe mode. When Tabella switches from the sandbox to live (or back), the old
+// account is set aside so the dealer connects a real bank and nobody is paid to a test account.
+export function payoutsOk(env, d) { return !!(d && d.payoutsReady && d.stripeAccount && (d.stripeMode || 'test') === stripeMode(env)); }
+async function payoutMode(env, d) {
+  if (!d.stripeAccount || (d.stripeMode || 'test') === stripeMode(env)) return;
+  d.oldAccounts = (d.oldAccounts || []).concat([{ id: d.stripeAccount, mode: d.stripeMode || 'test', until: Date.now() }]).slice(-5);
+  delete d.stripeAccount; d.payoutsReady = false; delete d.stripeMode;
+  await env.TABELLA.put('dealer:' + d.id, JSON.stringify(d));
+  await refreshListings(env, d);
+}
 async function payouts(env, d, url, b) {
   if (!d.stripeAccount) {
     const a = await createRecipient(env, { email: d.email, name: d.name, role: 'dealer', dealerId: d.id });
-    d.stripeAccount = a.id;
+    d.stripeAccount = a.id; d.stripeMode = stripeMode(env);
     await env.TABELLA.put('dealer:' + d.id, JSON.stringify(d));
   }
   const site = String(env.SITE_URL || 'https://tabellasuite.com').replace(/\/$/, '');
