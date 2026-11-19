@@ -10,12 +10,15 @@ import { handleStripe, stripeMode } from './stripe.js';
 import { handleShop } from './shop.js';
 import { handleApp } from './app.js';
 import { handleTrips } from './trips.js';
-import { handlePlaces } from './places.js';
+import { handlePlaces, buildNextState } from './places.js';
 
 const SHIPPO = 'https://api.goshippo.com';
 const DEFAULT_ORIGINS = 'https://tabellasuite.com,https://www.tabellasuite.com';
 
 export default {
+  // Timer (wrangler.toml [triggers]): fills in the nationwide antique shop list one state at a time.
+  async scheduled(event, env, ctx) { ctx.waitUntil(buildNextState(env).then(r => console.log('osm build', r))); },
+
   async fetch(request, env) {
     const url = new URL(request.url);
     const cors = corsHeaders(request, env);

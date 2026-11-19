@@ -92,6 +92,7 @@ footer{padding:36px 0 48px;border-top:1px solid var(--line);margin-top:48px;font
 /* card opened below its pin */
 .flip .leaflet-popup-tip-container{display:none}
 .leaflet-popup-content-wrapper{max-height:min(320px,52vh);overflow:auto}
+.clu{width:100%;height:100%;border-radius:50%;background:rgba(154,74,46,.88);color:#FFF8F0;display:flex;align-items:center;justify-content:center;font:600 .8rem Inter,sans-serif;border:3px solid rgba(251,248,242,.85);box-shadow:0 1px 5px rgba(0,0,0,.35);box-sizing:border-box}
 #zoomHint{font-size:.85rem;color:var(--muted);margin:8px 0 0}
 </style>
 </head>
@@ -123,7 +124,7 @@ footer{padding:36px 0 48px;border-top:1px solid var(--line);margin-top:48px;font
  <span><span class="dot v"></span><span id="nv">12</span> visited</span>
  <span><span class="dot ok"></span>Verified by the shop</span>
  <span><span class="dot r"></span>On our route</span>
- <span><span class="dot o"></span>Other antique shops</span>
+ <span><span class="dot o"></span>Other antique shops (circles show how many)</span>
  <span class="filters" role="group" aria-label="Area" id="areas"><button type="button" data-a="all" aria-pressed="true">Our trips</button><button type="button" data-a="se" aria-pressed="false">Kentucky to the Carolinas</button><button type="button" data-a="mo" aria-pressed="false">Springfield, Missouri</button></span>
 </div>
 <div id="map" role="region" aria-label="Map of antique malls"></div>
@@ -155,6 +156,7 @@ footer{padding:36px 0 48px;border-top:1px solid var(--line);margin-top:48px;font
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js" crossorigin=""></script>
 <script>
 (function(){
 var API='https://tabella-shipping.shawn-greene1981.workers.dev';
@@ -218,7 +220,7 @@ function applySaved(list){(list||[]).forEach(function(e){var p=P[e.id];
   if(e.ll&&!T[e.town])T[e.town]=e.ll;
   if(!p){if(e.s==='x')return;var ll=e.ll||T[e.town];if(!ll)return;p=P[e.id]={id:e.id,name:e.name,town:e.town,s:e.s,best:e.best||'',ll:ll.slice(),exact:!!e.ll,ours:e.s!=='o',listing:''};if(p.ours)OUR.push(e.id)}
   if(e.s==='x'){p.hidden=true;return}
-  p.s=e.s||p.s;if(e.best)p.best=e.best;if(e.verified){p.verified=true;p.website=e.website||'';p.phone=e.phone||''}if(e.addr)p.addr=e.addr;
+  p.s=e.s||p.s;if(e.best)p.best=e.best;if(e.verified){p.verified=true;VER.push(e.id);p.website=e.website||'';p.phone=e.phone||''}if(e.addr)p.addr=e.addr;
   if(e.ll&&e.s==='o'){p.ll=e.ll.slice();p.exact=true}if(e.osm)p.osm=e.osm})}
 
 // ---------- drawing the lists for our trips
@@ -230,6 +232,9 @@ function drawLists(){var vis=$('visited'),rt=$('route'),nv=0;vis.innerHTML='';rt
 
 if(!window.L){$('map').innerHTML='<p style="padding:20px;color:var(--muted)">The map could not load. Our shops are listed below.</p>';}
 var map=window.L?L.map('map',{scrollWheelZoom:false}):null,pinned=null,stopIds={};
+var cl=map&&L.markerClusterGroup?L.markerClusterGroup({showCoverageOnHover:false,maxClusterRadius:60,disableClusteringAtZoom:11,spiderfyOnMaxZoom:false,chunkedLoading:true,
+  iconCreateFunction:function(c){var n=c.getChildCount(),z=n<10?30:n<100?36:n<1000?44:52;return L.divIcon({html:'<div class="clu">'+(n>=1000?Math.round(n/100)/10+'k':n)+'</div>',className:'',iconSize:[z,z]})}}):null;
+if(cl)map.addLayer(cl);
 if(map)L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:18,attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'}).addTo(map);
 function kind(p){return p.verified?'ok':p.ours?p.s:'o'}
 function popHtml(p){var k=kind(p),where=p.addr||p.town||'';
@@ -248,23 +253,28 @@ function fit(mk){var pop=mk._pop,el=pop.getElement();if(!el||!map.latLngToContai
   if(pt.y-h-24<pad){dy=h+22;el.classList.add('flip')}
   if(pt.x-w/2<pad)dx=pad-(pt.x-w/2);else if(pt.x+w/2>sz.x-pad)dx=(sz.x-pad)-(pt.x+w/2);
   if(dx||dy!==-4){pop.options.offset=[dx,dy];pop.update()}}
-function show(mk){mk._pop.setLatLng(mk.getLatLng()).setContent(popHtml(mk._p));map.openPopup(mk._pop);fit(mk)}
+function show(mk){if(!mk._pop)mk._pop=L.popup({autoPan:false,offset:[0,-4]});mk._pop.setLatLng(mk.getLatLng()).setContent(popHtml(mk._p));map.openPopup(mk._pop);fit(mk)}
 function pin(mk){pinned=null;map.closePopup();show(mk);pinned=mk;var el=mk._pop.getElement();el&&el.classList.add('pinned');fit(mk)}
 if(map)map.on('popupclose',function(e){if(pinned&&e.popup===pinned._pop){var el=e.popup.getElement();el&&el.classList.remove('pinned');pinned=null}});
-function place(p){if(!map||p.hidden)return;var k=kind(p),sz=k==='o'?[11,11]:k==='r'?[12,12]:[16,16];
-  var icon=L.divIcon({className:'',html:'<div class="pin '+k+(stopIds[p.id]?' stop':'')+'"></div>',iconSize:sz});
-  if(p.mk){p.mk.setIcon(icon);p.mk.setLatLng(p.ll);return}
-  var mk=L.marker(p.ll,{icon:icon,title:p.name,keyboard:true,zIndexOffset:k==='o'?0:k==='r'?200:500});
-  mk._p=p;mk._pop=L.popup({autoPan:false,offset:[0,-4]}).setLatLng(p.ll).setContent(popHtml(p));
+function place(p,batch){if(!map||p.hidden)return;var k=kind(p),sz=k==='o'?[11,11]:k==='r'?[12,12]:[16,16];
+  var icon=L.divIcon({className:'',html:'<div class="pin '+k+(stopIds[p.id]?' stop':'')+'"></div>',iconSize:sz}),inCl=k==='o'&&!!cl;
+  if(p.mk){var mk0=p.mk;if(mk0._k!==icon.html){mk0.setIcon(icon);mk0._k=icon.html}mk0.setLatLng(p.ll);
+    if(mk0._inCl&&!inCl){cl.removeLayer(mk0);mk0.addTo(map);mk0._inCl=false}return}
+  var mk=L.marker(p.ll,{icon:icon,title:p.name,keyboard:true,zIndexOffset:k==='o'?0:k==='r'?200:500});mk._k=icon.html;
+  mk._p=p;
   mk.on('mouseover',function(){if(!pinned)show(mk)});
-  mk.on('mouseout',function(){if(!pinned)map.closePopup(mk._pop)});
+  mk.on('mouseout',function(){if(!pinned&&mk._pop)map.closePopup(mk._pop)});
   mk.on('click',function(){if(pinned===mk){window.open(goUrl(p),p.listing?'_self':'_blank');return}pin(mk)});
-  p.mk=mk;mk.addTo(map)}
+  p.mk=mk;mk._inCl=inCl;if(inCl){if(batch)batch.push(mk);else cl.addLayer(mk)}else mk.addTo(map)}
 function spread(){var seen={};OUR.forEach(function(id){var p=P[id];if(!p||p.exact||p.hidden)return;var n=seen[p.town]=(seen[p.town]||0)+1,a=n*2.4,d=n>1?0.012*Math.sqrt(n):0,c=T[p.town];p.ll=[c[0]+d*Math.sin(a),c[1]+d*1.25*Math.cos(a)]})}
 // An OpenStreetMap shop that is one of ours moves our pin to the exact spot instead of adding a second pin.
-function addOsm(list){(list||[]).forEach(function(s){if(P[s.id]||osmSeen[s.id])return;osmSeen[s.id]=1;
-  for(var id in P){var p=P[id];if(p.osm===s.id||(!p.exact&&p.name&&core(p.name)&&core(p.name)===core(s.name)&&hav(p.ll,[s.lat,s.lon])<25)){p.ll=[s.lat,s.lon];p.exact=true;p.addr=p.addr||s.addr;p.hours=s.hours;p.osm=s.id;place(p);return}}
-  var p={id:s.id,name:s.name,town:s.town,addr:s.addr,hours:s.hours,ll:[s.lat,s.lon],exact:true,s:'o',ours:false,listing:''};P[s.id]=p;place(p)})}
+var VER=[];
+function addOsm(list){var batch=[],cand=OUR.concat(VER);(list||[]).forEach(function(s){var p=P[s.id];
+  if(p){if(s.addr){p.addr=s.addr;p.hours=s.hours;if(s.town)p.town=s.town}return}
+  if(osmSeen[s.id]){var q=P[osmSeen[s.id]];if(q&&s.addr){q.addr=q.addr||s.addr;q.hours=s.hours}return}
+  var sc=null;for(var i=0;i<cand.length;i++){p=P[cand[i]];if(!p)continue;if(p._c==null)p._c=core(p.name);if(p.osm===s.id||(!p.exact&&p._c&&p._c===(sc==null?(sc=core(s.name)):sc)&&hav(p.ll,[s.lat,s.lon])<25)){osmSeen[s.id]=p.id;p.ll=[s.lat,s.lon];p.exact=true;p.addr=p.addr||s.addr;p.hours=s.hours;p.osm=s.id;place(p);return}}
+  osmSeen[s.id]=s.id;p={id:s.id,name:s.name,town:s.town,addr:s.addr,hours:s.hours,ll:[s.lat,s.lon],exact:true,s:'o',ours:false,listing:''};P[s.id]=p;place(p,batch)});
+  if(batch.length)cl.addLayers(batch)}
 var osmSeen={};
 
 // ---------- load every shop in the area being looked at (half-degree squares, cached by the server)
@@ -304,9 +314,9 @@ function plan(f,t,mi){var btn=$('tripBtn');btn.disabled=true;btn.textContent='Pl
     var ids={};d.shops.forEach(function(s){var p=P[s.id]||Object.keys(P).map(function(k){return P[k]}).filter(function(p){return p.osm===s.id})[0];if(p){p.along=s.along;p.off=s.off;ids[p.id]=1}});
     Object.keys(P).forEach(function(k){var p=P[k];if(ids[k]||p.hidden||!(p.ours||p.verified))return;var r=nearLine(p.ll,line);if(r[0]<=Number(mi)+(p.exact?0:3)){p.along=Math.round(cum[r[1]]*sc);p.off=Math.round(r[0]*10)/10;ids[k]=1}});
     var stops=Object.keys(ids).map(function(k){return P[k]}).sort(function(a,b){return a.along-b.along});
-    stopIds={};stops.forEach(function(p){if(p.ours&&p.s==='v'||p.verified)stopIds[p.id]=1});
+    var was=stopIds;stopIds={};stops.forEach(function(p){if(p.ours&&p.s==='v'||p.verified)stopIds[p.id]=1});
     if(routeLine)map.removeLayer(routeLine);routeLine=L.polyline(line,{color:'#2F6FA8',weight:5,opacity:.75}).addTo(map);map.fitBounds(routeLine.getBounds(),{padding:[24,24]});
-    Object.keys(P).forEach(function(k){place(P[k])});
+    Object.keys(was).concat(Object.keys(stopIds)).forEach(function(k){if(P[k])place(P[k])});
     drawTrip(stops);msg('');
     try{history.replaceState(null,'','?from='+encodeURIComponent(f)+'&to='+encodeURIComponent(t)+'&mi='+mi+'#trip')}catch(e){}
   }).catch(function(err){msg(err.message,1)}).then(function(){btn.disabled=false;btn.textContent='Plan trip'})}
@@ -331,6 +341,9 @@ $('visited').addEventListener('click',function(e){var b=e.target.closest('button
 var started=false;
 function start(list){if(started)return;started=true;try{applySaved(list)}catch(e){}spread();drawLists();
   if(!map)return;Object.keys(P).forEach(function(k){place(P[k])});area('all');
+  if(cl)fetch(API+'/places/us').then(function(r){return r.json()}).then(function(d){
+    addOsm((d.shops||[]).map(function(x){return{id:x[0],lat:x[1],lon:x[2],name:x[3],town:x[4],addr:'',hours:''}}));
+    if(d.of&&d.states<d.of){$('zoomHint').hidden=false;$('zoomHint').textContent='Filling in antique shops across the country: '+d.states+' of '+d.of+' states so far. Zoom in or search to see any area now.'}}).catch(function(){});
   var q=new URLSearchParams(location.search);
   if(q.get('from')&&q.get('to')){tab(true);$('from').value=q.get('from');$('to').value=q.get('to');if(q.get('mi'))$('mi').value=q.get('mi');plan(q.get('from'),q.get('to'),$('mi').value)}
   else if(/springfield/i.test(location.hash)){$('areas').querySelector('[data-a=mo]').click()}
