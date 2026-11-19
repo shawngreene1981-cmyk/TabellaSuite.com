@@ -89,7 +89,7 @@ function load(){fetch(API+'/shop/order?ref='+ref).then(function(r){return r.json
   o.innerHTML='<p>Order <b>'+esc(d.ref)+'</b>. '+(d.status==='paid'?'Payment received. We will email tracking when it ships.':'We are still confirming your payment. Check your email for the receipt.')+'</p>'+
    d.items.map(function(i){return row(esc(i.title),fm(i.price))}).join('')+
    (d.shipping?row('Shipping, '+esc(d.shipping.carrier)+' '+esc(d.shipping.service||''),fm(d.shipping.amount)):'')+
-   (d.tax?row('Sales tax',fm(d.tax)):'')+(d.total?row('Total charged',fm(d.total),1):'')+(d.refunded?'<p class="meta" style="margin-top:12px">This order was refunded.</p>':'')}).catch(function(){o.textContent='Could not load your order. Refresh to try again.'})}
+   (d.tax?row('Sales tax',fm(d.tax)):'')+(d.cardProcessing?row('Card processing',fm(d.cardProcessing)):'')+(d.total?row('Total charged',fm(d.total),1):'')+(d.refunded?'<p class="meta" style="margin-top:12px">This order was refunded.</p>':'')}).catch(function(){o.textContent='Could not load your order. Refresh to try again.'})}
 load();
 })();
 </script>

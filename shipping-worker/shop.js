@@ -116,7 +116,7 @@ export async function handleShop(request, env, url, json, cors, shippoFetch) {
       if (!env.ORDERS || !/^o_[a-z0-9]+$/.test(ref)) return json({ error: 'Order not found.' }, 404, cors);
       const o = JSON.parse(await env.ORDERS.get('order:' + ref) || 'null');
       if (!o) return json({ error: 'Order not found.' }, 404, cors);
-      return json({ ref, status: o.status, items: o.items.map(i => ({ id: i.id, title: i.title, price: i.price })), shipping: o.shipping && { amount: o.shipping.amount, carrier: o.shipping.carrier, service: o.shipping.service }, tax: o.breakdown && o.breakdown.tax, total: o.breakdown && o.breakdown.total, refunded: o.status === 'refunded' }, 200, cors);
+      return json({ ref, status: o.status, items: o.items.map(i => ({ id: i.id, title: i.title, price: i.price })), shipping: o.shipping && { amount: o.shipping.amount, carrier: o.shipping.carrier, service: o.shipping.service }, tax: o.breakdown && o.breakdown.tax, cardProcessing: o.breakdown && o.breakdown.cardProcessing, total: o.breakdown && o.breakdown.total, refunded: o.status === 'refunded' }, 200, cors);
     }
     return json({ error: 'Not found' }, 404, cors);
   } catch (e) {
