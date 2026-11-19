@@ -179,8 +179,9 @@ export async function verifySignature(raw, header, secret, nowSec) {
 async function onboardingLink(env, account, returnUrl) {
   const site = String(env.SITE_URL || 'https://tabellasuite.com').replace(/\/$/, '');
   const back = safeUrl(returnUrl, site) || site + '/';
+  // Since API 2026-09-30.endive Stripe works out which configurations need onboarding; sending them is rejected.
   return stripeV2(env, 'POST', '/v2/core/account_links', { account,
-    use_case: { type: 'account_onboarding', account_onboarding: { configurations: ['recipient'], return_url: back, refresh_url: back } } });
+    use_case: { type: 'account_onboarding', account_onboarding: { return_url: back, refresh_url: back } } });
 }
 
 async function stripe(env, method, path, fields, idem) {
