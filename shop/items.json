@@ -1,0 +1,237 @@
+{
+ "updated": "2026-11-19",
+ "dealers": {
+  "shantiques": {
+   "name": "Shantiques",
+   "account": "acct_1UdVSkBU5enShgDN",
+   "about": "Vintage decor, glassware and furniture."
+  }
+ },
+ "items": [
+  {
+   "id": "SH-0001",
+   "title": "Wood and iron vintage church hanging window",
+   "category": "Decor",
+   "price": 60.0,
+   "dealer": "shantiques",
+   "photo": "img/SH-0001.jpg",
+   "shippable": false
+  },
+  {
+   "id": "SH-0002",
+   "title": "Bamboo chest with brass fitting",
+   "category": "Decor",
+   "price": 15.0,
+   "dealer": "shantiques",
+   "photo": "img/SH-0002.jpg",
+   "shippable": false
+  },
+  {
+   "id": "SH-0003",
+   "title": "Oak stool or bench",
+   "category": "Furniture",
+   "price": 25.0,
+   "dealer": "shantiques",
+   "photo": "img/SH-0003.jpg",
+   "shippable": false
+  },
+  {
+   "id": "SH-0011",
+   "title": "Potted terrarium bird bath miniature",
+   "category": "Decor",
+   "price": 15.0,
+   "dealer": "shantiques",
+   "photo": "img/SH-0011.jpg",
+   "shippable": false
+  },
+  {
+   "id": "SH-0025",
+   "title": "Brass stand",
+   "category": "Decor",
+   "price": 15.0,
+   "dealer": "shantiques",
+   "photo": "img/SH-0025.jpg",
+   "shippable": false
+  },
+  {
+   "id": "SH-0026",
+   "title": "Lantern",
+   "category": "Decor",
+   "price": 58.0,
+   "dealer": "shantiques",
+   "photo": "img/SH-0026.jpg",
+   "shippable": false
+  },
+  {
+   "id": "SH-0027",
+   "title": "Oil lantern",
+   "category": "Decor",
+   "price": 30.0,
+   "dealer": "shantiques",
+   "photo": "img/SH-0027.jpg",
+   "shippable": false
+  },
+  {
+   "id": "SH-0028",
+   "title": "Wood shelf",
+   "category": "Furniture",
+   "price": 20.0,
+   "dealer": "shantiques",
+   "photo": "img/SH-0028.jpg",
+   "shippable": false
+  },
+  {
+   "id": "SH-0029",
+   "title": "Brass basket",
+   "category": "Decor",
+   "price": 18.0,
+   "dealer": "shantiques",
+   "photo": "img/SH-0029.jpg",
+   "shippable": false
+  },
+  {
+   "id": "SH-0030",
+   "title": "Small brass spittoon",
+   "category": "Decor",
+   "price": 32.0,
+   "dealer": "shantiques",
+   "photo": "img/SH-0030.jpg",
+   "shippable": false
+  },
+  {
+   "id": "SH-0031",
+   "title": "Duck planter",
+   "category": "Decor",
+   "price": 10.0,
+   "dealer": "shantiques",
+   "photo": "img/SH-0031.jpg",
+   "shippable": false
+  },
+  {
+   "id": "SH-0032",
+   "title": "Blue duck planter",
+   "category": "Decor",
+   "price": 12.0,
+   "dealer": "shantiques",
+   "photo": "img/SH-0032.jpg",
+   "shippable": false
+  },
+  {
+   "id": "SH-0033",
+   "title": "Antique bench",
+   "category": "Furniture",
+   "price": 85.0,
+   "dealer": "shantiques",
+   "photo": "img/SH-0033.jpg",
+   "shippable": false
+  },
+  {
+   "id": "SH-0034",
+   "title": "Milk glass basket",
+   "category": "Glassware",
+   "price": 80.0,
+   "dealer": "shantiques",
+   "photo": "img/SH-0034.jpg",
+   "shippable": false
+  },
+  {
+   "id": "SH-0035",
+   "title": "Japanese Turkey platter (hairline crack)",
+   "category": "Glassware",
+   "price": 14.0,
+   "dealer": "shantiques",
+   "photo": "img/SH-0035.jpg",
+   "shippable": false
+  },
+  {
+   "id": "SH-0036",
+   "title": "Watt ceramic bowl",
+   "category": "Glassware",
+   "price": 45.0,
+   "dealer": "shantiques",
+   "photo": "img/SH-0036.jpg",
+   "shippable": false
+  },
+  {
+   "id": "SH-0037",
+   "title": "Decanter",
+   "category": "Glassware",
+   "price": 22.0,
+   "dealer": "shantiques",
+   "photo": "img/SH-0037.jpg",
+   "shippable": false
+  },
+  {
+   "id": "SH-0038",
+   "title": "Glass dog decanter",
+   "category": "Glassware",
+   "price": 28.0,
+   "dealer": "shantiques",
+   "photo": "img/SH-0038.jpg",
+   "shippable": false
+  },
+  {
+   "id": "SH-0040",
+   "title": "House trinket shelf (decor shown sold separately)",
+   "category": "Decor",
+   "price": 20.0,
+   "dealer": "shantiques",
+   "photo": "img/SH-0040.jpg",
+   "shippable": false
+  },
+  {
+   "id": "SH-0041",
+   "title": "Willow thicket hand woven hanging potted plant base (display stand not included)",
+   "category": "Decor",
+   "price": 10.0,
+   "dealer": "shantiques",
+   "photo": "img/SH-0041.jpg",
+   "shippable": false
+  },
+  {
+   "id": "SH-0042",
+   "title": "Office globe, silver finish",
+   "category": "Decor",
+   "price": 30.0,
+   "dealer": "shantiques",
+   "photo": "img/SH-0042.jpg",
+   "shippable": false
+  },
+  {
+   "id": "SH-0052",
+   "title": "Owl trivet",
+   "category": "Decor",
+   "price": 15.0,
+   "dealer": "shantiques",
+   "photo": "img/SH-0052.jpg",
+   "shippable": false
+  },
+  {
+   "id": "SH-0055",
+   "title": "Fine China Japan Jacqueline 3 piece serving set",
+   "category": "Glassware",
+   "price": 100.0,
+   "dealer": "shantiques",
+   "photo": "img/SH-0055.jpg",
+   "shippable": false
+  },
+  {
+   "id": "SH-0056",
+   "title": "Vase",
+   "category": "Glassware",
+   "price": 8.0,
+   "dealer": "shantiques",
+   "photo": "img/SH-0056.jpg",
+   "shippable": false
+  },
+  {
+   "id": "SH-0057",
+   "title": "Vintage candy dish",
+   "category": "Glassware",
+   "price": 30.0,
+   "dealer": "shantiques",
+   "photo": "img/SH-0057.jpg",
+   "shippable": false
+  }
+ ]
+}

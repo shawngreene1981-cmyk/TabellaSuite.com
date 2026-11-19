@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Shop | Tabella</title>
+<meta name="robots" content="noindex">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Inter:wght@400;500;600&display=swap">
+<style>
+
+:root{--bg:#F4EFE6;--bg2:#EBE4D6;--ink:#231F1A;--muted:#6A6259;--line:#D5CCBA;--terra:#9A4A2E;--terra-ink:#FFF8F0;--gold:#A8842F;--card:#FBF8F2;--focus:#2F6FA8;--green:#3F6B45;--grey:#8C8478}
+@media (prefers-color-scheme:dark){:root{--bg:#1A1714;--bg2:#221E1A;--ink:#EFE8DB;--muted:#A89F90;--line:#3A342D;--terra:#D98A66;--terra-ink:#1A1714;--gold:#D2B15E;--card:#25211C;--focus:#7FB8E6;--green:#8DBE8F;--grey:#9C9486}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:17px/1.6 Inter,system-ui,sans-serif;padding-left:max(20px,env(safe-area-inset-left,0px));padding-right:max(20px,env(safe-area-inset-right,0px))}
+a{color:var(--terra)}
+.w{max-width:1040px;margin:0 auto}
+h1,h2,h3{font-family:'Cormorant Garamond',Georgia,serif;font-weight:600;line-height:1.1;margin:0;text-wrap:balance}
+.cap{font-family:Cinzel,'Times New Roman',serif;letter-spacing:.18em;text-transform:uppercase;font-size:.78rem;color:var(--gold);font-weight:600}
+
+.logo{font-family:Cinzel,serif;font-weight:600;letter-spacing:.22em;font-size:1.05rem;text-decoration:none;color:var(--ink)}
+header.top{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:20px 0;flex-wrap:wrap}nav.main{display:flex;flex-wrap:wrap;gap:4px 18px;align-items:center}nav.main a{font-size:.92rem;text-decoration:none;color:var(--muted);padding:6px 0}nav.main a:hover,nav.main a[aria-current]{color:var(--ink)}nav.main a.cta{color:var(--terra-ink);background:var(--terra);padding:7px 14px;border-radius:6px;font-weight:600}@media(max-width:640px){nav.main a.opt{display:none}}
+h1{font-size:clamp(2.4rem,5.6vw,4rem);margin:10px 0 14px}
+.lede{font-size:1.12rem;color:var(--muted);max-width:38em;margin:0 0 22px}
+a:focus-visible,button:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+
+.test{background:var(--gold);color:#1A1714;font-weight:600;font-size:.9rem;padding:9px 14px;border-radius:8px;margin:0 0 18px}
+.bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;margin:0 0 18px}
+.chips button{font:500 .85rem Inter,sans-serif;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:99px;padding:6px 14px;min-height:36px;cursor:pointer;margin:0 6px 6px 0}
+.chips button[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px;list-style:none;margin:0;padding:0}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:hidden;display:flex;flex-direction:column}
+.card button.open{all:unset;cursor:pointer;display:block}
+.card button.open:focus-visible{outline:2px solid var(--focus);outline-offset:-2px}
+.ph{aspect-ratio:1/1;background:var(--bg2);overflow:hidden}.ph img{width:100%;height:100%;object-fit:cover;display:block}
+.cb{padding:12px 14px 14px;display:flex;flex-direction:column;gap:4px;flex:1}
+.cb h3{font-size:1.2rem}
+.meta{font-size:.82rem;color:var(--muted)}
+.price{font-weight:600;font-size:1.05rem}
+.btn{font:600 .92rem Inter,sans-serif;border:0;border-radius:8px;padding:10px 16px;min-height:44px;cursor:pointer;background:var(--terra);color:var(--terra-ink)}
+.btn.sec{background:var(--card);color:var(--ink);border:1px solid var(--line)}
+.btn[disabled]{opacity:.55;cursor:not-allowed}
+.soonb{display:inline-block;align-self:flex-start;font-size:.75rem;font-weight:600;color:var(--muted);border:1px solid var(--line);border-radius:99px;padding:2px 9px}
+.cartbtn{position:sticky;top:10px;z-index:5}
+dialog{border:0;border-radius:14px;padding:0;max-height:92vh;overflow:auto;max-width:min(560px,94vw);width:100%;background:var(--card);color:var(--ink);box-shadow:0 20px 60px rgba(0,0,0,.35)}
+dialog::backdrop{background:rgba(20,16,12,.55)}
+.dlg{padding:18px 20px 20px}
+.dlg img{width:100%;border-radius:8px;max-height:60vh;object-fit:contain;background:var(--bg2)}
+.x{float:right;background:none;border:0;font-size:1.6rem;line-height:1;cursor:pointer;color:var(--muted);min-width:44px;min-height:44px}
+.rm{background:none;border:0;color:var(--terra);font:500 .85rem Inter,sans-serif;cursor:pointer;min-height:36px;text-decoration:underline}
+label{display:block;font-size:.85rem;margin:8px 0 2px}
+input{font:inherit;width:100%;padding:9px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)}
+.row2{display:grid;grid-template-columns:2fr 1fr 1fr;gap:8px}
+.line{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid var(--line)}
+.rate{display:flex;gap:10px;align-items:center;border:1px solid var(--line);border-radius:8px;padding:9px 12px;margin:6px 0;cursor:pointer}
+.rate input{width:auto}
+.msg{border-radius:8px;padding:10px 12px;margin:10px 0;font-size:.92rem}.msg.err{background:#F6E2DC;color:#7A2A17}.msg.ok{background:#E3EEDF;color:#264B2B}
+.empty{color:var(--muted);padding:20px 0}
+footer{padding:36px 0 48px;border-top:1px solid var(--line);margin-top:48px;font-size:.88rem;color:var(--muted);display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px}
+</style>
+</head>
+<body>
+<div class="w">
+<header class="top"><a class="logo" href="../">TABELLA</a><nav class="main" aria-label="Main"><a class="opt" href="../#shoppers">Shoppers</a><a class="opt" href="../#dealers">Dealers</a><a class="opt" href="../#malls">Malls</a><a href="../map.html">Mall map</a><a class="opt" href="../road-trip-1.html">Road trips</a><a class="opt" href="../pricing.html">Pricing</a><a class="cta" href="../#early">Early access</a></nav></header>
+<main>
+<p class="test" role="note">Test shop. Payments run in Stripe's sandbox: no real money moves. Pay with test card 4242 4242 4242 4242, any future date, any security code.</p>
+<div class="cap">Shop</div>
+<h1>Shantiques</h1>
+<p class="lede">Vintage decor, glassware and furniture. Every piece is one of a kind, photographed by the dealer, and shipped to your door.</p>
+<div class="bar"><div class="chips" id="chips" role="group" aria-label="Category"></div><button class="btn cartbtn" id="cartBtn" type="button">Cart (0)</button></div>
+<div id="canceled"></div>
+<ul class="grid" id="grid"><li class="empty">Loading the shop...</li></ul>
+</main>
+
+<dialog id="itemDlg" aria-labelledby="itTitle"><div class="dlg"><button class="x" type="button" data-close aria-label="Close">&times;</button>
+<img id="itImg" alt=""><h2 id="itTitle" style="font-size:1.7rem;margin:12px 0 4px"></h2><p class="meta" id="itMeta"></p>
+<p class="price" id="itPrice"></p><div id="itAct"></div></div></dialog>
+
+<dialog id="cartDlg" aria-labelledby="cartH"><div class="dlg"><button class="x" type="button" data-close aria-label="Close">&times;</button>
+<h2 id="cartH" style="font-size:1.7rem;margin:0 0 10px">Your cart</h2>
+<div id="cartList"></div>
+<form id="addr" hidden novalidate>
+ <h3 style="font-size:1.3rem;margin:14px 0 2px">Ship to</h3>
+ <label for="aName">Full name</label><input id="aName" autocomplete="name" required>
+ <label for="aSt">Street address</label><input id="aSt" autocomplete="address-line1" required>
+ <label for="aSt2">Apartment, suite (optional)</label><input id="aSt2" autocomplete="address-line2">
+ <div class="row2"><div><label for="aCity">City</label><input id="aCity" autocomplete="address-level2" required></div>
+ <div><label for="aState">State</label><input id="aState" autocomplete="address-level1" maxlength="2" placeholder="MO" required></div>
+ <div><label for="aZip">ZIP</label><input id="aZip" autocomplete="postal-code" inputmode="numeric" maxlength="10" required></div></div>
+ <label for="aEmail">Email, for your receipt and tracking</label><input id="aEmail" type="email" autocomplete="email" required>
+ <button class="btn sec" id="getShip" type="submit" style="margin-top:12px">Get shipping options</button>
+</form>
+<div id="rates"></div><div id="totals"></div><div id="cartMsg" aria-live="polite"></div>
+<button class="btn" id="payBtn" type="button" hidden style="width:100%;margin-top:8px">Go to secure checkout</button>
+</div></dialog>
+<footer><span>&copy; <span id="y"></span> Tabella Suite &middot; <a href="mailto:contact@tabellasuite.com">contact@tabellasuite.com</a></span><span><a href="../pricing.html">Pricing</a> &middot; <a href="../privacy.html">Privacy</a></span></footer>
+</div>
+<script>
+(function(){
+var API='https://tabella-shipping.shawn-greene1981.workers.dev';
+var $=function(i){return document.getElementById(i)};
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
+function fm(n){return '$'+Number(n).toFixed(2)}
+$('y').textContent=new Date().getFullYear();
+var CAT={items:[]},GONE={},cart=[],cat='All',rate=null,sub=0;
+try{cart=JSON.parse(localStorage.getItem('tabCart')||'[]')}catch(e){cart=[]}
+function save(){try{localStorage.setItem('tabCart',JSON.stringify(cart))}catch(e){}$('cartBtn').textContent='Cart ('+cart.length+')'}
+function item(id){return CAT.items.filter(function(i){return i.id===id})[0]}
+function draw(){
+  var cats=['All'];CAT.items.forEach(function(i){if(cats.indexOf(i.category)<0)cats.push(i.category)});
+  $('chips').innerHTML=cats.map(function(c){return '<button type="button" aria-pressed="'+(c===cat)+'" data-c="'+esc(c)+'">'+esc(c)+'</button>'}).join('');
+  var list=CAT.items.filter(function(i){return !GONE[i.id]&&(cat==='All'||i.category===cat)});
+  $('grid').innerHTML=list.length?list.map(function(i){
+    return '<li class="card"><button class="open" type="button" data-open="'+i.id+'" aria-label="'+esc(i.title)+', '+fm(i.price)+'"><div class="ph"><img src="'+esc(i.photo)+'" alt="" loading="lazy" width="450" height="450"></div></button>'+
+    '<div class="cb"><h3>'+esc(i.title)+'</h3><div class="meta">'+esc(i.category)+' &middot; '+i.id+'</div><div class="price">'+fm(i.price)+'</div>'+
+    (i.shippable?'':'<span class="soonb">Shipping coming soon</span>')+'</div></li>'}).join(''):'<li class="empty">Nothing here right now. Check back soon.</li>';
+  save()}
+document.addEventListener('click',function(e){
+  var t=e.target.closest('[data-c],[data-open],[data-add],[data-rm],[data-close]');if(!t)return;
+  if(t.hasAttribute('data-c')){cat=t.getAttribute('data-c');draw()}
+  else if(t.hasAttribute('data-open'))openItem(t.getAttribute('data-open'));
+  else if(t.hasAttribute('data-add')){var id=t.getAttribute('data-add');if(cart.indexOf(id)<0)cart.push(id);save();$('itemDlg').close();openCart()}
+  else if(t.hasAttribute('data-rm')){var r=t.getAttribute('data-rm');cart=cart.filter(function(x){return x!==r});save();resetShip();drawCart()}
+  else if(t.hasAttribute('data-close'))t.closest('dialog').close()});
+function openItem(id){var i=item(id);if(!i)return;
+  $('itImg').src=i.photo;$('itImg').alt=i.title;$('itTitle').textContent=i.title;$('itMeta').textContent=i.category+' · '+i.id+' · Sold by Shantiques';
+  $('itPrice').textContent=fm(i.price);
+  $('itAct').innerHTML=i.shippable?(cart.indexOf(id)>=0?'<button class="btn sec" type="button" data-close>In your cart</button>':'<button class="btn" type="button" data-add="'+id+'">Add to cart</button>'):'<p class="meta">This piece is being measured for shipping. It can be bought online soon.</p>';
+  $('itemDlg').showModal()}
+function resetShip(){rate=null;$('rates').innerHTML='';$('totals').innerHTML='';$('payBtn').hidden=true}
+function drawCart(){
+  cart=cart.filter(function(id){var i=item(id);return i&&i.shippable&&!GONE[id]});save();
+  if(!cart.length){$('cartList').innerHTML='<p class="empty">Your cart is empty.</p>';$('addr').hidden=true;resetShip();return}
+  sub=0;$('cartList').innerHTML=cart.map(function(id){var i=item(id);sub+=i.price;
+    return '<div class="line"><span>'+esc(i.title)+' <span class="meta">'+i.id+'</span></span><span>'+fm(i.price)+' <button type="button" class="rm" data-rm="'+id+'" aria-label="Remove '+esc(i.title)+'">Remove</button></span></div>'}).join('')+
+    '<div class="line"><b>Items</b><b>'+fm(sub)+'</b></div>';
+  $('addr').hidden=false}
+function openCart(){$('cartMsg').innerHTML='';drawCart();$('cartDlg').showModal()}
+$('cartBtn').onclick=openCart;
+function addr(){return{name:$('aName').value,street1:$('aSt').value,street2:$('aSt2').value,city:$('aCity').value,state:$('aState').value,zip:$('aZip').value}}
+function say(t,bad){$('cartMsg').innerHTML='<div class="msg '+(bad?'err':'ok')+'">'+esc(t)+'</div>'}
+async function post(p,b){var r=await fetch(API+p,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)});var d=await r.json().catch(function(){return{}});if(!r.ok)throw new Error(d.error||'Something went wrong. Try again.');return d}
+$('addr').addEventListener('submit',async function(e){e.preventDefault();resetShip();$('cartMsg').innerHTML='';
+  var b=$('getShip');b.disabled=true;b.textContent='Getting shipping...';
+  try{var d=await post('/shop/quote',{items:cart,to:addr()});
+    $('rates').innerHTML='<h3 style="font-size:1.3rem;margin:14px 0 2px">Shipping</h3>'+d.rates.map(function(r,k){return '<label class="rate"><input type="radio" name="rate" value="'+r.id+'" data-amt="'+r.amount+'"'+(k===0?' checked':'')+'> <span style="flex:1">'+esc(r.carrier)+' '+esc(r.service||'')+(r.days?' <span class="meta">about '+r.days+' days</span>':'')+'</span><b>'+fm(r.amount)+'</b></label>'}).join('');
+    pick(d.subtotal);$('rates').onchange=function(){pick(d.subtotal)};$('payBtn').hidden=false}
+  catch(err){say(err.message,1)}
+  b.disabled=false;b.textContent='Get shipping options'});
+function pick(s0){var r=document.querySelector('input[name=rate]:checked');if(!r)return;rate=r.value;var s=+r.getAttribute('data-amt'),pre=Math.round((s0+s)*100),tot=Math.ceil((pre+30)/(1-0.029));
+  $('totals').innerHTML='<div class="line"><span>Items</span><span>'+fm(s0)+'</span></div><div class="line"><span>Shipping</span><span>'+fm(s)+'</span></div><div class="line"><span>Card processing</span><span>'+fm((tot-pre)/100)+'</span></div><div class="line"><b>Total</b><b>'+fm(tot/100)+'</b></div>'}
+$('payBtn').onclick=async function(){var b=this;if(!rate)return;b.disabled=true;b.textContent='Opening checkout...';
+  try{var d=await post('/shop/checkout',{items:cart,to:addr(),rateId:rate,email:$('aEmail').value});location.href=d.url}
+  catch(err){say(err.message,1);b.disabled=false;b.textContent='Go to secure checkout'}};
+if(/canceled=/.test(location.search))$('canceled').innerHTML='<div class="msg ok">Checkout canceled. Your cart is still here.</div>';
+Promise.all([fetch('items.json',{cache:'no-cache'}).then(function(r){return r.json()}),fetch(API+'/shop/status').then(function(r){return r.json()}).catch(function(){return{sold:[],held:[]}})])
+ .then(function(a){CAT=a[0];(a[1].sold||[]).concat(a[1].held||[]).forEach(function(id){GONE[id]=1});draw()})
+ .catch(function(){$('grid').innerHTML='<li class="empty">The shop could not load. Refresh to try again.</li>'});
+})();
+</script>
+</body>
+</html>

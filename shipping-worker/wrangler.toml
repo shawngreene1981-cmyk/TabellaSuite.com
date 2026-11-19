@@ -14,3 +14,7 @@ SHOW_TEST_PAGE = "true"
 [previews.vars]
 ALLOWED_ORIGINS = "https://tabellasuite.com,https://www.tabellasuite.com"
 SHOW_TEST_PAGE = "true"
+
+# Shop holds, sold flags and order records. Cloudflare creates the store on first deploy.
+[[kv_namespaces]]
+binding = "ORDERS"

@@ -7,6 +7,7 @@
 //   SHOW_TEST_PAGE   optional. "true" shows a small test form at "/". Turn it off before using a live key.
 
 import { handleStripe, stripeMode } from './stripe.js';
+import { handleShop } from './shop.js';
 
 const SHIPPO = 'https://api.goshippo.com';
 const DEFAULT_ORIGINS = 'https://tabellasuite.com,https://www.tabellasuite.com';
@@ -24,6 +25,9 @@ export default {
 
     const paid = await handleStripe(request, env, url, json, cors);
     if (paid) return paid;
+
+    const shop = await handleShop(request, env, url, json, cors, (path, method, body) => shippo(env, path, method, body));
+    if (shop) return shop;
 
     if (url.pathname === '/' && request.method === 'GET') {
       if (String(env.SHOW_TEST_PAGE).toLowerCase() !== 'true') return new Response('Tabella shipping service', { headers: cors });
@@ -47,6 +51,14 @@ export default {
     return json({ error: 'Not found' }, 404, cors);
   }
 };
+
+async function shippo(env, path, method, body) {
+  if (!env.SHIPPO_API_KEY) { const e = new Error('The SHIPPO_API_KEY secret is not set.'); e.status = 500; throw e; }
+  const res = await fetch(SHIPPO + path, { method, headers: { 'Authorization': 'ShippoToken ' + env.SHIPPO_API_KEY, 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) { const e = new Error('Shippo said: ' + ((data && (data.detail || (data.messages && data.messages.map(m => m.text).join(' ')))) || res.status)); e.status = 502; throw e; }
+  return data;
+}
 
 function isTestKey(env) { return String(env.SHIPPO_API_KEY || '').startsWith('shippo_test_'); }
 

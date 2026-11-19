@@ -11,6 +11,8 @@
 // Money split per item (Shawn's decision): commission 9% of the sold price.
 //   mall 4%, Tabella 5%, dealer gets the rest. Card processing is a separate line on the buyer's receipt.
 
+import { shopAfterPayment } from './shop.js';
+
 const API = 'https://api.stripe.com/v1';
 const COMMISSION = 0.09, MALL_SHARE = 0.04;
 const CARD_PCT = 0.029, CARD_FIXED = 30; // cents; online card rate, passed to the buyer as its own line
@@ -80,24 +82,11 @@ export async function handleStripe(request, env, url, json, cors) {
       if (order.error) return json({ error: order.error }, 400, cors);
       if (mode === 'live') return json({ error: 'Live checkout must price items from Tabella inventory on the server, which is not built yet.' }, 403, cors);
       const site = String(env.SITE_URL || 'https://tabellasuite.com').replace(/\/$/, '');
-      const f = {
-        mode: 'payment',
+      const s = await createCheckoutSession(env, order, {
         success_url: safeUrl(b.successUrl, site, url.origin) || site + '/?paid={CHECKOUT_SESSION_ID}',
         cancel_url: safeUrl(b.cancelUrl, site, url.origin) || site + '/',
-        // Card rate only, so the Card processing line is right. Apple Pay and Google Pay ride on card.
-        'payment_method_types[0]': 'card', 'payment_method_types[1]': 'link',
-        'payment_intent_data[transfer_group]': order.group,
-        'metadata[group]': order.group,
-        'metadata[splits]': order.splitsMeta,
         'shipping_address_collection[allowed_countries][0]': 'US'
-      };
-      order.lines.forEach((l, i) => {
-        f['line_items[' + i + '][quantity]'] = '1';
-        f['line_items[' + i + '][price_data][currency]'] = 'usd';
-        f['line_items[' + i + '][price_data][unit_amount]'] = String(l.cents);
-        f['line_items[' + i + '][price_data][product_data][name]'] = l.name;
       });
-      const s = await stripe(env, 'POST', '/checkout/sessions', f);
       return json({ url: s.url, session: s.id, total: order.totalCents / 100, testMode: true,
         breakdown: order.breakdown }, 200, cors);
     }
@@ -140,6 +129,25 @@ export function buildOrder(b) {
   return { lines, splitsMeta, group, totalCents: total, breakdown: { items: breakdown, shipping: ship / 100, cardProcessing: fee / 100, total: total / 100 } };
 }
 
+// One Stripe Checkout page for an order built by buildOrder(). `extra` adds return links, metadata and so on.
+export async function createCheckoutSession(env, order, extra) {
+  const f = Object.assign({
+    mode: 'payment',
+    // Card rate only, so the Card processing line is right. Apple Pay and Google Pay ride on card.
+    'payment_method_types[0]': 'card', 'payment_method_types[1]': 'link',
+    'payment_intent_data[transfer_group]': order.group,
+    'metadata[group]': order.group,
+    'metadata[splits]': order.splitsMeta
+  }, extra || {});
+  order.lines.forEach((l, i) => {
+    f['line_items[' + i + '][quantity]'] = '1';
+    f['line_items[' + i + '][price_data][currency]'] = 'usd';
+    f['line_items[' + i + '][price_data][unit_amount]'] = String(l.cents);
+    f['line_items[' + i + '][price_data][product_data][name]'] = l.name;
+  });
+  return stripe(env, 'POST', '/checkout/sessions', f);
+}
+
 // ---------- after payment: move each share ----------
 async function webhook(request, env, json) {
   if (!env.STRIPE_WEBHOOK_SECRET) return json({ error: 'The STRIPE_WEBHOOK_SECRET secret is not set.' }, 500);
@@ -147,9 +155,11 @@ async function webhook(request, env, json) {
   const ok = await verifySignature(raw, request.headers.get('Stripe-Signature') || '', env.STRIPE_WEBHOOK_SECRET);
   if (!ok) return json({ error: 'Bad signature.' }, 400);
   const evt = JSON.parse(raw);
-  if (evt.type !== 'checkout.session.completed') return json({ ignored: evt.type }, 200);
   const s = evt.data.object;
+  if (evt.type === 'checkout.session.expired') { await shopAfterPayment(env, s, false); return json({ ok: true, released: true }, 200); }
+  if (evt.type !== 'checkout.session.completed') return json({ ignored: evt.type }, 200);
   if (s.payment_status !== 'paid') return json({ ignored: 'not paid' }, 200);
+  await shopAfterPayment(env, s, true);
   const pi = await stripe(env, 'GET', '/payment_intents/' + s.payment_intent);
   const charge = pi.latest_charge;
   const splits = String((s.metadata && s.metadata.splits) || '').split(',').filter(Boolean).map(x => x.split(':'));
