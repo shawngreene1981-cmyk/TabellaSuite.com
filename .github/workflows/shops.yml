@@ -1,0 +1,42 @@
+name: Build mall map shops
+
+# Refreshes data/shops/*.json (every antique shop in OpenStreetMap, by state) for the mall map.
+on:
+  schedule:
+    - cron: '17 9 * * 1'   # Mondays, early morning US time
+  workflow_dispatch:
+    inputs:
+      states:
+        description: 'Only these states, separated by spaces (blank = all)'
+        required: false
+  push:
+    branches: [main]
+    paths: ['tools/build_shops.py', '.github/workflows/shops.yml']
+
+permissions:
+  contents: write
+
+concurrency:
+  group: shops
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Download shops from OpenStreetMap
+        run: python tools/build_shops.py ${{ github.event.inputs.states }}
+      - name: Save to the website
+        run: |
+          git config user.name "Tabella map builder"
+          git config user.email "contact@tabellasuite.com"
+          git add data/shops
+          if git diff --cached --quiet; then echo "No changes"; exit 0; fi
+          git commit -m "Mall map: refresh antique shops from OpenStreetMap"
+          git pull --rebase origin main
+          git push
