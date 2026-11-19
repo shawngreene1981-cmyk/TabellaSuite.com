@@ -66,8 +66,8 @@ footer{padding:36px 0 48px;border-top:1px solid var(--line);margin-top:48px;font
 <main>
 <p class="test" role="note">Test shop. Payments run in Stripe's sandbox: no real money moves. Pay with test card 4242 4242 4242 4242, any future date, any security code.</p>
 <div class="cap">Shop</div>
-<h1>Shantiques</h1>
-<p class="lede">Vintage decor, glassware and furniture. Every piece is one of a kind, photographed by the dealer, and shipped to your door.</p>
+<h1>The Tabella shop</h1>
+<p class="lede">One-of-a-kind vintage and antique finds from independent dealers. Every piece is photographed by the dealer who has it, and shipped to your door.</p>
 <div class="bar"><div class="chips" id="chips" role="group" aria-label="Category"></div><button class="btn cartbtn" id="cartBtn" type="button">Cart (0)</button></div>
 <div id="canceled"></div>
 <ul class="grid" id="grid"><li class="empty">Loading the shop...</li></ul>
@@ -113,7 +113,7 @@ function draw(){
   var list=CAT.items.filter(function(i){return !GONE[i.id]&&(cat==='All'||i.category===cat)});
   $('grid').innerHTML=list.length?list.map(function(i){
     return '<li class="card"><button class="open" type="button" data-open="'+i.id+'" aria-label="'+esc(i.title)+', '+fm(i.price)+'"><div class="ph"><img src="'+esc(i.photo)+'" alt="" loading="lazy" width="450" height="450"></div></button>'+
-    '<div class="cb"><h3>'+esc(i.title)+'</h3><div class="meta">'+esc(i.category)+' &middot; '+i.id+'</div><div class="price">'+fm(i.price)+'</div>'+
+    '<div class="cb"><h3>'+esc(i.title)+'</h3><div class="meta">'+esc(i.dealerName||'')+' &middot; '+esc(i.category)+'</div><div class="price">'+fm(i.price)+'</div>'+
     (i.shippable?'':'<span class="soonb">Shipping coming soon</span>')+'</div></li>'}).join(''):'<li class="empty">Nothing here right now. Check back soon.</li>';
   save()}
 document.addEventListener('click',function(e){
@@ -124,7 +124,7 @@ document.addEventListener('click',function(e){
   else if(t.hasAttribute('data-rm')){var r=t.getAttribute('data-rm');cart=cart.filter(function(x){return x!==r});save();resetShip();drawCart()}
   else if(t.hasAttribute('data-close'))t.closest('dialog').close()});
 function openItem(id){var i=item(id);if(!i)return;
-  $('itImg').src=i.photo;$('itImg').alt=i.title;$('itTitle').textContent=i.title;$('itMeta').textContent=i.category+' · '+i.id+' · Sold by Shantiques';
+  $('itImg').src=i.photo;$('itImg').alt=i.title;$('itTitle').textContent=i.title;$('itMeta').textContent=i.category+' · '+i.id+' · Sold by '+(i.dealerName||'a Tabella dealer');
   $('itPrice').textContent=fm(i.price);
   $('itAct').innerHTML=i.shippable?(cart.indexOf(id)>=0?'<button class="btn sec" type="button" data-close>In your cart</button>':'<button class="btn" type="button" data-add="'+id+'">Add to cart</button>'):'<p class="meta">This piece is being measured for shipping. It can be bought online soon.</p>';
   $('itemDlg').showModal()}
@@ -154,7 +154,7 @@ $('payBtn').onclick=async function(){var b=this;if(!rate)return;b.disabled=true;
   try{var d=await post('/shop/checkout',{items:cart,to:addr(),rateId:rate,email:$('aEmail').value});location.href=d.url}
   catch(err){say(err.message,1);b.disabled=false;b.textContent='Go to secure checkout'}};
 if(/canceled=/.test(location.search))$('canceled').innerHTML='<div class="msg ok">Checkout canceled. Your cart is still here.</div>';
-Promise.all([fetch('items.json',{cache:'no-cache'}).then(function(r){return r.json()}),fetch(API+'/shop/status').then(function(r){return r.json()}).catch(function(){return{sold:[],held:[]}})])
+Promise.all([fetch(API+'/shop/catalog').then(function(r){if(!r.ok)throw 0;return r.json()}).catch(function(){return fetch('items.json',{cache:'no-cache'}).then(function(r){return r.json()})}),fetch(API+'/shop/status').then(function(r){return r.json()}).catch(function(){return{sold:[],held:[]}})])
  .then(function(a){CAT=a[0];(a[1].sold||[]).concat(a[1].held||[]).forEach(function(id){GONE[id]=1});draw()})
  .catch(function(){$('grid').innerHTML='<li class="empty">The shop could not load. Refresh to try again.</li>'});
 })();

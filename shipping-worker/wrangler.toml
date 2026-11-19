@@ -18,3 +18,7 @@ SHOW_TEST_PAGE = "true"
 # Shop holds, sold flags and order records. Cloudflare creates the store on first deploy.
 [[kv_namespaces]]
 binding = "ORDERS"
+
+# Dealer app: accounts, items, photos, listings. Cloudflare creates the store on first deploy.
+[[kv_namespaces]]
+binding = "TABELLA"

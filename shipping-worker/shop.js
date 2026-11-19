@@ -9,6 +9,7 @@
 //   CATALOG_URL       optional; defaults to https://tabellasuite.com/shop/items.json
 
 import { buildOrder, createCheckoutSession, stripeMode } from './stripe.js';
+import { dealerListings, dealerItem, markDealerItemSold } from './app.js';
 
 const HOLD_SECONDS = 35 * 60; // Stripe checkout pages last 30 minutes minimum; hold a little longer.
 
@@ -16,6 +17,16 @@ export async function handleShop(request, env, url, json, cors, shippoFetch) {
   const p = url.pathname;
   if (!p.startsWith('/shop/')) return null;
   try {
+    if (p === '/shop/catalog' && request.method === 'GET') {
+      // Public catalog: Shantiques' published list plus every dealer-app listing. No Stripe accounts or addresses.
+      const cat = await catalog(env);
+      const live = (await dealerListings(env)).map(i => Object.assign(i, { photo: url.origin + i.photo }));
+      const dealers = {};
+      Object.keys(cat.dealers || {}).forEach(k => { dealers[k] = { name: cat.dealers[k].name }; });
+      live.forEach(i => { dealers[i.dealer] = { name: i.dealerName }; });
+      const statics = (cat.items || []).map(i => { const o = Object.assign({}, i, { photo: 'https://tabellasuite.com/shop/' + i.photo, dealerName: (cat.dealers[i.dealer] || {}).name }); delete o.weightLb; delete o.box; return o; });
+      return new Response(JSON.stringify({ dealers, items: statics.concat(live) }), { headers: Object.assign({ 'content-type': 'application/json', 'cache-control': 'public, max-age=30' }, cors) });
+    }
     if (p === '/shop/status' && request.method === 'GET') {
       if (!env.ORDERS) return json({ sold: [], held: [], note: 'ORDERS store not set up' }, 200, cors);
       const [sold, held] = await Promise.all([keys(env, 'sold:'), keys(env, 'hold:')]);
@@ -28,7 +39,7 @@ export async function handleShop(request, env, url, json, cors, shippoFetch) {
       if (pick.error) return json({ error: pick.error }, 400, cors);
       const to = checkAddress(b.to);
       if (to.error) return json({ error: to.error }, 400, cors);
-      const from = shipFrom(env);
+      const from = pick.items[0].shipFrom || shipFrom(env);
       if (!from) return json({ error: 'The shop’s ship-from address is not set up yet (SHIP_FROM).' }, 500, cors);
       const q = await shippoFetch('/shipments/', 'POST', {
         address_from: from, address_to: to.addr, async: false,
@@ -55,7 +66,7 @@ export async function handleShop(request, env, url, json, cors, shippoFetch) {
       const email = String(b.email || '').trim().slice(0, 120);
       if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return json({ error: 'Enter your email so we can send tracking.' }, 400, cors);
 
-      const order = buildOrder({ items: pick.items.map(it => ({ name: it.title + ' (' + it.id + ')', price: it.price, dealerAccount: dealerAccount(cat, it), mallAccount: undefined })), shipping: ship });
+      const order = buildOrder({ items: pick.items.map(it => ({ name: it.title + ' (' + it.id + ')', price: it.price, dealerAccount: it.account || dealerAccount(cat, it), mallAccount: undefined })), shipping: ship });
       if (order.error) return json({ error: order.error }, 400, cors);
 
       // Hold each item so two people can't buy the same one-of-a-kind piece.
@@ -108,6 +119,7 @@ export async function shopAfterPayment(env, session, paid) {
   const o = JSON.parse(await env.ORDERS.get('order:' + ref) || 'null');
   if (paid) {
     await Promise.all(ids.map(id => env.ORDERS.put('sold:' + id, ref)));
+    await Promise.all(ids.filter(id => id.startsWith('T')).map(id => markDealerItemSold(env, id, ref)));
     if (o) { o.status = 'paid'; o.paidAt = Date.now(); o.paymentIntent = session.payment_intent; await env.ORDERS.put('order:' + ref, JSON.stringify(o), { expirationTtl: 60 * 60 * 24 * 400 }); }
   } else {
     if (o && o.status === 'checkout') { o.status = 'expired'; await env.ORDERS.put('order:' + ref, JSON.stringify(o), { expirationTtl: 60 * 60 * 24 * 30 }); }
@@ -130,8 +142,18 @@ async function pickItems(env, cat, ids) {
   if (ids.length > 10) return { error: 'Up to 10 items per order.' };
   const uniq = [...new Set(ids.map(String))], out = [];
   for (const id of uniq) {
-    const it = (cat.items || []).find(x => x.id === id);
-    if (!it) return { error: 'An item in your cart is no longer listed.' };
+    let it;
+    if (/^T[0-9A-Z]{6}$/.test(id)) {
+      // Dealer-app item: everything comes from the server record, never the browser.
+      const x = await dealerItem(env, id);
+      if (!x || x.item.status !== 'available' || !x.item.online || !(x.item.price > 0)) return { error: 'An item in your cart is no longer listed.' };
+      const d = x.dealer;
+      if (!(x.item.weightLb && x.item.box && d.payoutsReady && d.stripeAccount && d.shipFrom)) return { error: x.item.title + ' can\u2019t ship yet.' };
+      it = { id, title: x.item.title, price: x.item.price, dealer: d.id, shippable: true, weightLb: x.item.weightLb, box: x.item.box, account: d.stripeAccount, shipFrom: Object.assign({ country: 'US', name: d.name }, d.shipFrom) };
+    } else {
+      it = (cat.items || []).find(x => x.id === id);
+      if (!it) return { error: 'An item in your cart is no longer listed.' };
+    }
     if (!it.shippable) return { error: it.title + ' can’t ship yet.' };
     if (env.ORDERS && await env.ORDERS.get('sold:' + id)) return { error: it.title + ' has sold.' };
     out.push(it);

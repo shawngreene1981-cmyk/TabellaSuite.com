@@ -129,6 +129,26 @@ export function buildOrder(b) {
   return { lines, splitsMeta, group, totalCents: total, breakdown: { items: breakdown, shipping: ship / 100, cardProcessing: fee / 100, total: total / 100 } };
 }
 
+// Dealer and mall payout accounts (Accounts v2 recipients), used by the dealer app.
+export async function createRecipient(env, o) {
+  const meta = { role: o.role || 'dealer', name: o.name || '' };
+  if (o.dealerId) meta.tabella_dealer = o.dealerId;
+  return stripeV2(env, 'POST', '/v2/core/accounts', {
+    display_name: o.name || o.email, contact_email: o.email,
+    identity: { country: 'US' },
+    dashboard: 'express',
+    defaults: { responsibilities: { fees_collector: 'application', losses_collector: 'application' } },
+    configuration: { recipient: { capabilities: { stripe_balance: { stripe_transfers: { requested: true } } } } },
+    metadata: meta
+  });
+}
+export async function recipientLink(env, account, returnUrl, self) { return onboardingLink(env, account, returnUrl, self); }
+export async function recipientReady(env, account) {
+  const a = await stripeV2(env, 'GET', '/v2/core/accounts/' + account + '?include=configuration.recipient');
+  const cap = (((((a.configuration || {}).recipient || {}).capabilities || {}).stripe_balance || {}).stripe_transfers || {});
+  return cap.status === 'active';
+}
+
 // One Stripe Checkout page for an order built by buildOrder(). `extra` adds return links, metadata and so on.
 export async function createCheckoutSession(env, order, extra) {
   const f = Object.assign({
