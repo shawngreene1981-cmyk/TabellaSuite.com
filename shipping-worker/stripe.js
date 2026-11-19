@@ -133,8 +133,8 @@ export function buildOrder(b) {
 export async function createCheckoutSession(env, order, extra) {
   const f = Object.assign({
     mode: 'payment',
-    // Card rate only, so the Card processing line is right. Apple Pay and Google Pay ride on card.
-    'payment_method_types[0]': 'card', 'payment_method_types[1]': 'link',
+    // Payment methods are chosen in the Stripe Dashboard (Settings > Payment methods); Stripe no longer
+    // accepts payment_method_types here. Keep only card-rate methods on there so the Card processing line is right.
     'payment_intent_data[transfer_group]': order.group,
     'metadata[group]': order.group,
     'metadata[splits]': order.splitsMeta
