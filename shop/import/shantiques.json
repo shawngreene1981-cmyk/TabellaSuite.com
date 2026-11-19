@@ -1,0 +1,523 @@
+{
+ "dealer": "Shantiques",
+ "items": [
+  {
+   "id": "SH-0001",
+   "title": "Wood and iron vintage church hanging window",
+   "category": "Decor",
+   "price": 60.0,
+   "online": true,
+   "photo": "SH-0001.jpg"
+  },
+  {
+   "id": "SH-0002",
+   "title": "Bamboo chest with brass fitting",
+   "category": "Decor",
+   "price": 15.0,
+   "online": true,
+   "photo": "SH-0002.jpg"
+  },
+  {
+   "id": "SH-0003",
+   "title": "Oak stool or bench",
+   "category": "Furniture",
+   "price": 25.0,
+   "online": true,
+   "photo": "SH-0003.jpg"
+  },
+  {
+   "id": "SH-0004",
+   "title": "Gold filigree frame with peony sketch",
+   "category": "Decor",
+   "price": 18.0,
+   "online": false,
+   "photo": "SH-0004.jpg"
+  },
+  {
+   "id": "SH-0005",
+   "title": "Black tole tray with hand-painted peonies",
+   "category": "Decor",
+   "price": 28.0,
+   "online": false,
+   "photo": "SH-0005.jpg"
+  },
+  {
+   "id": "SH-0006",
+   "title": "Two-tier wooden wall shelf",
+   "category": "Furniture",
+   "price": 18.0,
+   "online": false,
+   "photo": "SH-0006.jpg"
+  },
+  {
+   "id": "SH-0007",
+   "title": "Floral china plate, gold rim",
+   "category": "Glassware",
+   "price": 8.0,
+   "online": false,
+   "photo": "SH-0007.jpg"
+  },
+  {
+   "id": "SH-0008",
+   "title": "Small brass pitcher",
+   "category": "Decor",
+   "price": 16.0,
+   "online": false,
+   "photo": "SH-0008.jpg"
+  },
+  {
+   "id": "SH-0009",
+   "title": "Ceramic turkey harvest plate",
+   "category": "Seasonal",
+   "price": 10.0,
+   "online": false,
+   "photo": "SH-0009.jpg"
+  },
+  {
+   "id": "SH-0010",
+   "title": "Scalloped floral china plate",
+   "category": "Glassware",
+   "price": 8.0,
+   "online": false,
+   "photo": "SH-0010.jpg"
+  },
+  {
+   "id": "SH-0011",
+   "title": "Potted terrarium bird bath miniature",
+   "category": "Decor",
+   "price": 15.0,
+   "online": true,
+   "photo": "SH-0011.jpg"
+  },
+  {
+   "id": "SH-0012",
+   "title": "Wooden cubby wall shelf with heart cutout and pegs",
+   "category": "Furniture",
+   "price": 28.0,
+   "online": false,
+   "photo": "SH-0012.jpg"
+  },
+  {
+   "id": "SH-0013",
+   "title": "Red striped lighthouse shaker",
+   "category": "Glassware",
+   "price": 8.0,
+   "online": false,
+   "photo": "SH-0013.jpg"
+  },
+  {
+   "id": "SH-0014",
+   "title": "Goose pedestal mug",
+   "category": "Glassware",
+   "price": 12.0,
+   "online": false,
+   "photo": "SH-0014.jpg"
+  },
+  {
+   "id": "SH-0015",
+   "title": "Green glass hen on nest dish",
+   "category": "Glassware",
+   "price": 28.0,
+   "online": false,
+   "photo": "SH-0015.jpg"
+  },
+  {
+   "id": "SH-0016",
+   "title": "Ceramic goose figurine with blue bow",
+   "category": "Decor",
+   "price": 10.0,
+   "online": false,
+   "photo": "SH-0016.jpg"
+  },
+  {
+   "id": "SH-0017",
+   "title": "Embroidered bird mini frame, blue bird",
+   "category": "Decor",
+   "price": 6.0,
+   "online": false,
+   "photo": "SH-0017.jpg"
+  },
+  {
+   "id": "SH-0018",
+   "title": "Small green ceramic crock",
+   "category": "Decor",
+   "price": 14.0,
+   "online": false,
+   "photo": "SH-0018.jpg"
+  },
+  {
+   "id": "SH-0019",
+   "title": "Three-tier wooden wall shelf with heart cutout",
+   "category": "Furniture",
+   "price": 32.0,
+   "online": false,
+   "photo": "SH-0019.jpg"
+  },
+  {
+   "id": "SH-0020",
+   "title": "Brass quail figurine, small",
+   "category": "Decor",
+   "price": 12.0,
+   "online": false,
+   "photo": "SH-0020.jpg"
+  },
+  {
+   "id": "SH-0021",
+   "title": "Blue floral porcelain watering can creamer",
+   "category": "Glassware",
+   "price": 12.0,
+   "online": false,
+   "photo": "SH-0021.jpg"
+  },
+  {
+   "id": "SH-0022",
+   "title": "Brass spittoon",
+   "category": "Decor",
+   "price": 45.0,
+   "online": false,
+   "photo": "SH-0022.jpg"
+  },
+  {
+   "id": "SH-0023",
+   "title": "Carved wooden duck decoy",
+   "category": "Decor",
+   "price": 35.0,
+   "online": false,
+   "photo": "SH-0023.jpg"
+  },
+  {
+   "id": "SH-0024",
+   "title": "Small painted mallard duck",
+   "category": "Decor",
+   "price": 10.0,
+   "online": false,
+   "photo": "SH-0024.jpg"
+  },
+  {
+   "id": "SH-0025",
+   "title": "Brass stand",
+   "category": "Decor",
+   "price": 15.0,
+   "online": true,
+   "photo": "SH-0025.jpg"
+  },
+  {
+   "id": "SH-0026",
+   "title": "Lantern",
+   "category": "Decor",
+   "price": 58.0,
+   "online": true,
+   "photo": "SH-0026.jpg"
+  },
+  {
+   "id": "SH-0027",
+   "title": "Oil lantern",
+   "category": "Decor",
+   "price": 30.0,
+   "online": true,
+   "photo": "SH-0027.jpg"
+  },
+  {
+   "id": "SH-0028",
+   "title": "Wood shelf",
+   "category": "Furniture",
+   "price": 20.0,
+   "online": true,
+   "photo": "SH-0028.jpg"
+  },
+  {
+   "id": "SH-0029",
+   "title": "Brass basket",
+   "category": "Decor",
+   "price": 18.0,
+   "online": true,
+   "photo": "SH-0029.jpg"
+  },
+  {
+   "id": "SH-0030",
+   "title": "Small brass spittoon",
+   "category": "Decor",
+   "price": 32.0,
+   "online": true,
+   "photo": "SH-0030.jpg"
+  },
+  {
+   "id": "SH-0031",
+   "title": "Duck planter",
+   "category": "Decor",
+   "price": 10.0,
+   "online": true,
+   "photo": "SH-0031.jpg"
+  },
+  {
+   "id": "SH-0032",
+   "title": "Blue duck planter",
+   "category": "Decor",
+   "price": 12.0,
+   "online": true,
+   "photo": "SH-0032.jpg"
+  },
+  {
+   "id": "SH-0033",
+   "title": "Antique bench",
+   "category": "Furniture",
+   "price": 85.0,
+   "online": true,
+   "photo": "SH-0033.jpg"
+  },
+  {
+   "id": "SH-0034",
+   "title": "Milk glass basket",
+   "category": "Glassware",
+   "price": 80.0,
+   "online": true,
+   "photo": "SH-0034.jpg"
+  },
+  {
+   "id": "SH-0035",
+   "title": "Japanese Turkey platter (hairline crack)",
+   "category": "Glassware",
+   "price": 14.0,
+   "online": true,
+   "photo": "SH-0035.jpg"
+  },
+  {
+   "id": "SH-0036",
+   "title": "Watt ceramic bowl",
+   "category": "Glassware",
+   "price": 45.0,
+   "online": true,
+   "photo": "SH-0036.jpg"
+  },
+  {
+   "id": "SH-0037",
+   "title": "Decanter",
+   "category": "Glassware",
+   "price": 22.0,
+   "online": true,
+   "photo": "SH-0037.jpg"
+  },
+  {
+   "id": "SH-0038",
+   "title": "Glass dog decanter",
+   "category": "Glassware",
+   "price": 28.0,
+   "online": true,
+   "photo": "SH-0038.jpg"
+  },
+  {
+   "id": "SH-0039",
+   "title": "Glass cat decanter",
+   "category": "Glassware",
+   "price": 28.0,
+   "online": true,
+   "photo": "SH-0039.jpg"
+  },
+  {
+   "id": "SH-0040",
+   "title": "House trinket shelf (decor shown sold separately)",
+   "category": "Decor",
+   "price": 20.0,
+   "online": true,
+   "photo": "SH-0040.jpg"
+  },
+  {
+   "id": "SH-0041",
+   "title": "Willow thicket hand woven hanging potted plant base (display stand not included)",
+   "category": "Decor",
+   "price": 10.0,
+   "online": true,
+   "photo": "SH-0041.jpg"
+  },
+  {
+   "id": "SH-0042",
+   "title": "Office globe, silver finish",
+   "category": "Decor",
+   "price": 30.0,
+   "online": true,
+   "photo": "SH-0042.jpg"
+  },
+  {
+   "id": "SH-0043",
+   "title": "Blue striped lighthouse shaker",
+   "category": "Glassware",
+   "price": 6.0,
+   "online": false,
+   "photo": "SH-0043.jpg"
+  },
+  {
+   "id": "SH-0044",
+   "title": "Brass quail figurine, large",
+   "category": "Decor",
+   "price": 24.0,
+   "online": false,
+   "photo": "SH-0044.jpg"
+  },
+  {
+   "id": "SH-0045",
+   "title": "Embroidered bird mini frame, red bird",
+   "category": "Decor",
+   "price": 8.0,
+   "online": false,
+   "photo": "SH-0045.jpg"
+  },
+  {
+   "id": "SH-0046",
+   "title": "Embroidered bird mini frame, dark bird",
+   "category": "Decor",
+   "price": 8.0,
+   "online": false,
+   "photo": "SH-0046.jpg"
+  },
+  {
+   "id": "SH-0047",
+   "title": "Blue velvet pumpkin",
+   "category": "Seasonal",
+   "price": 10.0,
+   "online": false,
+   "photo": "SH-0047.jpg"
+  },
+  {
+   "id": "SH-0048",
+   "title": "Blue-gray pumpkin",
+   "category": "Seasonal",
+   "price": 12.0,
+   "online": false,
+   "photo": "SH-0048.jpg"
+  },
+  {
+   "id": "SH-0049",
+   "title": "Amber glass acorn jar with lid",
+   "category": "Glassware",
+   "price": 18.0,
+   "online": false,
+   "photo": "SH-0049.jpg"
+  },
+  {
+   "id": "SH-0050",
+   "title": "Pink ceramic turkey figurine",
+   "category": "Seasonal",
+   "price": 14.0,
+   "online": false,
+   "photo": "SH-0050.jpg"
+  },
+  {
+   "id": "SH-0051",
+   "title": "Fine China of Japan Jacqueline gravy boat",
+   "category": "Glassware",
+   "price": 18.0,
+   "online": true,
+   "photo": "SH-0051.jpg"
+  },
+  {
+   "id": "SH-0052",
+   "title": "Owl trivet",
+   "category": "Decor",
+   "price": 15.0,
+   "online": true,
+   "photo": "SH-0052.jpg"
+  },
+  {
+   "id": "SH-0053",
+   "title": "Fine China Japan Jacqueline large platter",
+   "category": "Glassware",
+   "price": 28.0,
+   "online": true,
+   "photo": "SH-0053.jpg"
+  },
+  {
+   "id": "SH-0054",
+   "title": "Fine China Japan Jacqueline serving dish",
+   "category": "Glassware",
+   "price": 22.0,
+   "online": true,
+   "photo": "SH-0054.jpg"
+  },
+  {
+   "id": "SH-0055",
+   "title": "Fine China Japan Jacqueline 3 piece serving set",
+   "category": "Glassware",
+   "price": 100.0,
+   "online": true,
+   "photo": "SH-0055.jpg"
+  },
+  {
+   "id": "SH-0056",
+   "title": "Vase",
+   "category": "Glassware",
+   "price": 8.0,
+   "online": true,
+   "photo": "SH-0056.jpg"
+  },
+  {
+   "id": "SH-0057",
+   "title": "Vintage candy dish",
+   "category": "Glassware",
+   "price": 30.0,
+   "online": true,
+   "photo": "SH-0057.jpg"
+  },
+  {
+   "id": "SH-0085",
+   "title": "Hand painted basin from 1945",
+   "category": "Decor",
+   "price": 35.0,
+   "online": true,
+   "photo": "SH-0085.jpg"
+  },
+  {
+   "id": "SH-0086",
+   "title": "Fenton hobnail bowl",
+   "category": "Glassware",
+   "price": 32.0,
+   "online": true,
+   "photo": "SH-0086.jpg"
+  },
+  {
+   "id": "SH-0087",
+   "title": "Fenton hobnail basket small",
+   "category": "Glassware",
+   "price": 45.0,
+   "online": true,
+   "photo": "SH-0087.jpg"
+  },
+  {
+   "id": "SH-0088",
+   "title": "Hand painted wood duck",
+   "category": "Decor",
+   "price": 38.0,
+   "online": true,
+   "photo": "SH-0088.jpg"
+  },
+  {
+   "id": "SH-0089",
+   "title": "Haegar Boy Planter",
+   "category": "Decor",
+   "price": 28.0,
+   "online": true,
+   "photo": "SH-0089.jpg"
+  },
+  {
+   "id": "SH-0090",
+   "title": "Glazed pottery planter modeled as two fawns beside a textured bush on a rocky base, tan and brown glaze, impressed mark on base appears to read 'McCoy'",
+   "category": "Decor",
+   "price": 38.0,
+   "online": true,
+   "photo": "SH-0090.jpg"
+  },
+  {
+   "id": "SH-0091",
+   "title": "Indian Brass flower etched bowl",
+   "category": "Decor",
+   "price": 38.0,
+   "online": true,
+   "photo": "SH-0091.jpg",
+   "weightLb": 1.2,
+   "box": [
+    8.0,
+    6.0,
+    4.0
+   ]
+  }
+ ]
+}

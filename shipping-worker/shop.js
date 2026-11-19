@@ -9,7 +9,7 @@
 //   CATALOG_URL       optional; defaults to https://tabellasuite.com/shop/items.json
 
 import { buildOrder, createCheckoutSession, stripeMode } from './stripe.js';
-import { dealerListings, dealerItem, markDealerItemSold } from './app.js';
+import { dealerListings, dealerItem, markDealerItemSold, shantiquesMoved, ITEM_ID } from './app.js';
 
 const HOLD_SECONDS = 35 * 60; // Stripe checkout pages last 30 minutes minimum; hold a little longer.
 
@@ -24,7 +24,11 @@ export async function handleShop(request, env, url, json, cors, shippoFetch) {
       const dealers = {};
       Object.keys(cat.dealers || {}).forEach(k => { dealers[k] = { name: cat.dealers[k].name }; });
       live.forEach(i => { dealers[i.dealer] = { name: i.dealerName }; });
-      const statics = (cat.items || []).map(i => { const o = Object.assign({}, i, { photo: 'https://tabellasuite.com/shop/' + i.photo, dealerName: (cat.dealers[i.dealer] || {}).name }); delete o.weightLb; delete o.box; return o; });
+      // Once Shantiques has moved into the app, its old published list steps aside so nothing shows twice.
+      const moved = await shantiquesMoved(env), liveIds = new Set(live.map(i => i.id));
+      let staticList = moved.done ? [] : (cat.items || []).filter(i => !liveIds.has(i.id));
+      if (moved.started && !moved.done) staticList = (await Promise.all(staticList.map(async i => (await env.TABELLA.get('itemix:' + i.id)) ? null : i))).filter(Boolean);
+      const statics = staticList.map(i => { const o = Object.assign({}, i, { photo: 'https://tabellasuite.com/shop/' + i.photo, dealerName: (cat.dealers[i.dealer] || {}).name }); delete o.weightLb; delete o.box; return o; });
       return new Response(JSON.stringify({ dealers, items: statics.concat(live) }), { headers: Object.assign({ 'content-type': 'application/json', 'cache-control': 'public, max-age=30' }, cors) });
     }
     if (p === '/shop/status' && request.method === 'GET') {
@@ -119,7 +123,7 @@ export async function shopAfterPayment(env, session, paid) {
   const o = JSON.parse(await env.ORDERS.get('order:' + ref) || 'null');
   if (paid) {
     await Promise.all(ids.map(id => env.ORDERS.put('sold:' + id, ref)));
-    await Promise.all(ids.filter(id => id.startsWith('T')).map(id => markDealerItemSold(env, id, ref)));
+    await Promise.all(ids.map(id => markDealerItemSold(env, id, ref)));
     if (o) { o.status = 'paid'; o.paidAt = Date.now(); o.paymentIntent = session.payment_intent; await env.ORDERS.put('order:' + ref, JSON.stringify(o), { expirationTtl: 60 * 60 * 24 * 400 }); }
   } else {
     if (o && o.status === 'checkout') { o.status = 'expired'; await env.ORDERS.put('order:' + ref, JSON.stringify(o), { expirationTtl: 60 * 60 * 24 * 30 }); }
@@ -143,9 +147,9 @@ async function pickItems(env, cat, ids) {
   const uniq = [...new Set(ids.map(String))], out = [];
   for (const id of uniq) {
     let it;
-    if (/^T[0-9A-Z]{6}$/.test(id)) {
+    const x = ITEM_ID.test(id) ? await dealerItem(env, id) : null;
+    if (x || /^T[0-9A-Z]{6}$/.test(id)) {
       // Dealer-app item: everything comes from the server record, never the browser.
-      const x = await dealerItem(env, id);
       if (!x || x.item.status !== 'available' || !x.item.online || !(x.item.price > 0)) return { error: 'An item in your cart is no longer listed.' };
       const d = x.dealer;
       if (!(x.item.weightLb && x.item.box && d.payoutsReady && d.stripeAccount && d.shipFrom)) return { error: x.item.title + ' can\u2019t ship yet.' };

@@ -12,6 +12,7 @@
 import { createRecipient, recipientLink, recipientReady } from './stripe.js';
 
 const SESSION_TTL = 60 * 60 * 24 * 30;
+export const ITEM_ID = /^(T[0-9A-Z]{6}|SH-\d{4})$/;
 const MAX_PHOTO = 1.5 * 1024 * 1024;
 const CATEGORIES = ['Decor', 'Furniture', 'Glassware', 'Seasonal', 'Lighting', 'Art', 'Kitchen', 'Jewelry', 'Toys', 'Books', 'Other'];
 
@@ -33,7 +34,10 @@ export async function handleApp(request, env, url, json, cors) {
     if (p === '/app/photo' && request.method === 'POST') return json(await savePhoto(env, me.dealer, request), 200, cors);
     if (p === '/app/items' && request.method === 'GET') return json({ items: await listItems(env, me.dealer.id) }, 200, cors);
     if (p === '/app/items' && request.method === 'POST') return json({ item: await saveItem(env, me.dealer, null, await body(request)) }, 200, cors);
-    const m = p.match(/^\/app\/items\/(T[0-9A-Z]{6})$/);
+    if (p === '/app/import' && request.method === 'GET') return json(await importStatus(env, me.dealer), 200, cors);
+    if (p === '/app/import' && request.method === 'POST') return json(await importBatch(env, me.dealer), 200, cors);
+    if (p === '/app/export.csv' && request.method === 'GET') return exportCsv(env, me.dealer, cors);
+    const m = p.match(/^\/app\/items\/(T[0-9A-Z]{6}|SH-\d{4})$/);
     if (m && request.method === 'PUT') return json({ item: await saveItem(env, me.dealer, m[1], await body(request)) }, 200, cors);
     if (p === '/app/scan' && request.method === 'POST') return json(await scan(env, me.dealer, await body(request)), 200, cors);
     if (p === '/app/payouts' && request.method === 'POST') return json(await payouts(env, me.dealer, url, await body(request)), 200, cors);
@@ -191,7 +195,7 @@ export async function dealerListings(env) {
 }
 // Used by checkout: the full item and its dealer, checked server-side.
 export async function dealerItem(env, id) {
-  if (!env.TABELLA || !/^T[0-9A-Z]{6}$/.test(id)) return null;
+  if (!env.TABELLA || !ITEM_ID.test(id)) return null;
   const did = await env.TABELLA.get('itemix:' + id); if (!did) return null;
   const [it, d] = await Promise.all([env.TABELLA.get('item:' + did + ':' + id), env.TABELLA.get('dealer:' + did)]);
   return it && d ? { item: JSON.parse(it), dealer: JSON.parse(d) } : null;
@@ -201,6 +205,54 @@ export async function markDealerItemSold(env, id, ref) {
   x.item.status = 'sold'; x.item.soldAt = Date.now(); x.item.order = ref;
   await env.TABELLA.put('item:' + x.dealer.id + ':' + id, JSON.stringify(x.item));
   await env.TABELLA.delete('pub:' + id);
+}
+
+// ---------- one-time move of Shantiques' items into the app ----------
+// Reads the published list (tabellasuite.com/shop/import/shantiques.json) and its photos, in batches so each
+// request stays under the Worker's limit on outside fetches. Only a shop named Shantiques can run it, and only once.
+const IMPORT_URL = 'https://tabellasuite.com/shop/import/shantiques.json', IMPORT_BATCH = 12;
+async function importStatus(env, d) {
+  const owner = await env.TABELLA.get('import:shantiques');
+  const done = !!(await env.TABELLA.get('import:shantiques:done'));
+  return { available: d.name.trim().toLowerCase() === 'shantiques' && (!owner || owner === d.id) && !done, done: done && owner === d.id };
+}
+async function importBatch(env, d) {
+  const st = await importStatus(env, d);
+  if (!st.available) throw err(403, st.done ? 'Your Shantiques items are already in the app.' : 'This import is only for the Shantiques shop.');
+  await env.TABELLA.put('import:shantiques', d.id);
+  const r = await fetch(IMPORT_URL, { cf: { cacheTtl: 60 } });
+  if (!r.ok) throw err(502, 'The Shantiques item list could not be loaded. Try again.');
+  const list = (await r.json()).items || [];
+  let added = 0, skipped = 0, left = 0;
+  for (const s of list) {
+    if (!ITEM_ID.test(s.id)) { skipped++; continue; }
+    if (await env.TABELLA.get('itemix:' + s.id)) continue;
+    if (added >= IMPORT_BATCH) { left++; continue; }
+    const img = await fetch('https://tabellasuite.com/shop/img/' + s.id + '.jpg');
+    if (!img.ok) { skipped++; continue; }
+    const key = d.id + '-' + rand(12);
+    await env.TABELLA.put('img:' + key, await img.arrayBuffer(), { metadata: { type: 'image/jpeg', dealer: d.id } });
+    const it = { id: s.id, dealer: d.id, created: Date.now(), updated: Date.now(), status: 'available', photos: [key],
+      title: clean(s.title, 120) || s.id, category: CATEGORIES.includes(s.category) ? s.category : 'Other',
+      price: s.price > 0 ? Math.round(s.price * 100) / 100 : null, paid: null, online: !!s.online, notes: 'Moved from the Shantiques sheet',
+      weightLb: s.weightLb > 0 ? s.weightLb : null, box: Array.isArray(s.box) && s.box.length === 3 ? s.box.map(Number) : null };
+    await env.TABELLA.put('item:' + d.id + ':' + it.id, JSON.stringify(it));
+    await env.TABELLA.put('itemix:' + it.id, d.id);
+    await listing(env, d, it);
+    added++;
+  }
+  if (!left) await env.TABELLA.put('import:shantiques:done', d.id);
+  return { added, left, skipped, done: !left };
+}
+export async function shantiquesMoved(env) { return env.TABELLA ? { started: !!(await env.TABELLA.get('import:shantiques')), done: !!(await env.TABELLA.get('import:shantiques:done')) } : { started: false, done: false }; }
+
+// ---------- spreadsheet export ----------
+async function exportCsv(env, d, cors) {
+  const rows = [['Item ID', 'Description', 'Category', 'What you paid', 'Price', 'Status', 'Listed online', 'Packed weight (lb)', 'Box (in)', 'Sold', 'Notes']];
+  for (const it of (await listItems(env, d.id)).reverse()) rows.push([it.id, it.title, it.category || '', it.paid == null ? '' : it.paid, it.price == null ? '' : it.price, it.status,
+    it.online ? 'Yes' : 'No', it.weightLb || '', it.box ? it.box.join(' x ') : '', it.soldAt ? new Date(it.soldAt).toISOString().slice(0, 10) : '', it.notes || '']);
+  const csv = rows.map(r => r.map(v => { v = String(v); return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }).join(',')).join('\r\n');
+  return new Response(csv, { headers: Object.assign({ 'content-type': 'text/csv; charset=utf-8', 'content-disposition': 'attachment; filename="' + d.name.replace(/[^A-Za-z0-9]+/g, '-') + '-items.csv"' }, cors) });
 }
 
 // ---------- price scanner (Claude, through Tabella's own API key) ----------
