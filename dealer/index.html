@@ -91,6 +91,13 @@ fieldset{border:1px solid var(--line);border-radius:10px;margin:12px 0 4px;paddi
 .check{display:flex;gap:10px;align-items:center;margin:12px 0 0;font-size:.95rem}.check input{width:20px;height:20px}
 .row2{grid-template-columns:1fr 1fr}
 #photoEmpty[hidden],.photo img[hidden]{display:none}
+dialog{max-height:calc(100dvh - 24px);max-height:calc(100vh - 24px)}
+@supports (height:100dvh){dialog{max-height:calc(100dvh - 24px)}}
+@media(max-width:600px){dialog{max-width:100vw;width:100vw;margin:0;border-radius:0;height:100dvh;max-height:100dvh}}
+.dlg{padding-bottom:0}
+.dlgfoot{position:sticky;bottom:0;background:var(--card);display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:12px 0 calc(12px + env(safe-area-inset-bottom,0px));margin-top:12px;border-top:1px solid var(--line);z-index:2}
+.dlgfoot:has(#soldBtn[hidden]) #saveBtn{grid-column:1/-1}
+.scan{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-top:8px;display:grid;gap:4px;background:var(--bg)}
 </style>
 </head>
 <body>
@@ -138,6 +145,9 @@ fieldset{border:1px solid var(--line);border-radius:10px;margin:12px 0 4px;paddi
  <button class="x" type="button" data-close aria-label="Close">&times;</button>
  <h2 id="itH" style="font-size:1.6rem;margin:0 0 10px">Add an item</h2>
  <div class="photo" id="photoBox"><input type="file" id="photo" accept="image/*" aria-label="Item photo"><img id="photoPrev" alt="" hidden><div id="photoEmpty"><b>Tap to take or choose a photo</b><span class="meta">A clear photo on a plain background sells best.</span></div></div>
+ <label for="fSize" style="margin-top:10px">About how big is it? <span class="meta">helps the price scan</span></label><input id="fSize" placeholder="8 in across, 4 in tall" maxlength="80">
+ <button class="btn sec" type="button" id="scanBtn" style="width:100%;margin-top:8px" disabled>Scan for value</button>
+ <div id="scanOut" aria-live="polite"></div>
  <label for="fTitle">What is it?</label><input id="fTitle" placeholder="Fenton hobnail milk glass bowl" maxlength="120">
  <label for="fCat">Category</label><select id="fCat"></select>
  <div class="row2"><div><label for="fPaid">What you paid <span class="meta">private</span></label><div class="money"><span>$</span><input id="fPaid" type="number" inputmode="decimal" step="0.01" min="0"></div></div>
@@ -152,7 +162,7 @@ fieldset{border:1px solid var(--line);border-radius:10px;margin:12px 0 4px;paddi
  <label class="check"><input type="checkbox" id="fOnline" checked> List it in the Tabella shop</label>
  <label for="fNotes">Notes <span class="meta">optional, private</span></label><input id="fNotes" maxlength="500" placeholder="Maker's mark on base, small chip on rim">
  <div id="itMsg" aria-live="polite"></div>
- <div class="row2" style="margin-top:12px"><button class="btn" type="submit" id="saveBtn">Save item</button><button class="btn sec" type="button" id="soldBtn" hidden>Mark as sold</button></div>
+ <div class="dlgfoot"><button class="btn" type="submit" id="saveBtn">Save item</button><button class="btn sec" type="button" id="soldBtn" hidden>Mark as sold</button></div>
 </form></dialog>
 <footer><span>&copy; <span id="y"></span> Tabella Suite &middot; <a href="mailto:contact@tabellasuite.com">contact@tabellasuite.com</a></span><span><a href="../pricing.html">Pricing</a> &middot; <a href="../privacy.html">Privacy</a></span></footer>
 </div>
@@ -160,7 +170,7 @@ fieldset{border:1px solid var(--line);border-radius:10px;margin:12px 0 4px;paddi
 (function(){
 var API='https://tabella-shipping.shawn-greene1981.workers.dev',$=function(i){return document.getElementById(i)};
 var CATS=['Decor','Furniture','Glassware','Seasonal','Lighting','Art','Kitchen','Jewelry','Toys','Books','Other'];
-var tok=null,me=null,items=[],editing=null,photoBlob=null,mode='in';
+var tok=null,me=null,items=[],editing=null,photoBlob=null,photoKey=null,mode='in';
 try{tok=localStorage.getItem('tabTok')}catch(e){}
 function setTok(t){tok=t;try{t?localStorage.setItem('tabTok',t):localStorage.removeItem('tabTok')}catch(e){}}
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
@@ -210,17 +220,27 @@ document.querySelector('.boxsz').addEventListener('click',function(e){var b=e.ta
 function profit(){var p=+$('fPrice').value,c=+$('fPaid').value;if(!(p>0)){$('profit').textContent='';return}var net=p*0.91;
   $('profit').textContent='You get '+fm(net)+' after the 9% commission'+(c>0?', about '+fm(net-c)+' profit.':'.')}
 $('fPrice').oninput=profit;$('fPaid').oninput=profit;
-function openItem(it){editing=it;photoBlob=null;msg('itMsg','');$('itH').textContent=it?'Edit '+it.id:'Add an item';
+function openItem(it){editing=it;photoBlob=null;photoKey=null;$('scanOut').innerHTML='';$('fSize').value='';msg('itMsg','');$('itH').textContent=it?'Edit '+it.id:'Add an item';
   $('fTitle').value=it?it.title:'';$('fCat').value=it&&it.category?it.category:'Decor';$('fPaid').value=it&&it.paid!=null?it.paid:'';$('fPrice').value=it&&it.price!=null?it.price:'';
   $('fWt').value=it&&it.weightLb?it.weightLb:'';var bx=it&&it.box?it.box.join(','):'';$('fL').value=$('fW').value=$('fH').value='';
   document.querySelectorAll('.boxsz button').forEach(function(b){b.setAttribute('aria-pressed','false')});
   if(bx){var preset=[].some.call(document.querySelectorAll('.boxsz button'),function(b){return b.getAttribute('data-box')===bx});if(preset)setBox(bx);else{var d=it.box;$('fL').value=d[0];$('fW').value=d[1];$('fH').value=d[2];$('dims').hidden=false;document.querySelector('.boxsz button[data-box=""]').setAttribute('aria-pressed','true')}}else $('dims').hidden=true;
   $('fOnline').checked=it?it.online!==false:true;$('fNotes').value=it&&it.notes?it.notes:'';
   if(it&&it.photos[0]){$('photoPrev').src=API+'/img/'+it.photos[0];$('photoPrev').hidden=false;$('photoEmpty').hidden=true}else{$('photoPrev').hidden=true;$('photoEmpty').hidden=false;$('photo').value=''}
-  $('soldBtn').hidden=!it;$('soldBtn').textContent=it&&it.status==='sold'?'Mark as available':'Mark as sold';profit();$('itemDlg').showModal()}
+  $('soldBtn').hidden=!it;scanReady();$('soldBtn').textContent=it&&it.status==='sold'?'Mark as available':'Mark as sold';profit();$('itemDlg').showModal()}
 document.addEventListener('click',function(e){var c=e.target.closest('[data-close]');if(c)c.closest('dialog').close()});
 $('photo').addEventListener('change',async function(){var f=this.files&&this.files[0];if(!f)return;
-  try{photoBlob=await shrink(f);$('photoPrev').src=URL.createObjectURL(photoBlob);$('photoPrev').hidden=false;$('photoEmpty').hidden=true}catch(e){msg('itMsg','That photo could not be read. Try another.',1)}});
+  try{photoBlob=await shrink(f);photoKey=null;$('photoPrev').src=URL.createObjectURL(photoBlob);$('photoPrev').hidden=false;$('photoEmpty').hidden=true;scanReady()}catch(e){msg('itMsg','That photo could not be read. Try another.',1)}});
+function scanReady(){$('scanBtn').disabled=!(photoBlob||(editing&&editing.photos[0]))}
+async function upload(){if(photoKey)return photoKey;var up=await api('/app/photo',{method:'POST',headers:{'Content-Type':'image/jpeg'},body:photoBlob});photoKey=up.key;return photoKey}
+$('scanBtn').onclick=async function(){var b=this;b.disabled=true;b.textContent='Scanning...';$('scanOut').innerHTML='';
+  try{var key=photoBlob?await upload():editing.photos[0];var d=await api('/app/scan',{json:{photo:key,size:$('fSize').value}});drawScan(d)}
+  catch(err){$('scanOut').innerHTML='<div class="msg err">'+esc(err.message)+'</div>'}b.disabled=false;b.textContent='Scan again'};
+function drawScan(d){var h='<div class="scan"><b>'+esc(d.title||'')+'</b>';
+  if(d.low!=null)h+='<div>Sells for about <b>'+fm(d.low)+' to '+fm(d.high)+'</b>'+(d.suggested!=null?'. Suggested price <b>'+fm(d.suggested)+'</b>':'')+'</div>';
+  if(d.why)h+='<div class="meta">'+esc(d.why)+'</div>';if(d.check)h+='<div class="meta"><b>Check:</b> '+esc(d.check)+'</div>';
+  h+='<div class="row2" style="margin-top:8px"><button type="button" class="btn sec" id="useScan">Use these</button></div><p class="meta" style="margin:6px 0 0">An estimate from the photo. You set the final price.</p></div>';
+  $('scanOut').innerHTML=h;$('useScan').onclick=function(){if(d.title)$('fTitle').value=d.title;if(d.category&&CATS.indexOf(d.category)>=0)$('fCat').value=d.category;if(d.suggested!=null)$('fPrice').value=d.suggested;profit()}}
 function shrink(f){return new Promise(function(res,rej){var img=new Image();img.onload=function(){var m=1400,s=Math.min(1,m/Math.max(img.width,img.height)),c=document.createElement('canvas');
   c.width=Math.round(img.width*s);c.height=Math.round(img.height*s);c.getContext('2d').drawImage(img,0,0,c.width,c.height);c.toBlob(function(b){b?res(b):rej()},'image/jpeg',0.82)};img.onerror=rej;img.src=URL.createObjectURL(f)})}
 $('itemForm').addEventListener('submit',async function(e){e.preventDefault();var b=$('saveBtn');
@@ -228,7 +248,7 @@ $('itemForm').addEventListener('submit',async function(e){e.preventDefault();var
   if(!$('fTitle').value.trim()){msg('itMsg','Add a short description.',1);$('fTitle').focus();return}
   var box=[+$('fL').value,+$('fW').value,+$('fH').value];var hasBox=box.every(function(v){return v>0});
   b.disabled=true;b.textContent='Saving...';
-  try{var photos;if(photoBlob){b.textContent='Uploading photo...';var up=await api('/app/photo',{method:'POST',headers:{'Content-Type':'image/jpeg'},body:photoBlob});photos=[up.key]}
+  try{var photos;if(photoBlob){b.textContent='Uploading photo...';photos=[await upload()]}
     var body={title:$('fTitle').value,category:$('fCat').value,paid:$('fPaid').value,price:$('fPrice').value,weightLb:$('fWt').value,box:hasBox?box:null,online:$('fOnline').checked,notes:$('fNotes').value};
     if(photos)body.photos=photos;
     var d=await api(editing?'/app/items/'+editing.id:'/app/items',{method:editing?'PUT':'POST',json:body});

@@ -35,6 +35,7 @@ export async function handleApp(request, env, url, json, cors) {
     if (p === '/app/items' && request.method === 'POST') return json({ item: await saveItem(env, me.dealer, null, await body(request)) }, 200, cors);
     const m = p.match(/^\/app\/items\/(T[0-9A-Z]{6})$/);
     if (m && request.method === 'PUT') return json({ item: await saveItem(env, me.dealer, m[1], await body(request)) }, 200, cors);
+    if (p === '/app/scan' && request.method === 'POST') return json(await scan(env, me.dealer, await body(request)), 200, cors);
     if (p === '/app/payouts' && request.method === 'POST') return json(await payouts(env, me.dealer, url, await body(request)), 200, cors);
     if (p === '/app/payouts' && request.method === 'GET') return json(await payoutStatus(env, me.dealer), 200, cors);
     return json({ error: 'Not found' }, 404, cors);
@@ -200,6 +201,40 @@ export async function markDealerItemSold(env, id, ref) {
   x.item.status = 'sold'; x.item.soldAt = Date.now(); x.item.order = ref;
   await env.TABELLA.put('item:' + x.dealer.id + ':' + id, JSON.stringify(x.item));
   await env.TABELLA.delete('pub:' + id);
+}
+
+// ---------- price scanner (Claude, through Tabella's own API key) ----------
+//   ANTHROPIC_API_KEY  secret, required. SCAN_MODEL optional. SCANS_PER_DAY optional (default 40 per dealer).
+async function scan(env, d, b) {
+  if (!env.ANTHROPIC_API_KEY) throw err(503, 'The price scanner isn\u2019t switched on yet.');
+  const key = String(b.photo || '');
+  if (!key.startsWith(d.id + '-')) throw err(400, 'Add a photo first.');
+  const day = new Date().toISOString().slice(0, 10), ck = 'scan:' + d.id + ':' + day;
+  const used = Number(await env.TABELLA.get(ck) || 0), cap = Number(env.SCANS_PER_DAY || 40);
+  if (used >= cap) throw err(429, 'You\u2019ve used today\u2019s ' + cap + ' scans. They reset tomorrow.');
+  const img = await env.TABELLA.getWithMetadata('img:' + key, { type: 'arrayBuffer' });
+  if (!img || !img.value) throw err(404, 'That photo wasn\u2019t found. Choose it again.');
+  const bytes = new Uint8Array(img.value); let bin = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+  const size = clean(b.size, 80);
+  const prompt = 'You help a vintage and antique dealer price an item for resale online. Look at the photo' + (size ? ' (the dealer says it is about ' + size + ')' : '') + '.\n' +
+    'Reply with JSON only, no other text: {"title": short listing title naming maker and pattern if you can tell, under 80 characters, ' +
+    '"category": one of ' + JSON.stringify(CATEGORIES) + ', "low": number, "high": number, "suggested": number (a realistic asking price in US dollars for a one-off online sale, ' +
+    'typically near the middle of the range), "why": one short sentence on what drives the value, "check": one short thing to verify, such as a maker\u2019s mark, damage or a reproduction tell}. ' +
+    'Be conservative. If you cannot tell what it is, say so in "why" and give a wide range.';
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: { 'x-api-key': env.ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
+    body: JSON.stringify({ model: env.SCAN_MODEL || 'claude-sonnet-5-5', max_tokens: 400,
+      messages: [{ role: 'user', content: [{ type: 'image', source: { type: 'base64', media_type: (img.metadata && img.metadata.type) || 'image/jpeg', data: btoa(bin) } }, { type: 'text', text: prompt }] }] })
+  });
+  const out = await res.json().catch(() => ({}));
+  if (!res.ok) throw err(502, 'The scanner had a problem: ' + ((out.error && out.error.message) || res.status));
+  await env.TABELLA.put(ck, String(used + 1), { expirationTtl: 60 * 60 * 30 });
+  const txt = ((out.content || []).find(c => c.type === 'text') || {}).text || '';
+  let r; try { r = JSON.parse(txt.slice(txt.indexOf('{'), txt.lastIndexOf('}') + 1)); } catch (e) { throw err(502, 'The scanner\u2019s answer couldn\u2019t be read. Try again.'); }
+  const n = v => (isFinite(Number(v)) && Number(v) >= 0 ? Math.round(Number(v)) : null);
+  return { title: clean(r.title, 120), category: CATEGORIES.includes(r.category) ? r.category : 'Other', low: n(r.low), high: n(r.high), suggested: n(r.suggested), why: clean(r.why, 240), check: clean(r.check, 240), left: cap - used - 1 };
 }
 
 // ---------- payouts (Stripe Connect) ----------
