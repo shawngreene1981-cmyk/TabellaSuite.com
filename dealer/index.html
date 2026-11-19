@@ -143,6 +143,16 @@ dialog{max-height:calc(100dvh - 24px);max-height:calc(100vh - 24px)}
   <button class="btn" type="button" id="importBtn">Bring them in</button><div id="importMsg" aria-live="polite"></div>
  </div>
 
+ <details class="panel" id="acct" style="margin-top:14px;max-width:none"><summary style="cursor:pointer;font-weight:600">Account: sign-in email and password</summary>
+  <form id="acctForm" novalidate style="margin-top:8px">
+   <p class="meta" id="acctNow" style="margin:0 0 6px"></p>
+   <label for="cEmail">New sign-in email <span class="meta">leave blank to keep it</span></label><input id="cEmail" type="email" autocomplete="email">
+   <label for="cNewPw">New password <span class="meta">leave blank to keep it</span></label><input id="cNewPw" type="password" autocomplete="new-password" minlength="8">
+   <label for="cPw">Current password <span class="meta">needed to save</span></label><input id="cPw" type="password" autocomplete="current-password">
+   <button class="btn" type="submit" style="margin-top:10px">Save account</button><div id="acctMsg" aria-live="polite"></div>
+  </form>
+ </details>
+
  <div class="bar" style="margin-top:22px"><h2 style="font-size:1.7rem">Your items <span class="meta" id="count"></span></h2><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn sec" type="button" id="csvBtn">Download spreadsheet</button><button class="btn" type="button" id="addBtn">Add an item</button></div></div>
  <ul class="items" id="items"><li class="empty">Loading...</li></ul>
 </section>
@@ -196,7 +206,7 @@ $('authForm').addEventListener('submit',async function(e){e.preventDefault();var
   catch(err){msg('authMsg',err.message,1)}b.disabled=false});
 $('signOut').onclick=async function(){try{await api('/app/logout',{method:'POST'})}catch(e){}setTok(null);me=null;show('auth')};
 // ----- shop setup
-function drawSetup(){$('shopName').textContent=me.name;var okShip=me.hasShipFrom,okPay=me.payouts;
+function drawSetup(){$('shopName').textContent=me.name;$('acctNow').textContent='Signed in as '+me.email+'.';var okShip=me.hasShipFrom,okPay=me.payouts;
   $('stShip').className='step'+(okShip?' done':'');$('stShipTxt').textContent=okShip?me.shipFrom.street1+', '+me.shipFrom.city+', '+me.shipFrom.state+' '+me.shipFrom.zip+'. Never shown to shoppers.':'Where packages ship from. Never shown to shoppers.';
   $('shipEditBtn').textContent=okShip?'Change':'Add';
   $('stPay').className='step'+(okPay?' done':'');$('stPayTxt').textContent=okPay?'Payouts are set up. Your share goes to your bank after each sale.':'Stripe pays your share to your bank after each sale. Tabella never sees your bank details.';
@@ -262,6 +272,12 @@ $('itemForm').addEventListener('submit',async function(e){e.preventDefault();var
   catch(err){msg('itMsg',err.message,1)}b.disabled=false;b.textContent='Save item'});
 $('soldBtn').onclick=async function(){if(!editing)return;var to=editing.status==='sold'?'available':'sold';
   try{await api('/app/items/'+editing.id,{method:'PUT',json:{status:to}});$('itemDlg').close();await loadItems()}catch(err){msg('itMsg',err.message,1)}};
+// ----- account
+$('acctForm').addEventListener('submit',async function(e){e.preventDefault();
+  if(!$('cPw').value){msg('acctMsg','Enter your current password.',1);return}
+  try{var d=await api('/app/account',{method:'PUT',json:{password:$('cPw').value,newEmail:$('cEmail').value,newPassword:$('cNewPw').value}});me=d.dealer;
+    $('cPw').value=$('cNewPw').value=$('cEmail').value='';drawSetup();msg('acctMsg','Saved. Sign in with '+me.email+' from now on.')}
+  catch(err){msg('acctMsg',err.message,1)}});
 // ----- Shantiques import and spreadsheet
 async function checkImport(){try{var s=await api('/app/import');$('importCard').hidden=!s.available}catch(e){}}
 $('importBtn').onclick=async function(){var b=this,total=0;b.disabled=true;

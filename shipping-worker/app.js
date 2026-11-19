@@ -31,6 +31,7 @@ export async function handleApp(request, env, url, json, cors) {
     if (p === '/app/logout' && request.method === 'POST') { await env.TABELLA.delete('sess:' + me.token); return json({ ok: true }, 200, cors); }
     if (p === '/app/me' && request.method === 'GET') return json({ dealer: publicDealer(me.dealer), categories: CATEGORIES }, 200, cors);
     if (p === '/app/me' && request.method === 'PUT') return json({ dealer: publicDealer(await updateDealer(env, me.dealer, await body(request))) }, 200, cors);
+    if (p === '/app/account' && request.method === 'PUT') return json({ dealer: publicDealer(await updateAccount(env, me.dealer, await body(request))) }, 200, cors);
     if (p === '/app/photo' && request.method === 'POST') return json(await savePhoto(env, me.dealer, request), 200, cors);
     if (p === '/app/items' && request.method === 'GET') return json({ items: await listItems(env, me.dealer.id) }, 200, cors);
     if (p === '/app/items' && request.method === 'POST') return json({ item: await saveItem(env, me.dealer, null, await body(request)) }, 200, cors);
@@ -74,6 +75,30 @@ async function login(env, b) {
   await env.TABELLA.delete('rl:' + email);
   const dealer = JSON.parse(await env.TABELLA.get('dealer:' + u.id) || 'null');
   return { token: await newSession(env, u.id), dealer: publicDealer(dealer) };
+}
+// Change the sign-in email and/or password. Always needs the current password.
+async function updateAccount(env, d, b) {
+  const u = JSON.parse(await env.TABELLA.get('user:' + d.email) || 'null');
+  if (!u || u.id !== d.id) throw err(500, 'Your account record could not be found.');
+  if ((await hashPw(String(b.password || ''), u.salt)) !== u.hash) throw err(401, 'Your current password isn\u2019t right.');
+  if (b.newPassword) {
+    const np = String(b.newPassword);
+    if (np.length < 8) throw err(400, 'Use a new password of at least 8 characters.');
+    u.salt = rand(16); u.hash = await hashPw(np, u.salt);
+  }
+  let email = d.email;
+  if (b.newEmail != null && String(b.newEmail).trim()) {
+    const ne = cleanEmail(b.newEmail);
+    if (!ne) throw err(400, 'Enter a valid new email.');
+    if (ne !== d.email) {
+      if (await env.TABELLA.get('user:' + ne)) throw err(409, 'Another account already uses that email.');
+      email = ne;
+    }
+  }
+  u.email = email;
+  await env.TABELLA.put('user:' + email, JSON.stringify(u));
+  if (email !== d.email) { await env.TABELLA.delete('user:' + d.email); d.email = email; await env.TABELLA.put('dealer:' + d.id, JSON.stringify(d)); }
+  return d;
 }
 async function newSession(env, id) { const t = rand(40); await env.TABELLA.put('sess:' + t, id, { expirationTtl: SESSION_TTL }); return t; }
 async function session(env, request) {
