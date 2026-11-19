@@ -32,8 +32,16 @@ export async function handlePlaces(request, env, url, json, cors) {
       return out(await route(env, from, to, miles), 600);
     }
     if (p === '/places/us' && request.method === 'GET') {
-      const d = await env.TABELLA.get('osm:us');
-      return new Response(d || '{"shops":[],"states":0}', { headers: Object.assign({ 'content-type': 'application/json', 'cache-control': 'public, max-age=' + (d ? 21600 : 300) }, cors) });
+      // Which states are ready. The map then loads each ready state with /places/state.
+      const meta = JSON.parse((await env.TABELLA.get('osm:states')) || '{}');
+      const ready = STATES.filter(x => meta[x] && meta[x].t).map(x => [x, meta[x].n, meta[x].t]);
+      return out({ of: STATES.length, states: ready.length, ready }, 600);
+    }
+    if (p === '/places/state' && request.method === 'GET') {
+      const st = String(url.searchParams.get('st') || '').toUpperCase();
+      if (!STATES.includes(st)) throw err(400, 'Bad state.');
+      const d = await env.TABELLA.get('osmst:' + st);
+      return new Response(d || '[]', { headers: Object.assign({ 'content-type': 'application/json', 'cache-control': 'public, max-age=21600' }, cors) });
     }
     return json({ error: 'Not found' }, 404, cors);
   } catch (e) {
@@ -42,25 +50,51 @@ export async function handlePlaces(request, env, url, json, cors) {
 }
 
 // ---------- Nationwide list, built one state per run by the Worker's timer (see wrangler.toml [triggers]).
-// Each state is refreshed about once a week. The merged list is small: [id, lat, lon, name, town] per shop.
+// Each state is stored as its own small list, [id, lat, lon, name, town] per shop, and served as-is,
+// so no request has to read the whole country (the free Workers plan allows very little CPU per request).
 const STATES = 'AL AK AZ AR CA CO CT DE DC FL GA HI ID IL IN IA KS KY LA ME MD MA MI MN MS MO MT NE NV NH NJ NM NY NC ND OH OK OR PA RI SC SD TN TX UT VT VA WA WV WI WY'.split(' ');
+export function nextState(meta, now) {
+  const wait = x => meta[x] && meta[x].a && now - meta[x].a < 3600e3; // a failed state waits an hour before another try
+  return STATES.find(x => !meta[x]) || STATES.filter(x => !wait(x)).sort((a, b) => meta[a].t - meta[b].t).find(x => now - meta[x].t > 7 * DAY * 1000);
+}
 export async function buildNextState(env) {
   if (!env.TABELLA) return 'no storage';
   const meta = JSON.parse((await env.TABELLA.get('osm:states')) || '{}'), now = Date.now();
-  const wait = x => meta[x] && meta[x].a && now - meta[x].a < 3600e3; // a failed state waits an hour before another try
-  const st = STATES.find(x => !meta[x]) || STATES.filter(x => !wait(x)).sort((a, b) => meta[a].t - meta[b].t).find(x => now - meta[x].t > 7 * DAY * 1000);
+  const st = nextState(meta, now);
   if (!st) return 'all fresh';
+  return buildState(env, st, meta, now);
+}
+export async function buildState(env, st, meta, now) {
+  meta = meta || JSON.parse((await env.TABELLA.get('osm:states')) || '{}'); now = now || Date.now();
   let shops;
-  try {
-    shops = await overpass('[out:json][timeout:120];area["ISO3166-2"="US-' + st + '"][admin_level=4]->.a;(nwr["shop"="antiques"](area.a);nwr["shop"]["name"~"antique",i](area.a););out center tags;');
-  } catch (e) { meta[st] = Object.assign(meta[st] || { n: 0 }, { t: (meta[st] && meta[st].t) || 0, a: now, err: String(e.message).slice(0, 200) }); await env.TABELLA.put('osm:states', JSON.stringify(meta)); return st + ' failed'; }
-  await env.TABELLA.put('osmst:' + st, JSON.stringify(shops.map(x => [x.id, x.lat, x.lon, x.name, x.town || ''])));
+  try { shops = await overpassCsv(st); }
+  catch (e) { meta[st] = Object.assign(meta[st] || { n: 0, t: 0 }, { a: now, err: String(e.message).slice(0, 200) }); await env.TABELLA.put('osm:states', JSON.stringify(meta)); return st + ' failed: ' + meta[st].err; }
+  await env.TABELLA.put('osmst:' + st, JSON.stringify(shops));
   meta[st] = { t: now, n: shops.length };
   await env.TABELLA.put('osm:states', JSON.stringify(meta));
-  const all = [];
-  for (const x of STATES) { if (!meta[x] || !meta[x].n) continue; const v = await env.TABELLA.get('osmst:' + x); if (v) all.push.apply(all, JSON.parse(v)); }
-  await env.TABELLA.put('osm:us', JSON.stringify({ updated: now, states: Object.keys(meta).filter(x => meta[x].t).length, of: STATES.length, shops: all }));
   return st + ' ' + shops.length;
+}
+async function overpassCsv(st) {
+  const q = '[out:csv(::type,::id,::lat,::lon,name,shop,"addr:city";false;"\\t")][timeout:120];area["ISO3166-2"="US-' + st + '"][admin_level=4]->.a;(nwr["shop"="antiques"](area.a);nwr["shop"]["name"~"antique",i](area.a););out center;';
+  const why = [];
+  for (const host of OVERPASS) {
+    const name = new URL(host).hostname;
+    try {
+      const r = await fetch(host + '?data=' + encodeURIComponent(q), { headers: UA });
+      if (!r.ok) { why.push(name + ' ' + r.status); continue; }
+      const text = await r.text();
+      if (/^\s*</.test(text)) { why.push(name + ' error page'); continue; }
+      const seen = new Set(), out = [];
+      for (const line of text.split('\n')) {
+        const c = line.split('\t'); if (c.length < 6 || !c[4] || !c[2]) continue;
+        if (/thrift|goodwill|pawn/i.test(c[4]) && c[5] !== 'antiques') continue;
+        const id = 'osm-' + c[0][0] + c[1]; if (seen.has(id)) continue; seen.add(id);
+        out.push([id, +(+c[2]).toFixed(5), +(+c[3]).toFixed(5), c[4].slice(0, 90), c[6] ? c[6].slice(0, 50) + ', ' + st : '']);
+      }
+      return out;
+    } catch (e) { why.push(name + ' ' + String(e.message || 'failed').slice(0, 40)); }
+  }
+  throw err(503, 'The shop finder is busy (' + why.join('; ') + ')');
 }
 
 export async function geocode(env, q) {

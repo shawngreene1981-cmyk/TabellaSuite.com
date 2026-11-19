@@ -3,7 +3,7 @@
 // "Hide from map" sets s = 'x' so it can be brought back.
 
 import { sendEmail, opsEmail, noteEmail } from './mail.js';
-import { geocode, limit } from './places.js';
+import { geocode, limit, buildState, nextState } from './places.js';
 
 const KEY = 'trip:shops';
 
@@ -33,6 +33,17 @@ export async function handleTrips(request, env, url, json, cors) {
       if (b.known === false && !e.ll) { const g = await geocode(env, town); e.ll = [g.lat, g.lon]; }
       await env.TABELLA.put(KEY, JSON.stringify(list));
       return json({ ok: true, shop: e }, 200, cors);
+    }
+    // ----- Fill in the nationwide shop list now, one state per call (the timer does the same every 5 minutes).
+    if (p === '/trip/build' && request.method === 'POST') {
+      await auth(request, env);
+      const meta = JSON.parse((await env.TABELLA.get('osm:states')) || '{}'), now = Date.now();
+      const b = await request.json().catch(() => ({}));
+      const st = /^[A-Z]{2}$/.test(b.state || '') ? b.state : nextState(meta, now);
+      const done = Object.keys(meta).filter(x => meta[x].t).length;
+      if (!st) return json({ result: 'all fresh', done, of: 51, meta }, 200, cors);
+      const result = await buildState(env, st, meta, now);
+      return json({ result, state: st, done: Object.keys(meta).filter(x => meta[x].t).length, of: 51, meta }, 200, cors);
     }
     // ----- Listing claims: a shop owner asks to verify a listing and add their website. Shawn approves each one.
     if (p === '/trip/claim' && request.method === 'POST') {

@@ -107,7 +107,7 @@ dialog{max-height:calc(100dvh - 24px);max-height:calc(100vh - 24px)}
 
 .tabs button[aria-checked="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
 textarea{font:inherit;width:100%;padding:9px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);resize:vertical}
-#newRow[hidden],#visRow[hidden],#keyForm[hidden],#shopForm[hidden],#recent[hidden],#claims[hidden]{display:none}
+#newRow[hidden],#visRow[hidden],#keyForm[hidden],#shopForm[hidden],#recent[hidden],#claims[hidden],#build[hidden]{display:none}
 #shopForm,#keyForm{max-width:620px}
 </style>
 </head>
@@ -153,6 +153,13 @@ textarea{font:inherit;width:100%;padding:9px 10px;border:1px solid var(--line);b
  <p class="meta" style="margin:0 0 10px">Shop owners asking to verify a listing or add their shop. Call the shop's public number or check their website before you approve.</p>
  <ul class="items" id="claimList"></ul>
  <details style="margin-top:12px"><summary class="meta" style="cursor:pointer">Past decisions</summary><ul class="items" id="claimPast" style="margin-top:8px"></ul></details>
+</section>
+
+<section id="build" hidden style="margin-top:26px">
+ <h2 style="font-size:1.5rem">Antique shops across the US</h2>
+ <p class="meta" style="margin:0 0 10px" id="buildTxt">The map adds one state from OpenStreetMap every 5 minutes on its own. Tap below to add them now.</p>
+ <button type="button" class="btn sec" id="buildBtn">Fill in the map now</button>
+ <ul class="meta" id="buildLog" style="margin:10px 0 0;padding-left:18px;max-height:220px;overflow:auto"></ul>
 </section>
 
 <section id="recent" hidden style="margin-top:26px">
@@ -223,8 +230,17 @@ $('claimList').onclick=function(e){var b=e.target.closest('[data-act]');if(!b)re
   [].forEach.call(li.querySelectorAll('button'),function(x){x.disabled=true});
   call('/trip/claims/'+id,body).then(function(d){if(d.shop){SAVED=SAVED.filter(function(s){return s.id!==d.shop.id}).concat([d.shop]);fillSelect();drawSaved()}loadClaims()})
   .catch(function(err){m.innerHTML='<div class="msg err">'+esc(err.message)+'</div>';[].forEach.call(li.querySelectorAll('button'),function(x){x.disabled=false})})};
+var building=false;
+function buildStatus(m){var done=Object.keys(m||{}).filter(function(k){return m[k].t}).length,bad=Object.keys(m||{}).filter(function(k){return m[k].err&&!m[k].t});
+  $('buildTxt').textContent=done+' of 51 states are on the map'+(bad.length?'. Waiting to retry: '+bad.join(', '):'')+'. The map adds one every 5 minutes on its own.'}
+$('buildBtn').onclick=function(){if(building){building=false;return}building=true;var b=$('buildBtn'),fails=0;b.textContent='Stop';
+  (function step(){if(!building){b.textContent='Fill in the map now';return}
+    call('/trip/build',{}).then(function(d){buildStatus(d.meta);var li=document.createElement('li');li.textContent=d.result;$('buildLog').prepend(li);
+      if(d.result==='all fresh'){building=false;b.textContent='All states are in';return}
+      fails=/failed/.test(d.result)?fails+1:0;if(fails>=3){building=false;b.textContent='Fill in the map now';li.textContent+=' (stopped after 3 failures in a row; the timer keeps trying)';return}
+      setTimeout(step,1500)}).catch(function(err){building=false;b.textContent='Fill in the map now';var li=document.createElement('li');li.textContent=err.message;$('buildLog').prepend(li)})})()};
 function start(){$('keyForm').hidden=true;$('shopForm').hidden=false;
-  Promise.all([loadBase(),call('/trip/shops').then(function(d){SAVED=d.shops||[]})]).then(function(){fillSelect();drawSaved();loadClaims()}).catch(function(err){msg('saveMsg','Could not load the shop list: '+err.message,1)})}
+  Promise.all([loadBase(),call('/trip/shops').then(function(d){SAVED=d.shops||[]})]).then(function(){fillSelect();drawSaved();loadClaims();$('build').hidden=false;fetch(API+'/places/us').then(function(r){return r.json()}).then(function(d){$('buildTxt').textContent=d.states+' of 51 states are on the map. The map adds one every 5 minutes on its own.'}).catch(function(){})}).catch(function(err){msg('saveMsg','Could not load the shop list: '+err.message,1)})}
 document.getElementById('y')&&(document.getElementById('y').textContent=new Date().getFullYear());
 if(key)start();else $('keyForm').hidden=false;
 })();
