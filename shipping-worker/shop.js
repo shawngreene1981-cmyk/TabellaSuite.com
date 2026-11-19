@@ -10,6 +10,7 @@
 
 import { buildOrder, createCheckoutSession, stripeMode } from './stripe.js';
 import { dealerListings, dealerItem, markDealerItemSold, shantiquesMoved, ITEM_ID } from './app.js';
+import { sendEmail, buyerReceipt, dealerAlert, opsEmail } from './mail.js';
 
 const HOLD_SECONDS = 35 * 60; // Stripe checkout pages last 30 minutes minimum; hold a little longer.
 
@@ -124,7 +125,20 @@ export async function shopAfterPayment(env, session, paid) {
   if (paid) {
     await Promise.all(ids.map(id => env.ORDERS.put('sold:' + id, ref)));
     await Promise.all(ids.map(id => markDealerItemSold(env, id, ref)));
-    if (o) { o.status = 'paid'; o.paidAt = Date.now(); o.paymentIntent = session.payment_intent; await env.ORDERS.put('order:' + ref, JSON.stringify(o), { expirationTtl: 60 * 60 * 24 * 400 }); }
+    if (o) {
+      o.status = 'paid'; o.paidAt = o.paidAt || Date.now(); o.paymentIntent = session.payment_intent;
+      if (!o.emailed) {
+        // One email to the buyer, one to the shop. Stripe can resend the same event, so this runs once per order.
+        const x = ids.length ? await dealerItem(env, ids[0]) : null;
+        const shop = x ? x.dealer.name : 'Shantiques', to = x ? x.dealer.email : opsEmail(env);
+        o.test = stripeMode(env) === 'test';
+        const r1 = o.email ? await sendEmail(env, Object.assign({ to: o.email }, buyerReceipt(o, shop))) : { skipped: 'no buyer email' };
+        const r2 = await sendEmail(env, Object.assign({ to, bcc: to === opsEmail(env) ? undefined : opsEmail(env) }, dealerAlert(o, shop)));
+        o.emails = { buyer: r1, dealer: r2 };
+        if (!r1.skipped && !r2.skipped) o.emailed = true;
+      }
+      await env.ORDERS.put('order:' + ref, JSON.stringify(o), { expirationTtl: 60 * 60 * 24 * 400 });
+    }
   } else {
     if (o && o.status === 'checkout') { o.status = 'expired'; await env.ORDERS.put('order:' + ref, JSON.stringify(o), { expirationTtl: 60 * 60 * 24 * 30 }); }
   }

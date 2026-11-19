@@ -98,6 +98,7 @@ dialog{max-height:calc(100dvh - 24px);max-height:calc(100vh - 24px)}
 .dlgfoot{position:sticky;bottom:0;background:var(--card);display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:12px 0 calc(12px + env(safe-area-inset-bottom,0px));margin-top:12px;border-top:1px solid var(--line);z-index:2}
 .dlgfoot:has(#soldBtn[hidden]) #saveBtn{grid-column:1/-1}
 .scan{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-top:8px;display:grid;gap:4px;background:var(--bg)}
+.linkbtn{background:none;border:0;padding:0;color:var(--terra);font:500 .92rem Inter,sans-serif;text-decoration:underline;cursor:pointer;min-height:32px}
 </style>
 </head>
 <body>
@@ -118,6 +119,13 @@ dialog{max-height:calc(100dvh - 24px);max-height:calc(100vh - 24px)}
   <p class="meta" id="pwHint" hidden>At least 8 characters.</p>
   <button class="btn" id="authBtn" type="submit" style="width:100%;margin-top:14px">Sign in</button>
   <div id="authMsg" aria-live="polite"></div>
+  <p style="margin:12px 0 0"><button type="button" class="linkbtn" id="forgotBtn">Forgot password?</button></p>
+ </form>
+ <form id="resetForm" class="panel" novalidate hidden>
+  <h2 style="font-size:1.5rem;margin:0 0 6px">Choose a new password</h2>
+  <label for="rPw">New password <span class="meta">at least 8 characters</span></label><input id="rPw" type="password" autocomplete="new-password" minlength="8">
+  <button class="btn" type="submit" style="width:100%;margin-top:14px">Save and sign in</button>
+  <div id="resetMsg" aria-live="polite"></div>
  </form>
 </section>
 
@@ -177,6 +185,7 @@ dialog{max-height:calc(100dvh - 24px);max-height:calc(100vh - 24px)}
  </fieldset>
  <label class="check"><input type="checkbox" id="fOnline" checked> List it in the Tabella shop</label>
  <label for="fNotes">Notes <span class="meta">optional, private</span></label><input id="fNotes" maxlength="500" placeholder="Maker's mark on base, small chip on rim">
+ <div id="orderBox"></div>
  <div id="itMsg" aria-live="polite"></div>
  <div class="dlgfoot"><button class="btn" type="submit" id="saveBtn">Save item</button><button class="btn sec" type="button" id="soldBtn" hidden>Mark as sold</button></div>
 </form></dialog>
@@ -205,6 +214,12 @@ $('authForm').addEventListener('submit',async function(e){e.preventDefault();var
   try{var d=await api(mode==='up'?'/app/signup':'/app/login',{json:{email:$('aEmail').value,password:$('aPw').value,shop:$('aShop').value}});setTok(d.token);me=d.dealer;$('aPw').value='';await enter()}
   catch(err){msg('authMsg',err.message,1)}b.disabled=false});
 $('signOut').onclick=async function(){try{await api('/app/logout',{method:'POST'})}catch(e){}setTok(null);me=null;show('auth')};
+$('forgotBtn').onclick=async function(){var e=$('aEmail').value.trim();if(!e){msg('authMsg','Type your email above, then tap Forgot password again.',1);$('aEmail').focus();return}
+  try{await api('/app/forgot',{json:{email:e}});msg('authMsg','If there is a shop with that email, a reset link is on its way. Check your inbox (and spam) for an email from Tabella.')}catch(err){msg('authMsg',err.message,1)}};
+var resetTok=(location.search.match(/reset=([a-z0-9]{40})/)||[])[1];
+$('resetForm').addEventListener('submit',async function(e){e.preventDefault();
+  try{var d=await api('/app/reset',{json:{token:resetTok,password:$('rPw').value}});setTok(d.token);me=d.dealer;history.replaceState(null,'',location.pathname);$('resetForm').hidden=true;$('authForm').hidden=false;await enter()}
+  catch(err){msg('resetMsg',err.message,1)}});
 // ----- shop setup
 function drawSetup(){$('shopName').textContent=me.name;$('acctNow').textContent='Signed in as '+me.email+'.';var okShip=me.hasShipFrom,okPay=me.payouts;
   $('stShip').className='step'+(okShip?' done':'');$('stShipTxt').textContent=okShip?me.shipFrom.street1+', '+me.shipFrom.city+', '+me.shipFrom.state+' '+me.shipFrom.zip+'. Never shown to shoppers.':'Where packages ship from. Never shown to shoppers.';
@@ -243,7 +258,11 @@ function openItem(it){editing=it;photoBlob=null;photoKey=null;$('scanOut').inner
   if(bx){var preset=[].some.call(document.querySelectorAll('.boxsz button'),function(b){return b.getAttribute('data-box')===bx});if(preset)setBox(bx);else{var d=it.box;$('fL').value=d[0];$('fW').value=d[1];$('fH').value=d[2];$('dims').hidden=false;document.querySelector('.boxsz button[data-box=""]').setAttribute('aria-pressed','true')}}else $('dims').hidden=true;
   $('fOnline').checked=it?it.online!==false:true;$('fNotes').value=it&&it.notes?it.notes:'';
   if(it&&it.photos[0]){$('photoPrev').src=API+'/img/'+it.photos[0];$('photoPrev').hidden=false;$('photoEmpty').hidden=true}else{$('photoPrev').hidden=true;$('photoEmpty').hidden=false;$('photo').value=''}
+  $('orderBox').innerHTML='';if(it&&it.status==='sold')showOrder(it.id);
   $('soldBtn').hidden=!it;scanReady();$('soldBtn').textContent=it&&it.status==='sold'?'Mark as available':'Mark as sold';profit();$('itemDlg').showModal()}
+async function showOrder(id){try{var d=await api('/app/items/'+id+'/order');var o=d.order;if(!o)return;var a=o.shipTo||{};
+  $('orderBox').innerHTML='<div class="scan" style="margin-top:12px"><b>Sold, order '+esc(o.ref)+'</b><div><b>Ship to</b><br>'+[a.name,a.street1,a.street2,a.city+', '+a.state+' '+a.zip].filter(Boolean).map(esc).join('<br>')+'</div>'+
+  (o.shipping?'<div class="meta">They paid for '+esc(o.shipping.carrier+' '+(o.shipping.service||''))+' ('+fm(o.shipping.amount)+')</div>':'')+'</div>'}catch(e){}}
 document.addEventListener('click',function(e){var c=e.target.closest('[data-close]');if(c)c.closest('dialog').close()});
 $('photo').addEventListener('change',async function(){var f=this.files&&this.files[0];if(!f)return;
   try{photoBlob=await shrink(f);photoKey=null;$('photoPrev').src=URL.createObjectURL(photoBlob);$('photoPrev').hidden=false;$('photoEmpty').hidden=true;scanReady()}catch(e){msg('itMsg','That photo could not be read. Try another.',1)}});
@@ -291,7 +310,8 @@ $('csvBtn').onclick=async function(){var b=this;b.disabled=true;
 // ----- start
 async function enter(){show('app');drawSetup();loadItems();checkImport();
   if(/payouts=back/.test(location.search)){try{var s=await api('/app/payouts');me.payouts=s.ready;drawSetup();drawItems()}catch(e){}history.replaceState(null,'',location.pathname)}}
-(async function(){if(!tok){show('auth');setMode('in');return}try{var d=await api('/app/me');me=d.dealer;await enter()}catch(e){show('auth');setMode('in')}})();
+(async function(){if(resetTok){show('auth');setMode('in');$('authForm').hidden=true;$('resetForm').hidden=false;document.querySelector('.tabs').hidden=true;return}
+  if(!tok){show('auth');setMode('in');return}try{var d=await api('/app/me');me=d.dealer;await enter()}catch(e){show('auth');setMode('in')}})();
 })();
 </script>
 </body>

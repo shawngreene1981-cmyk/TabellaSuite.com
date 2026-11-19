@@ -10,6 +10,7 @@
 //   rl:<email>              failed sign-in counter
 
 import { createRecipient, recipientLink, recipientReady } from './stripe.js';
+import { sendEmail, resetEmail } from './mail.js';
 
 const SESSION_TTL = 60 * 60 * 24 * 30;
 export const ITEM_ID = /^(T[0-9A-Z]{6}|SH-\d{4})$/;
@@ -25,6 +26,9 @@ export async function handleApp(request, env, url, json, cors) {
     if (p === '/app/signup' && request.method === 'POST') return json(await signup(env, await body(request)), 200, cors);
     if (p === '/app/login' && request.method === 'POST') return json(await login(env, await body(request)), 200, cors);
 
+    if (p === '/app/forgot' && request.method === 'POST') return json(await forgot(env, await body(request)), 200, cors);
+    if (p === '/app/reset' && request.method === 'POST') return json(await resetPw(env, await body(request)), 200, cors);
+
     const me = await session(env, request);
     if (!me) return json({ error: 'Please sign in again.', signin: true }, 401, cors);
 
@@ -38,6 +42,8 @@ export async function handleApp(request, env, url, json, cors) {
     if (p === '/app/import' && request.method === 'GET') return json(await importStatus(env, me.dealer), 200, cors);
     if (p === '/app/import' && request.method === 'POST') return json(await importBatch(env, me.dealer), 200, cors);
     if (p === '/app/export.csv' && request.method === 'GET') return exportCsv(env, me.dealer, cors);
+    const mo = p.match(/^\/app\/items\/(T[0-9A-Z]{6}|SH-\d{4})\/order$/);
+    if (mo && request.method === 'GET') return json(await itemOrder(env, me.dealer, mo[1]), 200, cors);
     const m = p.match(/^\/app\/items\/(T[0-9A-Z]{6}|SH-\d{4})$/);
     if (m && request.method === 'PUT') return json({ item: await saveItem(env, me.dealer, m[1], await body(request)) }, 200, cors);
     if (p === '/app/scan' && request.method === 'POST') return json(await scan(env, me.dealer, await body(request)), 200, cors);
@@ -75,6 +81,44 @@ async function login(env, b) {
   await env.TABELLA.delete('rl:' + email);
   const dealer = JSON.parse(await env.TABELLA.get('dealer:' + u.id) || 'null');
   return { token: await newSession(env, u.id), dealer: publicDealer(dealer) };
+}
+// Forgot password: always answers the same way, so it never reveals whether an email has an account.
+async function forgot(env, b) {
+  const email = cleanEmail(b.email);
+  if (!email) throw err(400, 'Enter the email you sign in with.');
+  const n = Number(await env.TABELLA.get('rlf:' + email) || 0);
+  if (n < 3 && await env.TABELLA.get('user:' + email)) {
+    await env.TABELLA.put('rlf:' + email, String(n + 1), { expirationTtl: 3600 });
+    const t = rand(40);
+    await env.TABELLA.put('rst:' + t, email, { expirationTtl: 3600 });
+    const link = String(env.SITE_URL || 'https://tabellasuite.com').replace(/\/$/, '') + '/dealer/?reset=' + t;
+    const r = await sendEmail(env, Object.assign({ to: email }, resetEmail(link)));
+    if (r.skipped) throw err(503, 'Password reset emails aren\u2019t switched on yet. Write to contact@tabellasuite.com.');
+  }
+  return { ok: true };
+}
+async function resetPw(env, b) {
+  const t = String(b.token || ''), pw = String(b.password || '');
+  if (!/^[a-z0-9]{40}$/.test(t)) throw err(400, 'That reset link isn\u2019t valid. Ask for a new one.');
+  if (pw.length < 8) throw err(400, 'Use a password of at least 8 characters.');
+  const email = await env.TABELLA.get('rst:' + t);
+  if (!email) throw err(400, 'That reset link has expired or was already used. Ask for a new one.');
+  const u = JSON.parse(await env.TABELLA.get('user:' + email) || 'null');
+  if (!u) throw err(400, 'That account no longer exists.');
+  u.salt = rand(16); u.hash = await hashPw(pw, u.salt);
+  await env.TABELLA.put('user:' + email, JSON.stringify(u));
+  await env.TABELLA.delete('rst:' + t); await env.TABELLA.delete('rl:' + email);
+  const dealer = JSON.parse(await env.TABELLA.get('dealer:' + u.id) || 'null');
+  return { token: await newSession(env, u.id), dealer: publicDealer(dealer) };
+}
+// The order behind a sold item, so the dealer knows where to ship it.
+async function itemOrder(env, d, id) {
+  const it = JSON.parse(await env.TABELLA.get('item:' + d.id + ':' + id) || 'null');
+  if (!it) throw err(404, 'That item isn\u2019t in your shop.');
+  if (!it.order || !env.ORDERS) return { order: null };
+  const o = JSON.parse(await env.ORDERS.get('order:' + it.order) || 'null');
+  if (!o) return { order: null };
+  return { order: { ref: o.ref, paidAt: o.paidAt, shipTo: o.shipTo, shipping: o.shipping, items: o.items.map(i => ({ id: i.id, title: i.title, price: i.price })) } };
 }
 // Change the sign-in email and/or password. Always needs the current password.
 async function updateAccount(env, d, b) {
