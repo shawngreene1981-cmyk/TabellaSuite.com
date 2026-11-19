@@ -343,13 +343,11 @@ function start(list){if(started)return;started=true;try{applySaved(list)}catch(e
   if(!map)return;Object.keys(P).forEach(function(k){place(P[k])});area('all');
   // Every antique shop in OpenStreetMap, one file per state, refreshed weekly by GitHub (tools/build_shops.py).
   if(cl)fetch('data/shops/index.json',{cache:'no-cache'}).then(function(r){return r.json()}).then(function(d){
-    var ready=Object.keys(d.states||{}).filter(function(k){return d.states[k]>0}),i=0,v=encodeURIComponent(d.updated||'');
-    function next(){if(i>=ready.length)return;var st=ready[i++];
-      fetch('data/shops/'+st+'.json?v='+v).then(function(r){return r.json()}).then(function(list){
+    var t=d.tiles||{},ready=Object.keys(t).filter(function(k){return t[k]>0}),i=0,v=encodeURIComponent(d.updated||'');
+    function next(){if(i>=ready.length)return;var k=ready[i++];
+      fetch('data/shops/'+k+'.json?v='+v).then(function(r){return r.json()}).then(function(list){
         addOsm(list.map(function(x){return{id:x[0],lat:x[1],lon:x[2],name:x[3],town:x[4],addr:'',hours:''}}))}).catch(function(){}).then(next)}
-    for(var k=0;k<6;k++)next();
-    var n=Object.keys(d.states||{}).length;
-    if(d.of&&n<d.of){$('zoomHint').hidden=false;$('zoomHint').textContent='Filling in antique shops across the country: '+n+' of '+d.of+' states so far. Zoom in or search to see any area now.'}}).catch(function(){});
+    for(var j=0;j<6;j++)next()}).catch(function(){});
   var q=new URLSearchParams(location.search);
   if(q.get('from')&&q.get('to')){tab(true);$('from').value=q.get('from');$('to').value=q.get('to');if(q.get('mi'))$('mi').value=q.get('mi');plan(q.get('from'),q.get('to'),$('mi').value)}
   else if(/springfield/i.test(location.hash)){$('areas').querySelector('[data-a=mo]').click()}

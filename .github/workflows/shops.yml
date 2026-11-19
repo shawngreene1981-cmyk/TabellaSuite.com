@@ -5,10 +5,6 @@ on:
   schedule:
     - cron: '17 9 * * 1'   # Mondays, early morning US time
   workflow_dispatch:
-    inputs:
-      states:
-        description: 'Only these states, separated by spaces (blank = all)'
-        required: false
   push:
     branches: [main]
     paths: ['tools/build_shops.py', '.github/workflows/shops.yml']
@@ -18,19 +14,19 @@ permissions:
 
 concurrency:
   group: shops
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 300
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
       - name: Download shops from OpenStreetMap
-        run: python tools/build_shops.py ${{ github.event.inputs.states }}
+        run: python tools/build_shops.py
       - name: Save to the website
         run: |
           git config user.name "Tabella map builder"
