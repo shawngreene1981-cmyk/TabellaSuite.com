@@ -52,14 +52,14 @@ export async function handleStripe(request, env, url, json, cors) {
         configuration: { recipient: { capabilities: { stripe_balance: { stripe_transfers: { requested: true } } } } },
         metadata: meta
       });
-      const link = await onboardingLink(env, acct.id, b.returnUrl);
+      const link = await onboardingLink(env, acct.id, String(b.returnUrl || '').replace('signup=pending', 'signup=' + acct.id), url.origin);
       return json({ account: acct.id, onboardingUrl: link.url, testMode: mode === 'test' }, 200, cors);
     }
 
     if (p === '/pay/onboarding-link' && request.method === 'POST') {
       const b = await body(request);
       if (!/^acct_[A-Za-z0-9]+$/.test(String(b.account || ''))) return json({ error: 'Missing account.' }, 400, cors);
-      const link = await onboardingLink(env, b.account, b.returnUrl);
+      const link = await onboardingLink(env, b.account, b.returnUrl, url.origin);
       return json({ onboardingUrl: link.url }, 200, cors);
     }
 
@@ -82,8 +82,10 @@ export async function handleStripe(request, env, url, json, cors) {
       const site = String(env.SITE_URL || 'https://tabellasuite.com').replace(/\/$/, '');
       const f = {
         mode: 'payment',
-        success_url: safeUrl(b.successUrl, site) || site + '/?paid={CHECKOUT_SESSION_ID}',
-        cancel_url: safeUrl(b.cancelUrl, site) || site + '/',
+        success_url: safeUrl(b.successUrl, site, url.origin) || site + '/?paid={CHECKOUT_SESSION_ID}',
+        cancel_url: safeUrl(b.cancelUrl, site, url.origin) || site + '/',
+        // Card rate only, so the Card processing line is right. Apple Pay and Google Pay ride on card.
+        'payment_method_types[0]': 'card', 'payment_method_types[1]': 'link',
         'payment_intent_data[transfer_group]': order.group,
         'metadata[group]': order.group,
         'metadata[splits]': order.splitsMeta,
@@ -176,9 +178,9 @@ export async function verifySignature(raw, header, secret, nowSec) {
 }
 
 // ---------- helpers ----------
-async function onboardingLink(env, account, returnUrl) {
+async function onboardingLink(env, account, returnUrl, self) {
   const site = String(env.SITE_URL || 'https://tabellasuite.com').replace(/\/$/, '');
-  const back = safeUrl(returnUrl, site) || site + '/';
+  const back = safeUrl(returnUrl, site, self) || site + '/';
   // Since API 2026-09-30.endive Stripe works out which configurations need onboarding; sending them is rejected.
   return stripeV2(env, 'POST', '/v2/core/account_links', { account,
     use_case: { type: 'account_onboarding', account_onboarding: { return_url: back, refresh_url: back } } });
@@ -210,8 +212,8 @@ async function stripeV2(env, method, path, obj) {
 
 async function body(request) { try { return await request.json(); } catch (e) { return {}; } }
 function clean(s, n) { return String(s == null ? '' : s).replace(/[\u0000-\u001f]/g, ' ').trim().slice(0, n); }
-function safeUrl(u, site) {
-  try { const x = new URL(String(u || '')); const allowed = new URL(site); return (x.origin === allowed.origin || x.origin === 'https://www.' + allowed.host || x.origin.endsWith('.claudeusercontent.com')) ? x.href : ''; }
+function safeUrl(u, site, self) {
+  try { const x = new URL(String(u || '')); const allowed = new URL(site); return (x.origin === allowed.origin || x.origin === self || x.origin === 'https://www.' + allowed.host || x.origin.endsWith('.claudeusercontent.com')) ? x.href : ''; }
   catch (e) { return ''; }
 }
 
@@ -237,11 +239,12 @@ function $(i){return document.getElementById(i)}
 async function call(p,b){var r=await fetch(p,b?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)}:{});var d=await r.json();if(!r.ok)throw new Error(d.error||r.status);return d}
 function show(id,t,bad){var o=$(id);o.hidden=false;o.className='out'+(bad?' err':'');o.textContent=t}
 var back=location.href.split('?')[0];
-$('mk').onclick=async function(){try{var d=await call('/pay/account',{role:$('role').value,name:$('name').value,email:$('email').value,returnUrl:back});
+$('mk').onclick=async function(){try{var d=await call('/pay/account',{role:$('role').value,name:$('name').value,email:$('email').value,returnUrl:back+'?signup=pending'});
   show('o1','Created '+d.account+'. Opening Stripe sign-up...');$('acct').value=d.account;if($('role').value==='mall')$('ma').value=d.account;else $('da').value=d.account;window.open(d.onboardingUrl,'_blank')}catch(e){show('o1',e.message,1)}};
 $('st').onclick=async function(){try{var d=await call('/pay/account-status?account='+encodeURIComponent($('acct').value.trim()));
   show('o2',(d.ready?'Ready to be paid.':'Not finished yet.')+(d.needs.length?' Still needs: '+d.needs.join(', '):''))}catch(e){show('o2',e.message,1)}};
 $('buy').onclick=async function(){try{var d=await call('/pay/checkout',{items:[{name:$('item').value,price:+$('price').value,dealerAccount:$('da').value.trim(),mallAccount:$('ma').value.trim()||undefined}],shipping:+$('ship').value||0,successUrl:back+'?paid=1',cancelUrl:back});
   var b=d.breakdown,i=b.items[0];show('o3','Total $'+b.total.toFixed(2)+' (item $'+i.price.toFixed(2)+', shipping $'+b.shipping.toFixed(2)+', card processing $'+b.cardProcessing.toFixed(2)+').\\nAfter payment: dealer $'+i.dealer.toFixed(2)+', mall $'+i.mall.toFixed(2)+', Tabella $'+i.tabella.toFixed(2)+'.\\nOpening Stripe checkout...');window.open(d.url,'_blank')}catch(e){show('o3',e.message,1)}};
 if(location.search.indexOf('paid=1')>=0)show('o3','Payment done. In Stripe, check Connect > Transfers to see the dealer and mall shares.');
+if(location.search.indexOf('signup=')>=0){var a=decodeURIComponent(location.search.split('signup=')[1].split('&')[0]);$('acct').value=a;$('da').value=a;show('o1','Back from Stripe sign-up for '+a+'. Click Check in box 2.')}
 </script></body></html>`;
