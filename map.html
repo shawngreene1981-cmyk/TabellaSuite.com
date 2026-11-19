@@ -259,13 +259,17 @@ var osmSeen={};
 
 // ---------- load every shop in the area being looked at (half-degree squares, cached by the server)
 var cells={},busy=0;
-function loadView(){if(!map)return;var z=map.getZoom();$('zoomHint').hidden=z>=9;if(z<9)return;
+function loadView(){if(!map)return;var z=map.getZoom();if(z<9){$('zoomHint').hidden=false;$('zoomHint').textContent='Zoom in on any area, or search above, to see every antique shop there.';return}
   var b=map.getBounds(),s=Math.floor(b.getSouth()*2)/2,w=Math.floor(b.getWest()*2)/2,n=b.getNorth(),e=b.getEast(),list=[];
   for(var la=s;la<n;la+=0.5)for(var lo=w;lo<e;lo+=0.5)list.push([la,lo]);
   if(list.length>12)return;
-  list.forEach(function(c){var k=c.join(',');if(cells[k])return;cells[k]=1;busy++;
-    fetch(API+'/places/area?lat='+c[0]+'&lon='+c[1]).then(function(r){return r.json()}).then(function(d){if(d.shops)addOsm(d.shops);else cells[k]=0})
-    .catch(function(){cells[k]=0}).then(function(){busy--})})}
+  var todo=list.filter(function(c){return !cells[c.join(',')]});if(!todo.length)return;
+  $('zoomHint').hidden=false;$('zoomHint').textContent='Loading antique shops in this area…';var bad='',found=0;
+  todo.forEach(function(c){var k=c.join(',');cells[k]=1;busy++;
+    fetch(API+'/places/area?lat='+c[0]+'&lon='+c[1]).then(getJson).then(function(d){found+=(d.shops||[]).length;addOsm(d.shops)})
+    .catch(function(e){cells[k]=0;bad=e.message}).then(function(){if(--busy)return;
+      $('zoomHint').textContent=bad?'Could not load shops for part of this area. '+bad:found?'':'No antique shops are listed in OpenStreetMap here yet. Know one? Add it with "Add your shop" below.';
+      $('zoomHint').hidden=!$('zoomHint').textContent})})}
 if(map)map.on('moveend',loadView);
 
 // ---------- search and near me

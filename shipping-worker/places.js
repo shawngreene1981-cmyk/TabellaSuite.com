@@ -4,7 +4,7 @@
 // Map data (c) OpenStreetMap contributors, ODbL. The map page shows that credit.
 
 const UA = { 'User-Agent': 'TabellaSuite mall map (contact@tabellasuite.com)' };
-const OVERPASS = ['https://overpass-api.de/api/interpreter', 'https://overpass.kumi.systems/api/interpreter'];
+const OVERPASS = ['https://overpass-api.de/api/interpreter', 'https://overpass.private.coffee/api/interpreter', 'https://maps.mail.ru/osm/tools/overpass/api/interpreter', 'https://overpass.kumi.systems/api/interpreter'];
 const DAY = 86400;
 
 export async function handlePlaces(request, env, url, json, cors) {
@@ -88,13 +88,18 @@ async function route(env, fromQ, toQ, miles) {
 }
 
 async function overpass(q) {
+  const why = [];
   for (const host of OVERPASS) {
-    const r = await fetch(host, { method: 'POST', headers: Object.assign({ 'Content-Type': 'application/x-www-form-urlencoded' }, UA), body: 'data=' + encodeURIComponent(q) }).catch(() => null);
-    if (!r || !r.ok) continue;
-    const d = await r.json().catch(() => null);
-    if (d && d.elements) return tidy(d.elements);
+    const name = new URL(host).hostname;
+    try {
+      const r = await fetch(host + '?data=' + encodeURIComponent(q), { headers: Object.assign({ Accept: 'application/json' }, UA) });
+      if (!r.ok) { why.push(name + ' ' + r.status); continue; }
+      const d = await r.json().catch(() => null);
+      if (d && d.elements) return tidy(d.elements);
+      why.push(name + ' bad reply');
+    } catch (e) { why.push(name + ' ' + (e.message || 'failed').slice(0, 40)); }
   }
-  throw err(503, 'The shop finder is busy right now. Try again in a minute.');
+  throw err(503, 'The shop finder is busy right now. Try again in a minute. (' + why.join('; ') + ')');
 }
 
 function tidy(els) {
