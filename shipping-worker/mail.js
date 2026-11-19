@@ -67,6 +67,17 @@ export function dealerAlert(o, shopName) {
   return { subject: (o.test ? '[Test] ' : '') + 'Sold: ' + o.items.map(i => i.title).join(', ').slice(0, 80), html, text };
 }
 
+export function shippedEmail(o, shopName) {
+  const l = o.label || {}, test = o.test ? '<p style="background:#F6E7B8;padding:8px 10px;border-radius:8px;font-size:14px">Test order. This is a test label, not a real shipment.</p>' : '';
+  const track = l.trackingUrl ? '<p><a href="' + esc(l.trackingUrl) + '" style="display:inline-block;background:#9A4A2E;color:#FFF8F0;text-decoration:none;padding:10px 16px;border-radius:8px;font-weight:600">Track your package</a></p>' : '';
+  const html = wrap('Your order is on its way', test + '<p>' + esc(shopName) + ' shipped order <b>' + esc(o.ref) + '</b>:</p>' + rows(o.items.map(i => [esc(i.title), fm(i.price)])) +
+    '<p><b>' + esc((l.carrier || '') + ' ' + (l.service || '')) + '</b><br>Tracking number: ' + esc(l.tracking || '') + '</p>' + track +
+    '<p style="margin:14px 0 4px"><b>Shipping to</b></p><p style="margin:0">' + addr(o.shipTo) + '</p>');
+  const text = (o.test ? 'TEST ORDER. Test label only.\n\n' : '') + shopName + ' shipped order ' + o.ref + '.\n\n' + o.items.map(i => i.title).join('\n') +
+    '\n\n' + (l.carrier || '') + ' ' + (l.service || '') + '\nTracking number: ' + (l.tracking || '') + (l.trackingUrl ? '\nTrack it: ' + l.trackingUrl : '') + '\n\nTabella';
+  return { subject: (o.test ? '[Test] ' : '') + 'Shipped: your Tabella order ' + o.ref, html, text };
+}
+
 export function resetEmail(link) {
   return { subject: 'Reset your Tabella password',
     html: wrap('Reset your password', '<p>Someone asked to reset the password for your Tabella shop. If it was you, tap the button. The link works for one hour.</p>' +

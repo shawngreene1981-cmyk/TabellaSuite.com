@@ -234,7 +234,7 @@ $('payBtn').onclick=async function(){var b=this;b.disabled=true;b.textContent='O
   try{var d=await api('/app/payouts',{method:'POST',json:{}});location.href=d.url}catch(err){b.disabled=false;drawSetup();alertMsg(err.message)}};
 function alertMsg(t){var p=$('setup');var m=document.createElement('div');m.className='msg err';m.textContent=t;p.appendChild(m);setTimeout(function(){m.remove()},8000)}
 // ----- items
-function why(it){if(it.status==='sold')return['sold','Sold'];if(!it.online)return['off','Not listed'];if(!(it.price>0))return['warn','Add a price to list it'];
+function why(it){if(it.status==='sold')return it.shippedAt?['ok','Shipped']:it.order?['sold','Sold: print the shipping label']:['sold','Sold'];if(!it.online)return['off','Not listed'];if(!(it.price>0))return['warn','Add a price to list it'];
   var miss=[];if(!(it.weightLb&&it.box))miss.push('ship size');if(!me.hasShipFrom)miss.push('ship-from address');if(!me.payouts)miss.push('payouts');
   return miss.length?['warn','Listed. To sell online, add '+miss.join(', ')]:['ok','Listed and ready to sell']}
 function drawItems(){var u=$('items');$('count').textContent=items.length?'('+items.length+')':'';
@@ -262,7 +262,13 @@ function openItem(it){editing=it;photoBlob=null;photoKey=null;$('scanOut').inner
   $('soldBtn').hidden=!it;scanReady();$('soldBtn').textContent=it&&it.status==='sold'?'Mark as available':'Mark as sold';profit();$('itemDlg').showModal()}
 async function showOrder(id){try{var d=await api('/app/items/'+id+'/order');var o=d.order;if(!o)return;var a=o.shipTo||{};
   $('orderBox').innerHTML='<div class="scan" style="margin-top:12px"><b>Sold, order '+esc(o.ref)+'</b><div><b>Ship to</b><br>'+[a.name,a.street1,a.street2,a.city+', '+a.state+' '+a.zip].filter(Boolean).map(esc).join('<br>')+'</div>'+
-  (o.shipping?'<div class="meta">They paid for '+esc(o.shipping.carrier+' '+(o.shipping.service||''))+' ('+fm(o.shipping.amount)+')</div>':'')+'</div>'}catch(e){}}
+  (o.shipping?'<div class="meta">They paid for '+esc(o.shipping.carrier+' '+(o.shipping.service||''))+' ('+fm(o.shipping.amount)+')</div>':'')+
+  (o.label?labelHtml(o.label):'<button type="button" class="btn" id="labelBtn" style="margin-top:6px">Print shipping label</button><div class="meta">Tabella pays for the label from the shipping the buyer paid. The buyer gets tracking by email.</div><div id="labelMsg" aria-live="polite"></div>')+'</div>';
+  var lb=$('labelBtn');if(lb)lb.onclick=async function(){lb.disabled=true;lb.textContent='Making the label...';
+    try{var r=await api('/app/items/'+id+'/label',{method:'POST',json:{}});lb.outerHTML=labelHtml(r.label);var lm=$('labelMsg');if(lm)lm.innerHTML='<div class="msg ok">Label ready. The buyer has been emailed the tracking number.</div>';loadItems()}
+    catch(err){lb.disabled=false;lb.textContent='Print shipping label';$('labelMsg').innerHTML='<div class="msg err">'+esc(err.message)+'</div>'}}}catch(e){}}
+function labelHtml(l){return '<div style="margin-top:6px"><a class="btn" href="'+esc(l.url)+'" target="_blank" rel="noopener" style="display:inline-block;text-decoration:none">Open label (PDF)</a></div>'+
+  '<div class="meta" style="margin-top:4px">'+esc((l.carrier||'')+' '+(l.service||''))+' &middot; tracking '+(l.trackingUrl?'<a href="'+esc(l.trackingUrl)+'" target="_blank" rel="noopener">'+esc(l.tracking||'')+'</a>':esc(l.tracking||''))+'. Print it on a 4 x 6 label or plain paper.</div>'}
 document.addEventListener('click',function(e){var c=e.target.closest('[data-close]');if(c)c.closest('dialog').close()});
 $('photo').addEventListener('change',async function(){var f=this.files&&this.files[0];if(!f)return;
   try{photoBlob=await shrink(f);photoKey=null;$('photoPrev').src=URL.createObjectURL(photoBlob);$('photoPrev').hidden=false;$('photoEmpty').hidden=true;scanReady()}catch(e){msg('itMsg','That photo could not be read. Try another.',1)}});

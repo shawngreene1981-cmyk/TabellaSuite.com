@@ -99,7 +99,7 @@ export async function handleShop(request, env, url, json, cors, shippoFetch) {
       }
       await env.ORDERS.put('order:' + ref, JSON.stringify({ ref, status: 'checkout', created: Date.now(), session: session.id,
         items: pick.items.map(i => ({ id: i.id, title: i.title, price: i.price, dealer: i.dealer })), shipTo: to.addr, email,
-        shipping: { rateId: b.rateId, amount: ship, carrier: rate.provider, service: rate.servicelevel && rate.servicelevel.name }, breakdown: order.breakdown }), { expirationTtl: 60 * 60 * 24 * 400 });
+        shipping: { rateId: b.rateId, amount: ship, carrier: rate.provider, service: rate.servicelevel && rate.servicelevel.name, token: rate.servicelevel && rate.servicelevel.token }, breakdown: order.breakdown }), { expirationTtl: 60 * 60 * 24 * 400 });
       return json({ url: session.url, order: ref, breakdown: order.breakdown, testMode: stripeMode(env) === 'test' }, 200, cors);
     }
     if (p === '/shop/order' && request.method === 'GET') {

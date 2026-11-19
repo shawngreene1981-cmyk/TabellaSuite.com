@@ -27,7 +27,7 @@ export default {
     const paid = await handleStripe(request, env, url, json, cors);
     if (paid) return paid;
 
-    const app = await handleApp(request, env, url, json, cors);
+    const app = await handleApp(request, env, url, json, cors, (path, method, body) => shippo(env, path, method, body));
     if (app) return app;
 
     const shop = await handleShop(request, env, url, json, cors, (path, method, body) => shippo(env, path, method, body));

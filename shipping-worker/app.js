@@ -10,14 +10,14 @@
 //   rl:<email>              failed sign-in counter
 
 import { createRecipient, recipientLink, recipientReady } from './stripe.js';
-import { sendEmail, resetEmail } from './mail.js';
+import { sendEmail, resetEmail, shippedEmail } from './mail.js';
 
 const SESSION_TTL = 60 * 60 * 24 * 30;
 export const ITEM_ID = /^(T[0-9A-Z]{6}|SH-\d{4})$/;
 const MAX_PHOTO = 1.5 * 1024 * 1024;
 const CATEGORIES = ['Decor', 'Furniture', 'Glassware', 'Seasonal', 'Lighting', 'Art', 'Kitchen', 'Jewelry', 'Toys', 'Books', 'Other'];
 
-export async function handleApp(request, env, url, json, cors) {
+export async function handleApp(request, env, url, json, cors, shippo) {
   const p = url.pathname;
   if (p.startsWith('/img/') && request.method === 'GET') return image(env, p.slice(5), cors);
   if (!p.startsWith('/app/')) return null;
@@ -44,6 +44,8 @@ export async function handleApp(request, env, url, json, cors) {
     if (p === '/app/export.csv' && request.method === 'GET') return exportCsv(env, me.dealer, cors);
     const mo = p.match(/^\/app\/items\/(T[0-9A-Z]{6}|SH-\d{4})\/order$/);
     if (mo && request.method === 'GET') return json(await itemOrder(env, me.dealer, mo[1]), 200, cors);
+    const ml = p.match(/^\/app\/items\/(T[0-9A-Z]{6}|SH-\d{4})\/label$/);
+    if (ml && request.method === 'POST') return json(await buyLabel(env, me.dealer, ml[1], shippo), 200, cors);
     const m = p.match(/^\/app\/items\/(T[0-9A-Z]{6}|SH-\d{4})$/);
     if (m && request.method === 'PUT') return json({ item: await saveItem(env, me.dealer, m[1], await body(request)) }, 200, cors);
     if (p === '/app/scan' && request.method === 'POST') return json(await scan(env, me.dealer, await body(request)), 200, cors);
@@ -118,7 +120,59 @@ async function itemOrder(env, d, id) {
   if (!it.order || !env.ORDERS) return { order: null };
   const o = JSON.parse(await env.ORDERS.get('order:' + it.order) || 'null');
   if (!o) return { order: null };
-  return { order: { ref: o.ref, paidAt: o.paidAt, shipTo: o.shipTo, shipping: o.shipping, items: o.items.map(i => ({ id: i.id, title: i.title, price: i.price })) } };
+  return { order: { ref: o.ref, paidAt: o.paidAt, shipTo: o.shipTo, shipping: o.shipping, label: o.label || null, items: o.items.map(i => ({ id: i.id, title: i.title, price: i.price })) } };
+}
+// Buy the shipping label for a paid order. Uses the rate the buyer paid for; if Shippo has expired it,
+// gets fresh rates for the same boxes and picks the same service (or the closest match, cheapest first).
+async function buyLabel(env, d, id, shippo) {
+  if (!env.ORDERS) throw err(500, 'The ORDERS store is not set up.');
+  const it = JSON.parse(await env.TABELLA.get('item:' + d.id + ':' + id) || 'null');
+  if (!it) throw err(404, 'That item isn\u2019t in your shop.');
+  if (!it.order) throw err(400, 'This item doesn\u2019t have an online order to ship.');
+  const key = 'order:' + it.order, o = JSON.parse(await env.ORDERS.get(key) || 'null');
+  if (!o || o.status !== 'paid') throw err(400, 'That order isn\u2019t paid yet.');
+  if (o.label && o.label.url) return { label: o.label, already: true };
+  if (!d.shipFrom || !d.shipFrom.zip) throw err(400, 'Add your ship-from address first.');
+  const lock = 'lbl:' + o.ref;
+  if (await env.ORDERS.get(lock)) throw err(409, 'A label is already being made for this order. Wait a moment and reload.');
+  await env.ORDERS.put(lock, '1', { expirationTtl: 120 });
+  try {
+    const from = Object.assign({ country: 'US', name: d.name, email: d.email }, d.shipFrom);
+    const to = Object.assign({ email: o.email }, o.shipTo);
+    let rateId = o.shipping && o.shipping.rateId, tx = null;
+    const buy = async rid => shippo('/transactions/', 'POST', { rate: rid, label_file_type: 'PDF_4x6', async: false, metadata: 'Tabella ' + o.ref });
+    if (rateId) { try { tx = await buy(rateId); } catch (e) { tx = null; } if (tx && tx.status !== 'SUCCESS') tx = null; }
+    if (!tx) {
+      // Fresh quote for the same items and boxes.
+      const parcels = [];
+      for (const i of o.items) {
+        const rec = JSON.parse(await env.TABELLA.get('item:' + d.id + ':' + i.id) || 'null');
+        if (!rec || !rec.weightLb || !rec.box) throw err(400, (i.title || i.id) + ' is missing its packed weight or box size.');
+        parcels.push({ length: String(rec.box[0]), width: String(rec.box[1]), height: String(rec.box[2]), distance_unit: 'in', weight: String(rec.weightLb), mass_unit: 'lb' });
+      }
+      const sh = await shippo('/shipments/', 'POST', { address_from: from, address_to: to, parcels, async: false });
+      const rates = (sh.rates || []).filter(r => isFinite(Number(r.amount))).sort((a, b) => Number(a.amount) - Number(b.amount));
+      if (!rates.length) throw err(502, 'Shippo returned no rates for this address. ' + ((sh.messages || []).map(m => m.text).join(' ') || ''));
+      const want = o.shipping || {};
+      const pick = rates.find(r => want.token && r.servicelevel && r.servicelevel.token === want.token) ||
+        rates.find(r => r.provider === want.carrier && r.servicelevel && r.servicelevel.name === want.service) ||
+        rates.find(r => r.provider === want.carrier) || rates[0];
+      tx = await buy(pick.object_id);
+      if (tx.status !== 'SUCCESS') throw err(502, 'Shippo couldn\u2019t make the label: ' + ((tx.messages || []).map(m => m.text).join(' ') || tx.status) + (/phone/i.test(JSON.stringify(tx.messages || '')) ? ' Add a phone number to your ship-from address.' : ''));
+      rateId = pick.object_id;
+    }
+    const rate = (tx.rate && typeof tx.rate === 'object') ? tx.rate : null;
+    o.label = { url: tx.label_url, tracking: tx.tracking_number, trackingUrl: tx.tracking_url_provider, carrier: (rate && rate.provider) || (o.shipping && o.shipping.carrier),
+      service: (rate && rate.servicelevel && rate.servicelevel.name) || (o.shipping && o.shipping.service), transaction: tx.object_id, rateId, at: Date.now() };
+    o.test = o.test != null ? o.test : String(env.SHIPPO_API_KEY || '').startsWith('shippo_test_');
+    await env.ORDERS.put(key, JSON.stringify(o), { expirationTtl: 60 * 60 * 24 * 400 });
+    for (const i of o.items) {
+      const rec = JSON.parse(await env.TABELLA.get('item:' + d.id + ':' + i.id) || 'null');
+      if (rec) { rec.shippedAt = Date.now(); rec.tracking = o.label.tracking; await env.TABELLA.put('item:' + d.id + ':' + i.id, JSON.stringify(rec)); }
+    }
+    if (o.email) { o.emails = Object.assign({}, o.emails, { shipped: await sendEmail(env, Object.assign({ to: o.email }, shippedEmail(o, d.name))) }); await env.ORDERS.put(key, JSON.stringify(o), { expirationTtl: 60 * 60 * 24 * 400 }); }
+    return { label: o.label };
+  } finally { await env.ORDERS.delete(lock); }
 }
 // Change the sign-in email and/or password. Always needs the current password.
 async function updateAccount(env, d, b) {
