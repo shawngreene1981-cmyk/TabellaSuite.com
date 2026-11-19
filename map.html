@@ -89,6 +89,9 @@ footer{padding:36px 0 48px;border-top:1px solid var(--line);margin-top:48px;font
 .stops b{font-weight:600}.stops .sub{font-size:.85rem;color:var(--muted)}
 .stops button.nm{all:unset;cursor:pointer}.stops button.nm:hover b{color:var(--terra)}
 .tripbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;position:sticky;bottom:0;background:var(--bg);padding:10px 0;border-top:1px solid var(--line)}
+/* card opened below its pin */
+.flip .leaflet-popup-tip-container{display:none}
+.leaflet-popup-content-wrapper{max-height:min(320px,52vh);overflow:auto}
 #zoomHint{font-size:.85rem;color:var(--muted);margin:8px 0 0}
 </style>
 </head>
@@ -239,16 +242,23 @@ function popHtml(p){var k=kind(p),where=p.addr||p.town||'';
   (k==='o'?'<p class="pop-src">From OpenStreetMap. Not checked by Tabella yet.</p>':'')+
   '<p class="pop-hint">Click the pin again to '+(p.listing?'open our write-up':p.website?'visit their website':'get directions')+'.</p>'}
 function goUrl(p){return p.listing||p.website||dirUrl(p)}
-function pin(mk){pinned=null;map.closePopup();mk._pop.setContent(popHtml(mk._p));mk._pop.options.autoPan=true;map.openPopup(mk._pop);pinned=mk;var el=mk._pop.getElement();el&&el.classList.add('pinned');mk._pop.options.autoPan=false}
+// Keep the card inside the map: open it below the pin near the top edge, and slide it in from the sides.
+function fit(mk){var pop=mk._pop,el=pop.getElement();if(!el||!map.latLngToContainerPoint)return;pop.options.offset=[0,-4];pop.update();el.classList.remove('flip');
+  var pt=map.latLngToContainerPoint(mk.getLatLng()),sz=map.getSize(),w=el.offsetWidth,h=el.offsetHeight,dx=0,dy=-4,pad=10;
+  if(pt.y-h-24<pad){dy=h+22;el.classList.add('flip')}
+  if(pt.x-w/2<pad)dx=pad-(pt.x-w/2);else if(pt.x+w/2>sz.x-pad)dx=(sz.x-pad)-(pt.x+w/2);
+  if(dx||dy!==-4){pop.options.offset=[dx,dy];pop.update()}}
+function show(mk){mk._pop.setLatLng(mk.getLatLng()).setContent(popHtml(mk._p));map.openPopup(mk._pop);fit(mk)}
+function pin(mk){pinned=null;map.closePopup();show(mk);pinned=mk;var el=mk._pop.getElement();el&&el.classList.add('pinned');fit(mk)}
 if(map)map.on('popupclose',function(e){if(pinned&&e.popup===pinned._pop){var el=e.popup.getElement();el&&el.classList.remove('pinned');pinned=null}});
 function place(p){if(!map||p.hidden)return;var k=kind(p),sz=k==='o'?[11,11]:k==='r'?[12,12]:[16,16];
   var icon=L.divIcon({className:'',html:'<div class="pin '+k+(stopIds[p.id]?' stop':'')+'"></div>',iconSize:sz});
   if(p.mk){p.mk.setIcon(icon);p.mk.setLatLng(p.ll);return}
   var mk=L.marker(p.ll,{icon:icon,title:p.name,keyboard:true,zIndexOffset:k==='o'?0:k==='r'?200:500});
   mk._p=p;mk._pop=L.popup({autoPan:false,offset:[0,-4]}).setLatLng(p.ll).setContent(popHtml(p));
-  mk.on('mouseover',function(){if(!pinned){mk._pop.setLatLng(mk.getLatLng()).setContent(popHtml(p));map.openPopup(mk._pop)}});
+  mk.on('mouseover',function(){if(!pinned)show(mk)});
   mk.on('mouseout',function(){if(!pinned)map.closePopup(mk._pop)});
-  mk.on('click',function(){if(pinned===mk){window.open(goUrl(p),p.listing?'_self':'_blank');return}mk._pop.setLatLng(mk.getLatLng());pin(mk)});
+  mk.on('click',function(){if(pinned===mk){window.open(goUrl(p),p.listing?'_self':'_blank');return}pin(mk)});
   p.mk=mk;mk.addTo(map)}
 function spread(){var seen={};OUR.forEach(function(id){var p=P[id];if(!p||p.exact||p.hidden)return;var n=seen[p.town]=(seen[p.town]||0)+1,a=n*2.4,d=n>1?0.012*Math.sqrt(n):0,c=T[p.town];p.ll=[c[0]+d*Math.sin(a),c[1]+d*1.25*Math.cos(a)]})}
 // An OpenStreetMap shop that is one of ours moves our pin to the exact spot instead of adding a second pin.
