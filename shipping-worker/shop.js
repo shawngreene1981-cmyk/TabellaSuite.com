@@ -8,8 +8,8 @@
 //   SHIPPO_API_KEY, STRIPE_SECRET_KEY (already set)
 //   CATALOG_URL       optional; defaults to https://tabellasuite.com/shop/items.json
 
-import { buildOrder, createCheckoutSession, stripeMode } from './stripe.js';
-import { dealerListings, dealerItem, markDealerItemSold, shantiquesMoved, ITEM_ID } from './app.js';
+import { buildOrder, createCheckoutSession, stripeMode, stripeApi } from './stripe.js';
+import { dealerListings, dealerItem, markDealerItemSold, markDealerItemAvailable, shantiquesMoved, ITEM_ID } from './app.js';
 import { sendEmail, buyerReceipt, dealerAlert, opsEmail } from './mail.js';
 
 const HOLD_SECONDS = 35 * 60; // Stripe checkout pages last 30 minutes minimum; hold a little longer.
@@ -53,10 +53,11 @@ export async function handleShop(request, env, url, json, cors, shippoFetch) {
       const rates = (q.rates || []).map(r => ({ id: r.object_id, carrier: r.provider, service: r.servicelevel && r.servicelevel.name, amount: Number(r.amount), days: r.estimated_days == null ? null : r.estimated_days }))
         .filter(r => isFinite(r.amount) && r.amount > 0).sort((a, c) => a.amount - c.amount).slice(0, 6);
       if (!rates.length) return json({ error: 'No shipping options came back for that address. Check the address and try again.', notes: (q.messages || []).map(m => m.text) }, 400, cors);
-      return json({ rates, items: pick.items.map(publicItem), subtotal: pick.items.reduce((t, i) => t + i.price, 0) }, 200, cors);
+      return json({ rates, items: pick.items.map(publicItem), subtotal: pick.items.reduce((t, i) => t + i.price, 0), taxAtCheckout: taxOn(env) }, 200, cors);
     }
     if (p === '/shop/checkout' && request.method === 'POST') {
       if (!env.ORDERS) return json({ error: 'The ORDERS store is not set up yet.' }, 500, cors);
+      if (stripeMode(env) === 'live' && String(env.ALLOW_LIVE_PAYMENTS).toLowerCase() !== 'true') return json({ error: 'The shop is not open for real payments yet.' }, 403, cors);
       const b = await body(request);
       const cat = await catalog(env);
       const pick = await pickItems(env, cat, b.items, null);
@@ -71,7 +72,14 @@ export async function handleShop(request, env, url, json, cors, shippoFetch) {
       const email = String(b.email || '').trim().slice(0, 120);
       if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return json({ error: 'Enter your email so we can send tracking.' }, 400, cors);
 
-      const order = buildOrder({ items: pick.items.map(it => ({ name: it.title + ' (' + it.id + ')', price: it.price, dealerAccount: it.account || dealerAccount(cat, it), mallAccount: undefined })), shipping: ship });
+      // Sales tax by where the order ships (Stripe Tax applies Missouri's origin rule for in-state orders).
+      const from = pick.items[0].shipFrom || shipFrom(env);
+      let tax = null;
+      if (taxOn(env)) {
+        try { tax = await taxCalc(env, pick.items, ship, to.addr, from); }
+        catch (e) { return json({ error: 'We could not work out sales tax for that address. Check the address and try again.' }, 400, cors); }
+      }
+      const order = buildOrder({ items: pick.items.map(it => ({ name: it.title + ' (' + it.id + ')', price: it.price, dealerAccount: it.account || dealerAccount(cat, it), mallAccount: undefined })), shipping: ship, taxCents: tax ? tax.cents : 0 });
       if (order.error) return json({ error: order.error }, 400, cors);
 
       // Hold each item so two people can't buy the same one-of-a-kind piece.
@@ -98,7 +106,7 @@ export async function handleShop(request, env, url, json, cors, shippoFetch) {
         throw e;
       }
       await env.ORDERS.put('order:' + ref, JSON.stringify({ ref, status: 'checkout', created: Date.now(), session: session.id,
-        items: pick.items.map(i => ({ id: i.id, title: i.title, price: i.price, dealer: i.dealer })), shipTo: to.addr, email,
+        items: pick.items.map(i => ({ id: i.id, title: i.title, price: i.price, dealer: i.dealer })), shipTo: to.addr, email, tax: tax ? { cents: tax.cents, calc: tax.id } : null,
         shipping: { rateId: b.rateId, amount: ship, carrier: rate.provider, service: rate.servicelevel && rate.servicelevel.name, token: rate.servicelevel && rate.servicelevel.token }, breakdown: order.breakdown }), { expirationTtl: 60 * 60 * 24 * 400 });
       return json({ url: session.url, order: ref, breakdown: order.breakdown, testMode: stripeMode(env) === 'test' }, 200, cors);
     }
@@ -108,7 +116,7 @@ export async function handleShop(request, env, url, json, cors, shippoFetch) {
       if (!env.ORDERS || !/^o_[a-z0-9]+$/.test(ref)) return json({ error: 'Order not found.' }, 404, cors);
       const o = JSON.parse(await env.ORDERS.get('order:' + ref) || 'null');
       if (!o) return json({ error: 'Order not found.' }, 404, cors);
-      return json({ ref, status: o.status, items: o.items.map(i => ({ id: i.id, title: i.title, price: i.price })), shipping: o.shipping && { amount: o.shipping.amount, carrier: o.shipping.carrier, service: o.shipping.service }, total: o.breakdown && o.breakdown.total }, 200, cors);
+      return json({ ref, status: o.status, items: o.items.map(i => ({ id: i.id, title: i.title, price: i.price })), shipping: o.shipping && { amount: o.shipping.amount, carrier: o.shipping.carrier, service: o.shipping.service }, tax: o.breakdown && o.breakdown.tax, total: o.breakdown && o.breakdown.total, refunded: o.status === 'refunded' }, 200, cors);
     }
     return json({ error: 'Not found' }, 404, cors);
   } catch (e) {
@@ -127,6 +135,11 @@ export async function shopAfterPayment(env, session, paid) {
     await Promise.all(ids.map(id => markDealerItemSold(env, id, ref)));
     if (o) {
       o.status = 'paid'; o.paidAt = o.paidAt || Date.now(); o.paymentIntent = session.payment_intent;
+      // Record the sale with Stripe Tax so it shows in the tax reports used for filing.
+      if (o.tax && o.tax.calc && !o.tax.tx) {
+        try { const t = await stripeApi(env, 'POST', '/tax/transactions/create_from_calculation', { calculation: o.tax.calc, reference: ref }, 'taxtx-' + ref); o.tax.tx = t.id; }
+        catch (e) { o.tax.error = String(e.message).slice(0, 200); }
+      }
       if (!o.emailed) {
         // One email to the buyer, one to the shop. Stripe can resend the same event, so this runs once per order.
         const x = ids.length ? await dealerItem(env, ids[0]) : null;
@@ -143,6 +156,44 @@ export async function shopAfterPayment(env, session, paid) {
     if (o && o.status === 'checkout') { o.status = 'expired'; await env.ORDERS.put('order:' + ref, JSON.stringify(o), { expirationTtl: 60 * 60 * 24 * 30 }); }
   }
   await Promise.all(ids.map(async id => { if ((await env.ORDERS.get('hold:' + id)) === ref) await env.ORDERS.delete('hold:' + id); }));
+}
+
+// After a refund in the Stripe Dashboard (see stripe.js). Full refund: items back on sale and the tax record reversed.
+export async function shopAfterRefund(env, ref, charge, full, out) {
+  const o = ref && env.ORDERS ? JSON.parse(await env.ORDERS.get('order:' + ref) || 'null') : null;
+  if (o && full && o.status !== 'refunded') {
+    o.status = 'refunded'; o.refundedAt = Date.now();
+    for (const it of o.items) { if ((await env.ORDERS.get('sold:' + it.id)) === ref) await env.ORDERS.delete('sold:' + it.id); await markDealerItemAvailable(env, it.id, ref); }
+    if (o.tax && o.tax.tx && !o.tax.reversal) {
+      try { const r = await stripeApi(env, 'POST', '/tax/transactions/create_reversal', { mode: 'full', original_transaction: o.tax.tx, reference: ref + '-refund' }, 'taxrev-' + ref); o.tax.reversal = r.id; }
+      catch (e) { out.problems.push('tax: ' + e.message); }
+    }
+    await env.ORDERS.put('order:' + ref, JSON.stringify(o), { expirationTtl: 60 * 60 * 24 * 400 });
+  }
+  const amt = '$' + ((charge.amount_refunded || 0) / 100).toFixed(2);
+  const lines = [full ? 'Full refund of ' + amt + ' on order ' + (ref || charge.id) + '.' : 'Partial refund of ' + amt + ' on order ' + (ref || charge.id) + '. Partial refunds are not settled automatically: take the right amount back from the dealer in Stripe (Connect > the dealer > Transfers > Reverse) if needed.',
+    full ? (o ? 'The items are back on sale and ' + out.reversed.length + ' payout(s) were taken back.' : 'No Tabella order matched, so only the payouts were taken back.') : '',
+    o && o.label && o.label.url ? 'A shipping label was bought for this order. If it was not used, void it in Shippo to get the postage back.' : '',
+    out.problems.length ? 'Needs a look: ' + out.problems.join('; ') : ''].filter(Boolean);
+  await sendEmail(env, { to: opsEmail(env), subject: (stripeMode(env) === 'test' ? '[Test] ' : '') + 'Refund: ' + (ref || charge.id), html: '<p>' + lines.map(l => l.replace(/[<>&]/g, '')).join('</p><p>') + '</p>', text: lines.join('\n\n') }).catch(() => null);
+}
+
+// ---------- sales tax (Stripe Tax) ----------
+// Switched on with TAX_ENABLED = "true" (wrangler.toml) once Tabella is registered and the registration is added in Stripe.
+function taxOn(env) { return String(env.TAX_ENABLED).toLowerCase() === 'true'; }
+async function taxCalc(env, items, ship, to, from) {
+  const f = { currency: 'usd', 'customer_details[address_source]': 'shipping',
+    'customer_details[address][line1]': to.street1, 'customer_details[address][line2]': to.street2, 'customer_details[address][city]': to.city,
+    'customer_details[address][state]': to.state, 'customer_details[address][postal_code]': to.zip, 'customer_details[address][country]': 'US',
+    'shipping_cost[amount]': String(Math.round(ship * 100)), 'shipping_cost[tax_behavior]': 'exclusive' };
+  items.forEach((it, i) => {
+    f['line_items[' + i + '][amount]'] = String(Math.round(it.price * 100)); f['line_items[' + i + '][reference]'] = it.id;
+    f['line_items[' + i + '][tax_code]'] = 'txcd_99999999'; f['line_items[' + i + '][tax_behavior]'] = 'exclusive';
+  });
+  if (from && from.zip) Object.assign(f, { 'ship_from_details[address][line1]': from.street1, 'ship_from_details[address][city]': from.city,
+    'ship_from_details[address][state]': from.state, 'ship_from_details[address][postal_code]': from.zip, 'ship_from_details[address][country]': 'US' });
+  const c = await stripeApi(env, 'POST', '/tax/calculations', f);
+  return { id: c.id, cents: Number(c.tax_amount_exclusive) || 0 };
 }
 
 // ---------- helpers ----------

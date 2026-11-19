@@ -39,13 +39,14 @@ export function buyerReceipt(o, shopNames) {
   const b = o.breakdown || {}, test = o.test ? '<p style="background:#F6E7B8;padding:8px 10px;border-radius:8px;font-size:14px">Test order. No real money was charged.</p>' : '';
   const lines = o.items.map(i => [esc(i.title) + ' <span style="color:#6A6259">' + esc(i.id) + '</span>', fm(i.price)]);
   if (b.shipping) lines.push(['Shipping, ' + esc(o.shipping && (o.shipping.carrier + ' ' + (o.shipping.service || ''))), fm(b.shipping)]);
+  if (b.tax) lines.push(['Sales tax', fm(b.tax)]);
   if (b.cardProcessing) lines.push(['Card processing', fm(b.cardProcessing)]);
   lines.push(['Total charged', fm(b.total), 1]);
   const html = wrap('Thank you for your order', test + '<p>Order <b>' + esc(o.ref) + '</b> from ' + esc(shopNames) + '. Your payment went through.</p>' + rows(lines) +
     '<p style="margin:14px 0 4px"><b>Shipping to</b></p><p style="margin:0">' + addr(o.shipTo) + '</p>' +
     '<p style="margin-top:16px">The shop packs and ships one-of-a-kind pieces by hand. You will get another email with tracking when it ships.</p>');
   const text = (o.test ? 'TEST ORDER. No real money was charged.\n\n' : '') + 'Thank you for your order ' + o.ref + ' from ' + shopNames + '.\n\n' +
-    o.items.map(i => i.title + ' (' + i.id + ')  ' + fm(i.price)).join('\n') + '\nShipping  ' + fm(b.shipping) + '\nCard processing  ' + fm(b.cardProcessing) + '\nTotal charged  ' + fm(b.total) +
+    o.items.map(i => i.title + ' (' + i.id + ')  ' + fm(i.price)).join('\n') + '\nShipping  ' + fm(b.shipping) + (b.tax ? '\nSales tax  ' + fm(b.tax) : '') + '\nCard processing  ' + fm(b.cardProcessing) + '\nTotal charged  ' + fm(b.total) +
     '\n\nShipping to:\n' + addrText(o.shipTo) + '\n\nYou will get tracking when it ships.\n\nTabella';
   return { subject: (o.test ? '[Test] ' : '') + 'Your Tabella order ' + o.ref, html, text };
 }

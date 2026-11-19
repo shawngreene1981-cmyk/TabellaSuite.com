@@ -11,7 +11,7 @@
 // Money split per item (Shawn's decision): commission 9% of the sold price.
 //   mall 4%, Tabella 5%, dealer gets the rest. Card processing is a separate line on the buyer's receipt.
 
-import { shopAfterPayment } from './shop.js';
+import { shopAfterPayment, shopAfterRefund } from './shop.js';
 
 const API = 'https://api.stripe.com/v1';
 const COMMISSION = 0.09, MALL_SHARE = 0.04;
@@ -120,13 +120,18 @@ export function buildOrder(b) {
   const ship = Math.round(Number(b.shipping || 0) * 100);
   if (!isFinite(ship) || ship < 0 || ship > 100000) return { error: 'Shipping looks wrong.' };
   if (ship) lines.push({ name: 'Shipping', cents: ship });
+  // Sales tax comes from Stripe Tax (calculated by the shop before checkout). It stays with Tabella to file and pay;
+  // dealers' and malls' shares are figured on the item price only.
+  const tax = Math.round(Number(b.taxCents || 0));
+  if (!isFinite(tax) || tax < 0 || tax > 1000000) return { error: 'Sales tax looks wrong.' };
+  if (tax) lines.push({ name: 'Sales tax', cents: tax });
   // Card processing passed to the buyer, grossed up so the fee is covered on the full total.
-  const pre = goods + ship, total = Math.ceil((pre + CARD_FIXED) / (1 - CARD_PCT)), fee = total - pre;
+  const pre = goods + ship + tax, total = Math.ceil((pre + CARD_FIXED) / (1 - CARD_PCT)), fee = total - pre;
   lines.push({ name: 'Card processing', cents: fee });
   const splitsMeta = splits.map(s => s.join(':')).join(',');
   if (splitsMeta.length > 500) return { error: 'Too many dealers in one checkout. Split the order.' };
   const group = 'tab_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-  return { lines, splitsMeta, group, totalCents: total, breakdown: { items: breakdown, shipping: ship / 100, cardProcessing: fee / 100, total: total / 100 } };
+  return { lines, splitsMeta, group, totalCents: total, breakdown: { items: breakdown, shipping: ship / 100, tax: tax / 100, cardProcessing: fee / 100, total: total / 100 } };
 }
 
 // Dealer and mall payout accounts (Accounts v2 recipients), used by the dealer app.
@@ -177,6 +182,7 @@ async function webhook(request, env, json) {
   const evt = JSON.parse(raw);
   const s = evt.data.object;
   if (evt.type === 'checkout.session.expired') { await shopAfterPayment(env, s, false); return json({ ok: true, released: true }, 200); }
+  if (evt.type === 'charge.refunded') return json(await refunded(env, s), 200);
   if (evt.type !== 'checkout.session.completed') return json({ ignored: evt.type }, 200);
   if (s.payment_status !== 'paid') return json({ ignored: 'not paid' }, 200);
   await shopAfterPayment(env, s, true);
@@ -193,6 +199,27 @@ async function webhook(request, env, json) {
       transfer_group: s.metadata.group, source_transaction: charge, 'metadata[role]': 'mall', 'metadata[session]': s.id }, s.id + '-m' + i));
   }
   return json({ ok: true, transfers: done.map(t => t.id) }, 200);
+}
+
+// ---------- refunds (issued in the Stripe Dashboard) ----------
+// A full refund takes back each dealer's and mall's share, reverses the sales tax record and puts the items back on sale.
+// A partial refund is left for a person to settle; Tabella's ops inbox gets an email either way.
+async function refunded(env, charge) {
+  const pi = charge.payment_intent ? await stripe(env, 'GET', '/payment_intents/' + charge.payment_intent) : null;
+  const ref = pi && pi.metadata && pi.metadata.order;
+  const full = charge.refunded === true || charge.amount_refunded >= charge.amount;
+  const out = { ref, full, reversed: [], problems: [] };
+  if (full && pi && pi.transfer_group) {
+    const list = await stripe(env, 'GET', '/transfers?limit=100&transfer_group=' + encodeURIComponent(pi.transfer_group));
+    for (const t of (list.data || [])) {
+      const left = t.amount - (t.amount_reversed || 0);
+      if (left <= 0) continue;
+      try { const r = await stripe(env, 'POST', '/transfers/' + t.id + '/reversals', { amount: String(left), 'metadata[reason]': 'refund ' + (ref || charge.id) }, 'rev-' + t.id); out.reversed.push(r.id); }
+      catch (e) { out.problems.push(t.id + ': ' + e.message); }
+    }
+  }
+  await shopAfterRefund(env, ref, charge, full, out);
+  return out;
 }
 
 export async function verifySignature(raw, header, secret, nowSec) {
@@ -216,6 +243,7 @@ async function onboardingLink(env, account, returnUrl, self) {
     use_case: { type: 'account_onboarding', account_onboarding: { return_url: back, refresh_url: back } } });
 }
 
+export async function stripeApi(env, method, path, fields, idem) { return stripe(env, method, path, fields, idem); }
 async function stripe(env, method, path, fields, idem) {
   const headers = { Authorization: 'Bearer ' + env.STRIPE_SECRET_KEY };
   let bodyStr;

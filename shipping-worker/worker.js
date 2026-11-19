@@ -45,7 +45,7 @@ export default {
     if (shop) return shop;
 
     if (url.pathname === '/' && request.method === 'GET') {
-      if (String(env.SHOW_TEST_PAGE).toLowerCase() !== 'true') return new Response('Tabella shipping service', { headers: cors });
+      if (String(env.SHOW_TEST_PAGE).toLowerCase() !== 'true' || stripeMode(env) === 'live') return new Response('Tabella shipping service', { headers: cors });
       return new Response(TEST_PAGE, { headers: { 'content-type': 'text/html; charset=utf-8' } });
     }
 

@@ -5,6 +5,9 @@ compatibility_date = "2026-11-01"
 [vars]
 ALLOWED_ORIGINS = "https://tabellasuite.com,https://www.tabellasuite.com"
 SHOW_TEST_PAGE = "true"
+# Go-live switches (Claude flips these with Shawn): sales tax at checkout, and accepting a live Stripe key.
+TAX_ENABLED = "false"
+ALLOW_LIVE_PAYMENTS = "false"
 
 # SHIPPO_API_KEY is a secret. Set it in the Cloudflare dashboard
 # (Worker > Settings > Variables and Secrets), never in this file.

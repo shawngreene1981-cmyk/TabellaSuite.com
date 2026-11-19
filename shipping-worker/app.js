@@ -216,6 +216,9 @@ async function updateDealer(env, d, b) {
     if (!/^\d{5}(-\d{4})?$/.test(a.zip)) throw err(400, 'The ZIP code looks wrong.');
     if (!/^[A-Za-z]{2}$/.test(a.state)) throw err(400, 'Use the two-letter state code, like MO.');
     a.state = a.state.toUpperCase(); if (!a.name) a.name = d.name;
+    const digits = String(a.phone || '').replace(/\D/g, '').replace(/^1(?=\d{10}$)/, '');
+    if (digits.length !== 10) throw err(400, 'Add a 10-digit phone number. UPS and FedEx print it on every label.');
+    a.phone = digits.replace(/(\d{3})(\d{3})(\d{4})/, '$1-$2-$3');
     d.shipFrom = a;
   }
   await env.TABELLA.put('dealer:' + d.id, JSON.stringify(d));
@@ -328,6 +331,14 @@ export async function markDealerItemSold(env, id, ref) {
   x.item.status = 'sold'; x.item.soldAt = Date.now(); x.item.order = ref;
   await env.TABELLA.put('item:' + x.dealer.id + ':' + id, JSON.stringify(x.item));
   await env.TABELLA.delete('pub:' + id);
+}
+// A refunded order puts the piece back on sale (only if it is still marked sold to that order).
+export async function markDealerItemAvailable(env, id, ref) {
+  const x = await dealerItem(env, id); if (!x || x.item.status !== 'sold' || (ref && x.item.order !== ref)) return;
+  x.item.status = 'available'; delete x.item.soldAt; delete x.item.order; delete x.item.shippedAt; delete x.item.tracking;
+  x.item.notes = ((x.item.notes || '') + ' Refunded ' + new Date().toISOString().slice(0, 10) + ' (order ' + ref + ').').trim().slice(0, 600);
+  await env.TABELLA.put('item:' + x.dealer.id + ':' + id, JSON.stringify(x.item));
+  await listing(env, x.dealer, x.item);
 }
 
 // ---------- one-time move of Shantiques' items into the app ----------

@@ -24,6 +24,7 @@ header.top{display:flex;justify-content:space-between;align-items:center;gap:16p
 h1{font-size:clamp(2.4rem,5.6vw,4rem);margin:10px 0 14px}
 .lede{font-size:1.12rem;color:var(--muted);max-width:38em;margin:0 0 22px}
 a:focus-visible,button:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.pop-add{margin:8px 0 0;font-size:.85rem}.pop-hint{display:none;margin:6px 0 0;font-size:.75rem;color:var(--muted)}.pinned .pop-hint{display:block}
 
 .test{background:var(--gold);color:#1A1714;font-weight:600;font-size:.9rem;padding:9px 14px;border-radius:8px;margin:0 0 18px}
 .bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;margin:0 0 18px}
@@ -109,7 +110,7 @@ dialog{max-height:calc(100dvh - 24px);max-height:calc(100vh - 24px)}
 <div class="w">
 <header class="top"><a class="logo" href="../">TABELLA</a><nav class="main" aria-label="Main"><a class="opt" href="../#shoppers">Shoppers</a><a class="opt" href="../#dealers">Dealers</a><a class="opt" href="../#malls">Malls</a><a href="../shop/">Shop</a><a href="../map.html">Mall map</a><a class="opt" href="../road-trip-1.html">Road trips</a><a class="opt" href="../pricing.html">Pricing</a><a class="cta" href="../#early">Early access</a></nav></header>
 <main>
-<p class="test" role="note">Early test version. Payments and payouts run in Stripe's sandbox: no real money moves yet.</p>
+<p class="test" role="note" hidden>Early test version. Payments and payouts run in Stripe's sandbox: no real money moves yet.</p><script>fetch('https://tabella-shipping.shawn-greene1981.workers.dev/health').then(function(r){return r.json()}).then(function(h){if(h.stripe!=='live')document.querySelectorAll('.test').forEach(function(e){e.hidden=false})}).catch(function(){document.querySelectorAll('.test').forEach(function(e){e.hidden=false})})</script>
 
 <section id="authView" hidden>
  <div class="cap">For dealers</div>
@@ -228,7 +229,7 @@ $('resetForm').addEventListener('submit',async function(e){e.preventDefault();
   catch(err){msg('resetMsg',err.message,1)}});
 // ----- shop setup
 function drawSetup(){$('shopName').textContent=me.name;$('acctNow').textContent='Signed in as '+me.email+'.';var okShip=me.hasShipFrom,okPay=me.payouts;
-  $('stShip').className='step'+(okShip?' done':'');$('stShipTxt').textContent=okShip?me.shipFrom.street1+', '+me.shipFrom.city+', '+me.shipFrom.state+' '+me.shipFrom.zip+'. Never shown to shoppers.':'Where packages ship from. Never shown to shoppers.';
+  $('stShip').className='step'+(okShip?' done':'');$('stShipTxt').textContent=okShip?me.shipFrom.street1+', '+me.shipFrom.city+', '+me.shipFrom.state+' '+me.shipFrom.zip+(me.shipFrom.phone?'. Never shown to shoppers.':'. Add a phone number: UPS and FedEx need it on labels.'):'Where packages ship from. Never shown to shoppers.';
   $('shipEditBtn').textContent=okShip?'Change':'Add';
   $('stPay').className='step'+(okPay?' done':'');$('stPayTxt').textContent=okPay?'Payouts are set up. Your share goes to your bank after each sale.':'Stripe pays your share to your bank after each sale. Tabella never sees your bank details.';
   $('payBtn').textContent=okPay?'Update':'Set up';$('setupH').textContent=okShip&&okPay?'Shop setup':'Before your items can sell';$('setup').hidden=false}
