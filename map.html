@@ -30,6 +30,7 @@ header.top{display:flex;justify-content:space-between;align-items:center;gap:16p
 h1{font-size:clamp(2.4rem,5.6vw,4rem);margin:10px 0 14px}
 .lede{font-size:1.12rem;color:var(--muted);max-width:38em;margin:0 0 22px}
 a:focus-visible,button:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.pop-add{margin:8px 0 0;font-size:.85rem}.pop-hint{display:none;margin:6px 0 0;font-size:.75rem;color:var(--muted)}.pinned .pop-hint{display:block}
 .legend{display:flex;flex-wrap:wrap;gap:8px 22px;align-items:center;margin:0 0 14px;font-size:.9rem;color:var(--muted)}
 .dot{display:inline-block;width:12px;height:12px;border-radius:50%;margin-right:7px;vertical-align:-1px;border:2px solid var(--card)}
 .dot.v{background:var(--green)}.dot.r{background:var(--grey)}
@@ -143,6 +144,7 @@ var LISTING={"Miss Lucille\u2019s Marketplace": "shops/miss-lucilles-marketplace
 function esc(s){return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
 document.getElementById('y').textContent=new Date().getFullYear();
 // Notes saved from tabellasuite.com/trip/ (visited, best for, new shops) are merged in here.
+function addUrl(m){return './?shop='+encodeURIComponent(m[0]+', '+m[1])+'#early'}
 function slug(t){return t.toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,120)}
 function merge(list){var ix={};M.forEach(function(m,i){ix[slug(m[0]+' '+m[1])]=i});
  (list||[]).forEach(function(e){var i=ix[e.id];if(e.ll&&!T[e.town])T[e.town]=e.ll;if(!T[e.town])return;
@@ -163,13 +165,21 @@ document.getElementById('nv').textContent=nv;document.getElementById('nr').textC
 if(!window.L){document.getElementById('map').innerHTML='<p style="padding:20px;color:var(--muted)">The map could not load. Every shop is listed below.</p>';return}
 var map=L.map('map',{scrollWheelZoom:false});
 L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:17,attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'}).addTo(map);
-var seen={},markers=[],bounds=[];
+var seen={},markers=[],bounds=[],pinned=null;
+function pin(mk){pinned=null;map.closePopup();mk._pop.options.autoPan=true;map.openPopup(mk._pop);pinned=mk;mk._pop.getElement()&&mk._pop.getElement().classList.add('pinned');mk._pop.options.autoPan=false}
+map.on('popupclose',function(e){if(pinned&&e.popup===pinned._pop){var el=e.popup.getElement();el&&el.classList.remove('pinned');pinned=null}});
 M.forEach(function(m,i){
  var c=T[m[1]],n=seen[m[1]]=(seen[m[1]]||0)+1,a=n*2.4,d=n>1?0.012*Math.sqrt(n):0;
  var ll=[c[0]+d*Math.sin(a),c[1]+d*1.25*Math.cos(a)];
  var icon=L.divIcon({className:'',html:'<div class="pin '+m[2]+'"></div>',iconSize:m[2]==='v'?[16,16]:[12,12]});
- var html='<h3>'+esc(m[0])+'</h3><p class="pop-where">'+esc(m[1])+(m[2]==='v'?' · Visited':' · On our route')+'</p>'+(m[3]?'<p class="pop-best"><b>Best for:</b> '+esc(m[3])+'</p>':'')+(LISTING[m[0]]?'<p style="margin:6px 0 0"><a href="'+LISTING[m[0]]+'">See the listing</a></p>':'');
- var mk=L.marker(ll,{icon:icon,title:m[0],zIndexOffset:m[2]==='v'?500:0}).bindPopup(html);
+ var go=LISTING[m[0]]||addUrl(m),html='<h3>'+esc(m[0])+'</h3><p class="pop-where">'+esc(m[1])+(m[2]==='v'?' · Visited':' · On our route')+'</p>'+(m[3]?'<p class="pop-best"><b>Best for:</b> '+esc(m[3])+'</p>':'')+
+  (LISTING[m[0]]?'<p style="margin:6px 0 0"><a href="'+LISTING[m[0]]+'">See the listing &rarr;</a></p>':'')+
+  '<p class="pop-add"><a href="'+addUrl(m)+'">Is this your shop? Add it to Tabella</a></p><p class="pop-hint">Click the pin again to '+(LISTING[m[0]]?'open the listing':'add this shop')+'.</p>';
+ var mk=L.marker(ll,{icon:icon,title:m[0],keyboard:true,zIndexOffset:m[2]==='v'?500:0});
+ mk._pop=L.popup({autoPan:false,closeButton:true,offset:[0,-4]}).setLatLng(ll).setContent(html);mk._go=go;
+ mk.on('mouseover',function(){if(!pinned)map.openPopup(mk._pop)});
+ mk.on('mouseout',function(){if(!pinned)map.closePopup(mk._pop)});
+ mk.on('click',function(){if(pinned===mk){location.href=mk._go;return}pin(mk)});
  mk._s=m[2];markers[i]=mk;mk.addTo(map);bounds.push(ll);
 });
 map.fitBounds(bounds,{padding:[24,24]});
@@ -179,7 +189,7 @@ document.getElementById('areas').addEventListener('click',function(e){var b=e.ta
 window.addEventListener('hashchange',function(){if(/springfield/i.test(location.hash)){var mb=document.querySelector('#areas [data-a=mo]');if(mb)mb.click();document.getElementById('map').scrollIntoView({block:'center'})}});
 if(/springfield|ozarks|mo$/i.test(location.hash)){var mb=document.querySelector('#areas [data-a=mo]');if(mb)mb.click()}
 vis.addEventListener('click',function(e){var b=e.target.closest('button[data-i]');if(!b)return;var mk=markers[b.getAttribute('data-i')];
- document.getElementById('map').scrollIntoView({behavior:'smooth',block:'center'});map.setView(mk.getLatLng(),11);mk.openPopup()});
+ document.getElementById('map').scrollIntoView({behavior:'smooth',block:'center'});map.setView(mk.getLatLng(),11);pin(mk)});
 document.getElementById('shows').addEventListener('click',function(e){var b=e.target.closest('button');if(!b)return;var f=b.getAttribute('data-f');
  this.querySelectorAll('button').forEach(function(x){x.setAttribute('aria-pressed',x===b?'true':'false')});
  markers.forEach(function(mk){if(f==='all'||mk._s===f){mk.addTo(map)}else{map.removeLayer(mk)}})});

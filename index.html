@@ -130,6 +130,7 @@
 var ENDPOINT='https://formspree.io/f/xrpqelgl';
 document.getElementById('y').textContent=new Date().getFullYear();
 var f=document.getElementById('f'),msg=document.getElementById('msg'),btn=f.querySelector('button');
+try{var q=new URLSearchParams(location.search).get('shop');if(q){f.where.value=q.slice(0,120);f.role.value='Mall owner or manager'}}catch(e){}
 f.addEventListener('submit',function(e){
  e.preventDefault();
  if(f.website&&f.website.value)return; // honeypot
