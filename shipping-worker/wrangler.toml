@@ -9,6 +9,10 @@ SHOW_TEST_PAGE = "true"
 TAX_ENABLED = "true"
 ALLOW_LIVE_PAYMENTS = "false"
 
+# Daily at 14:00 UTC (8 or 9 a.m. Central): sends malls' automatic monthly dealer statements on the day each mall picked.
+[triggers]
+crons = ["0 14 * * *"]
+
 # SHIPPO_API_KEY is a secret. Set it in the Cloudflare dashboard
 # (Worker > Settings > Variables and Secrets), never in this file.
 

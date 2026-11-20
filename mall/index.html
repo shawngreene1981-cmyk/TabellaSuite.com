@@ -106,6 +106,7 @@ dialog{max-height:calc(100dvh - 24px);max-height:calc(100vh - 24px)}
 #salesBar[hidden],#invBar[hidden]{display:none}
 
 [hidden]{display:none!important}
+.autorow{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 14px;margin:0 0 12px}
 .stl{list-style:none;padding:0;margin:14px 0 0}.stl li{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-bottom:10px;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center}.stl li.empty{color:var(--muted)}
 .sth{display:flex;flex-direction:column;gap:2px}.stb{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .bybooth{margin-top:8px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:8px 12px}.bybooth summary{cursor:pointer;font-weight:600}
@@ -216,7 +217,9 @@ dialog{max-height:calc(100dvh - 24px);max-height:calc(100vh - 24px)}
 
  <!-- Statements -->
  <div id="v-stmt" class="view" hidden>
-  <div class="bar"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><label for="monPick" style="margin:0">Month</label><input id="monPick" type="month" style="width:auto"></div><button class="btn sec" type="button" id="stCsv">Download spreadsheet</button></div>
+  <div class="bar"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><label for="monPick" style="margin:0">Month</label><input id="monPick" type="month" style="width:auto"></div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" type="button" id="stAll">Email all statements</button><button class="btn sec" type="button" id="stCsv">Download spreadsheet</button></div></div>
+  <form id="autoForm" class="autorow" novalidate><label class="check" style="margin:0"><input type="checkbox" id="autoOn"> Email every booth its statement automatically</label>
+   <span>on day <select id="autoDay" style="width:auto"></select> of each month, for the month before.</span><span id="autoMsg" class="meta" aria-live="polite"></span></form>
   <p class="meta" style="margin:0 0 10px">One statement per booth: every sale this month, your commission and card fees, and the dealer's share. Mark a booth paid when you write the check.</p>
   <div class="stats" id="stStats"></div>
   <ul class="stl" id="stList"></ul>
@@ -466,12 +469,24 @@ var stm=null;
 function thisMonth(){return today().slice(0,7)}
 function monLabel(m){return new Date(m+'-15T12:00:00Z').toLocaleDateString('en-US',{month:'long',year:'numeric',timeZone:'UTC'})}
 $('monPick').onchange=loadStmts;
-async function loadStmts(){if(!$('monPick').value)$('monPick').value=thisMonth();msg('stMsg','');
+(function(){var o='';for(var i=1;i<=28;i++)o+='<option value="'+i+'">'+i+'</option>';$('autoDay').innerHTML=o})();
+function drawAuto(){var a=me.autoStatements||{on:false,day:1};$('autoOn').checked=!!a.on;$('autoDay').value=String(a.day||1)}
+async function saveAuto(){try{me=(await api('/mall/statements/auto',{method:'PUT',json:{on:$('autoOn').checked,day:$('autoDay').value}})).mall;drawAuto();
+  $('autoMsg').textContent=me.autoStatements.on?'On. Each month you get an email saying what went out.':'Off.'}catch(err){$('autoMsg').textContent=err.message}}
+$('autoOn').onchange=saveAuto;$('autoDay').onchange=saveAuto;
+$('stAll').onclick=async function(){if(!stm)return;var todo=stm.dealers.filter(function(d){return d.lines.length&&d.email&&!d.sent}).length;
+  if(!todo){msg('stMsg','Every booth with sales and an email already has this month\u2019s statement.'+(stm.dealers.some(function(d){return d.lines.length&&!d.email})?' Booths without an email need a printed one.':''));return}
+  if(!confirm('Email '+todo+' statement'+(todo===1?'':'s')+' for '+monLabel(stm.month)+'? Booths already emailed this month are skipped.'))return;
+  var b=this;b.disabled=true;var sent=0,failed=[],noEmail=[];
+  try{for(var i=0;i<30;i++){b.textContent='Sending... '+sent+' of '+todo;var r=await api('/mall/statements/send-all',{json:{month:stm.month}});sent+=r.sent;failed=failed.concat(r.failed);noEmail=r.noEmail;if(!r.left||!r.sent)break}
+    msg('stMsg','Sent '+sent+' statement'+(sent===1?'':'s')+'.'+(noEmail.length?' No email for: '+noEmail.join(', ')+'. Print those.':'')+(failed.length?' Didn\u2019t send: '+failed.join('; '):''),failed.length>0)}
+  catch(err){msg('stMsg',err.message,1)}b.disabled=false;b.textContent='Email all statements';loadStmts()};
+async function loadStmts(){if(!$('monPick').value)$('monPick').value=thisMonth();drawAuto();
   try{stm=await api('/mall/statements?month='+$('monPick').value);var t=stm.totals;
     $('stStats').innerHTML=[['Sales',fc(t.sales)],['Your commission',fc(t.commission)],['Card fees',fc(t.cardFees)],['Dealers\u2019 share',fc(t.share)],['You owe dealers',fc(t.mallOwes)],['Sent by Tabella',fc(t.paidByTabella)]].map(function(x){return '<div><span class="meta">'+esc(x[0])+'</span><b>'+esc(x[1])+'</b></div>'}).join('');
     $('stList').innerHTML=stm.dealers.length?stm.dealers.map(function(d){var paid=d.paid;
       return '<li data-id="'+d.id+'"><div class="sth"><b>Booth '+esc(d.booth)+' &middot; '+esc(d.name)+'</b><span class="meta">'+d.lines.length+' sale'+(d.lines.length===1?'':'s')+' &middot; sales '+fc(d.sales)+' &middot; share '+fc(d.share)+'</span>'+
-        '<span>'+(d.mallOwes?'You owe <b>'+fc(d.mallOwes)+'</b> ':'')+(paid?'<span class="pill ok">Paid '+esc(new Date(paid.at).toLocaleDateString())+(paid.note?' &middot; '+esc(paid.note):'')+'</span>':d.mallOwes?'<span class="pill warn">Not paid yet</span>':'')+(d.paidByTabella?' <span class="meta">'+fc(d.paidByTabella)+' sent to their bank by Tabella</span>':'')+(d.waiting?' <span class="meta">'+fc(d.waiting)+' waiting for their bank</span>':'')+'</span></div>'+
+        '<span>'+(d.mallOwes?'You owe <b>'+fc(d.mallOwes)+'</b> ':'')+(paid?'<span class="pill ok">Paid '+esc(new Date(paid.at).toLocaleDateString())+(paid.note?' &middot; '+esc(paid.note):'')+'</span>':d.mallOwes?'<span class="pill warn">Not paid yet</span>':'')+(d.sent?' <span class="pill">Emailed '+esc(new Date(d.sent).toLocaleDateString())+'</span>':'')+(d.paidByTabella?' <span class="meta">'+fc(d.paidByTabella)+' sent to their bank by Tabella</span>':'')+(d.waiting?' <span class="meta">'+fc(d.waiting)+' waiting for their bank</span>':'')+'</span></div>'+
         '<div class="stb"><button type="button" class="btn sec" data-a="view">View and print</button><button type="button" class="btn sec" data-a="mail"'+(d.email?'':' title="Add an email on the Dealers tab"')+'>Email</button>'+(paid?'<button type="button" class="rm" data-a="undo">Undo paid</button>':d.mallOwes?'<button type="button" class="btn" data-a="paid">Mark paid</button>':'')+'</div></li>'}).join(''):'<li class="empty">No booths yet.</li>';
     $('stList').querySelectorAll('[data-a]').forEach(function(b){b.onclick=function(){stAction(b.closest('li').dataset.id,b.dataset.a,b)}});
   }catch(err){msg('stMsg',err.message,1)}}

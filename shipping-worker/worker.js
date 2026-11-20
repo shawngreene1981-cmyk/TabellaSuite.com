@@ -9,16 +9,17 @@
 import { handleStripe, stripeMode } from './stripe.js';
 import { handleShop } from './shop.js';
 import { handleApp } from './app.js';
-import { handleMall } from './mall.js';
+import { handleMall, autoStatements } from './mall.js';
 import { handleTrips } from './trips.js';
-import { handlePlaces, buildNextState } from './places.js';
+import { handlePlaces } from './places.js';
 
 const SHIPPO = 'https://api.goshippo.com';
 const DEFAULT_ORIGINS = 'https://tabellasuite.com,https://www.tabellasuite.com';
 
 export default {
   // Timer (wrangler.toml [triggers]): fills in the nationwide antique shop list one state at a time.
-  async scheduled(event, env, ctx) { ctx.waitUntil(buildNextState(env).then(r => console.log('osm build', r))); },
+  // Daily timer (wrangler.toml [triggers]): malls' automatic monthly dealer statements.
+  async scheduled(event, env, ctx) { ctx.waitUntil(autoStatements(env).then(r => console.log('auto statements', JSON.stringify(r)))); },
 
   async fetch(request, env) {
     const url = new URL(request.url);

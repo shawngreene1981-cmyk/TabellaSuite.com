@@ -68,6 +68,8 @@ export async function handleMall(request, env, url, json, cors) {
     if (p === '/mall/statements' && request.method === 'GET') return json(await statements(env, m.mall, url.searchParams.get('month')), 200, cors);
     if (p === '/mall/statements.csv' && request.method === 'GET') return statementsCsv(env, m.mall, url.searchParams.get('month'), cors);
     if (p === '/mall/statements/paid' && request.method === 'POST') return json(await markPaid(env, m.mall, await body(request)), 200, cors);
+    if (p === '/mall/statements/send-all' && request.method === 'POST') return json(await sendAll(env, m.mall, await body(request)), 200, cors);
+    if (p === '/mall/statements/auto' && request.method === 'PUT') return json({ mall: publicMall(env, await setAuto(env, m.mall, await body(request))) }, 200, cors);
     if (p === '/mall/statements/send' && request.method === 'POST') return json(await sendStatement(env, m.mall, await body(request)), 200, cors);
     if (p === '/mall/report' && request.method === 'GET') return json(await report(env, m.mall, url.searchParams.get('day')), 200, cors);
     if (p === '/mall/report.csv' && request.method === 'GET') return reportCsv(env, m.mall, url.searchParams.get('day'), cors);
@@ -129,7 +131,7 @@ function publicMall(env, m) {
   if (!m) return null;
   const r = readerFor(env, m);
   return { id: m.id, name: m.name, email: m.email, city: m.city, state: m.state, commissionPct: m.commissionPct, cardFeePct: m.cardFeePct, taxRate: m.taxRate,
-    tz: m.tz, code: m.code, address: m.address || null, payouts: mallPayoutsOk(env, m), reader: r ? { label: r.label, simulated: !!r.simulated } : null,
+    tz: m.tz, code: m.code, autoStatements: m.autoStatements || { on: false, day: 1 }, address: m.address || null, payouts: mallPayoutsOk(env, m), reader: r ? { label: r.label, simulated: !!r.simulated } : null,
     mode: stripeMode(env), live: stripeMode(env) === 'live' && String(env.ALLOW_LIVE_PAYMENTS).toLowerCase() === 'true' };
 }
 async function updateMall(env, m, b) {
@@ -665,7 +667,8 @@ async function statements(env, m, month) {
     }
   }
   const list = Object.values(byId);
-  await Promise.all(list.map(async st => { st.paid = JSON.parse(await env.TABELLA.get('mpaid:' + m.id + ':' + month.replace('-', '') + ':' + st.id) || 'null'); }));
+  await Promise.all(list.map(async st => { st.paid = JSON.parse(await env.TABELLA.get('mpaid:' + m.id + ':' + month.replace('-', '') + ':' + st.id) || 'null');
+    st.sent = Number(await env.TABELLA.get('msent:' + m.id + ':' + month.replace('-', '') + ':' + st.id)) || null; }));
   list.sort((a, b) => String(a.booth).localeCompare(String(b.booth), 'en', { numeric: true }));
   const tot = list.reduce((t, st) => { for (const k of ['sales', 'commission', 'cardFees', 'share', 'mallOwes', 'paidByTabella', 'waiting']) t[k] += st[k]; return t; },
     { sales: 0, commission: 0, cardFees: 0, share: 0, mallOwes: 0, paidByTabella: 0, waiting: 0 });
@@ -685,6 +688,9 @@ async function markPaid(env, m, b) {
 async function sendStatement(env, m, b) {
   const r = await statements(env, m, b.month), st = r.dealers.find(x => x.id === b.dealer);
   if (!st) throw err(404, 'That dealer isn\u2019t on this month\u2019s statements.');
+  return emailStatement(env, m, r, st);
+}
+async function emailStatement(env, m, r, st) {
   if (!st.email) throw err(400, 'There\u2019s no email for ' + st.name + '. Add one on the Dealers tab, or print the statement.');
   const c = v => '$' + (v / 100).toFixed(2), e = v => String(v == null ? '' : v).replace(/[&<>"']/g, x => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[x]));
   const label = new Date(r.month + '-15T12:00:00Z').toLocaleDateString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' });
@@ -701,6 +707,8 @@ async function sendStatement(env, m, b) {
   const r2 = await sendEmail(env, { to: st.email, replyTo: m.email, subject: m.name + ' statement, ' + label + ', booth ' + st.booth, html: emailFrame('Your ' + label + ' statement', inner), text });
   if (r2.skipped) throw err(503, 'Email isn\u2019t switched on yet. Print the statement instead.');
   if (r2.error) throw err(502, 'The email didn\u2019t send: ' + r2.error);
+  const at = Date.now(); st.sent = at;
+  await env.TABELLA.put('msent:' + m.id + ':' + r.month.replace('-', '') + ':' + st.id, String(at), { expirationTtl: 60 * 60 * 24 * 800 });
   return { ok: true, to: st.email };
 }
 async function statementsCsv(env, m, month, cors) {
@@ -713,4 +721,66 @@ async function statementsCsv(env, m, month, cors) {
   for (const st of r.dealers) rows.push([st.booth, st.name, c(st.sales), c(st.commission), c(st.cardFees), c(st.share), c(st.mallOwes), c(st.paidByTabella), c(st.waiting), st.paid ? new Date(st.paid.at).toISOString().slice(0, 10) + (st.paid.note ? ' ' + st.paid.note : '') : '']);
   const csv = rows.map(row => row.map(v => { v = String(v); return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }).join(',')).join('\r\n');
   return new Response(csv, { headers: Object.assign({ 'content-type': 'text/csv; charset=utf-8', 'content-disposition': 'attachment; filename="' + m.name.replace(/[^A-Za-z0-9]+/g, '-') + '-statements-' + r.month + '.csv"' }, cors) });
+}
+
+// ---------- emailing every statement ----------
+// Sends to each booth that had sales this month, has an email and hasn't been emailed this month's statement yet.
+// A few at a time (the register's button calls again until none are left), so one request never runs long.
+const SEND_BATCH = 15;
+async function sendAll(env, m, b) {
+  const r = await statements(env, m, b.month);
+  const todo = r.dealers.filter(st => st.lines.length && st.email && !st.sent);
+  const out = { month: r.month, sent: 0, failed: [], noEmail: r.dealers.filter(st => st.lines.length && !st.email).map(st => 'Booth ' + st.booth + ' ' + st.name) };
+  for (const st of todo.slice(0, SEND_BATCH)) {
+    try { await emailStatement(env, m, r, st); out.sent++; } catch (e) { out.failed.push('Booth ' + st.booth + ' ' + st.name + ': ' + e.message); if (e.status === 503) break; }
+    await new Promise(ok => setTimeout(ok, 600)); // stay under the email service's rate limit
+  }
+  out.left = Math.max(0, todo.length - SEND_BATCH);
+  return out;
+}
+
+// ---------- automatic monthly statements ----------
+//   mallauto:<mall>                 present when the mall has auto-send on (so the daily timer only reads those malls)
+//   mautodone:<mall>:<yyyymm>       last month's statements were sent automatically
+// The Worker's daily timer (wrangler.toml) calls autoStatements. On the mall's chosen day it emails last month's
+// statements and sends the mall a short summary.
+async function setAuto(env, m, b) {
+  const on = !!b.on, day = Math.round(Number(b.day || 1));
+  if (!(day >= 1 && day <= 28)) throw err(400, 'Pick a day from 1 to 28.');
+  m.autoStatements = { on, day };
+  await env.TABELLA.put('mall:' + m.id, JSON.stringify(m));
+  if (on) await env.TABELLA.put('mallauto:' + m.id, '1'); else await env.TABELLA.delete('mallauto:' + m.id);
+  return m;
+}
+function lastMonth(ym) { let [y, mo] = ym.split('-').map(Number); mo--; if (!mo) { mo = 12; y--; } return y + '-' + String(mo).padStart(2, '0'); }
+export async function autoStatements(env) {
+  if (!env.TABELLA) return [];
+  const done = []; let cursor;
+  do {
+    const l = await env.TABELLA.list({ prefix: 'mallauto:', cursor });
+    for (const k of l.keys) {
+      const id = k.name.slice(9), m = JSON.parse(await env.TABELLA.get('mall:' + id) || 'null');
+      if (!m || !m.autoStatements || !m.autoStatements.on) { await env.TABELLA.delete(k.name); continue; }
+      const today = dayOf(m, Date.now());
+      if (Number(today.slice(8)) < m.autoStatements.day) continue;
+      const month = lastMonth(today.slice(0, 7)), flag = 'mautodone:' + id + ':' + month.replace('-', '');
+      if (await env.TABELLA.get(flag)) continue;
+      const total = { sent: 0, failed: [], noEmail: [] };
+      for (let i = 0; i < 20; i++) {
+        const r = await sendAll(env, m, { month });
+        total.sent += r.sent; total.failed.push(...r.failed); total.noEmail = r.noEmail;
+        if (!r.left || !r.sent) break;
+      }
+      await env.TABELLA.put(flag, String(Date.now()), { expirationTtl: 60 * 60 * 24 * 400 });
+      const label = new Date(month + '-15T12:00:00Z').toLocaleDateString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' });
+      const paras = ['Tabella emailed ' + total.sent + ' dealer statement' + (total.sent === 1 ? '' : 's') + ' for ' + label + '.',
+        total.noEmail.length ? 'No email on file, so print these from the Statements tab: ' + total.noEmail.join(', ') + '.' : '',
+        total.failed.length ? 'These didn\u2019t send: ' + total.failed.join('; ') + '.' : '',
+        'Open the Statements tab at tabellasuite.com/mall/ to print, resend or mark booths paid.'];
+      await sendEmail(env, { to: m.email, subject: label + ' dealer statements sent', html: emailFrame(label + ' statements', paras.filter(Boolean).map(p => '<p style="margin:0 0 12px">' + p.replace(/[<>&]/g, '') + '</p>').join('')), text: paras.filter(Boolean).join('\n\n') }).catch(() => null);
+      done.push({ mall: id, month, sent: total.sent });
+    }
+    cursor = l.list_complete ? null : l.cursor;
+  } while (cursor);
+  return done;
 }
