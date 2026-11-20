@@ -175,7 +175,7 @@ async function deck(id){
     '<li>When they want a brick-and-mortar home, they find malls like '+esc(short)+' on the Tabella map.</li>'+
     '<li><b>Before you say yes, you see their pieces and prices</b> in their Tabella shop: exactly what would go in your booth.</li>'+
     '<li>They arrive with Tabella tags on their pieces, ready to scan at your register.</li></ul>'+
-    (dealer?'<div class="money"><b>'+esc(dealer)+'</b> is a Tabella dealer looking for a booth in '+esc(town)+'. Their shop is ready for you to look through today.</div>'
+    (dealer?'<div class="money"><b>'+esc(dealer)+'</b> is a Tabella dealer looking for a booth in '+esc(town)+'. See their pieces today: <b>tabellasuite.com/shop/?dealer='+esc(slug(dealer))+'</b></div>'
            :'<div class="money">Fill an empty booth faster, with a dealer whose pieces you have already seen.</div>')+foot+'</section>');
   S.push('<section class="slide"><div class="cap">In the mall</div><h2>A register made for booths.</h2><ul>'+
     '<li>Scan the tag: price, booth and dealer come up. Paper tags work too, by booth number and price.</li>'+

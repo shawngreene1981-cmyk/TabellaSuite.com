@@ -59,6 +59,7 @@ input{font:inherit;width:100%;padding:9px 10px;border:1px solid var(--line);bord
 .msg{border-radius:8px;padding:10px 12px;margin:10px 0;font-size:.92rem}.msg.err{background:#F6E2DC;color:#7A2A17}.msg.ok{background:#E3EEDF;color:#264B2B}
 .empty{color:var(--muted);padding:20px 0}
 footer{padding:36px 0 48px;border-top:1px solid var(--line);margin-top:48px;font-size:.88rem;color:var(--muted);display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px}
+.dnote{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 14px;margin:0 0 12px}
 </style>
 </head>
 <body>
@@ -69,6 +70,7 @@ footer{padding:36px 0 48px;border-top:1px solid var(--line);margin-top:48px;font
 <div class="cap">Shop</div>
 <h1>The Tabella shop</h1>
 <p class="lede">One-of-a-kind vintage and antique finds from independent dealers. Every piece is photographed by the dealer who has it, and shipped to your door.</p>
+<div id="dealerNote" hidden class="dnote"></div>
 <div class="bar"><div class="chips" id="chips" role="group" aria-label="Category"></div><button class="btn cartbtn" id="cartBtn" type="button">Cart (0)</button></div>
 <div id="canceled"></div>
 <ul class="grid" id="grid"><li class="empty">Loading the shop...</li></ul>
@@ -105,13 +107,18 @@ function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){retur
 function fm(n){return '$'+Number(n).toFixed(2)}
 $('y').textContent=new Date().getFullYear();
 var CAT={items:[]},GONE={},cart=[],cat='All',rate=null,sub=0;
+// One dealer's shop: ?dealer=<dealer id or name>, e.g. ?dealer=shantiques. Malls use it to see a dealer's pieces before offering a booth.
+function slug(t){return String(t||'').toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')}
+var ONLY=slug(new URLSearchParams(location.search).get('dealer')||'');
+function mine(i){return !ONLY||slug(i.dealer)===ONLY||slug(i.dealerName)===ONLY}
 try{cart=JSON.parse(localStorage.getItem('tabCart')||'[]')}catch(e){cart=[]}
 function save(){try{localStorage.setItem('tabCart',JSON.stringify(cart))}catch(e){}$('cartBtn').textContent='Cart ('+cart.length+')'}
 function item(id){return CAT.items.filter(function(i){return i.id===id})[0]}
 function draw(){
-  var cats=['All'];CAT.items.forEach(function(i){if(cats.indexOf(i.category)<0)cats.push(i.category)});
+  var cats=['All'];CAT.items.forEach(function(i){if(mine(i)&&cats.indexOf(i.category)<0)cats.push(i.category)});
+  if(ONLY){var any=CAT.items.filter(mine)[0];$('dealerNote').hidden=false;$('dealerNote').innerHTML=any?'Showing pieces from <b>'+esc(any.dealerName||((CAT.dealers||{})[any.dealer]||{}).name||'this dealer')+'</b> only. <a href="./">See the whole shop</a>':'No pieces from that dealer right now. <a href="./">See the whole shop</a>'}
   $('chips').innerHTML=cats.map(function(c){return '<button type="button" aria-pressed="'+(c===cat)+'" data-c="'+esc(c)+'">'+esc(c)+'</button>'}).join('');
-  var list=CAT.items.filter(function(i){return !GONE[i.id]&&(cat==='All'||i.category===cat)});
+  var list=CAT.items.filter(function(i){return !GONE[i.id]&&mine(i)&&(cat==='All'||i.category===cat)});
   $('grid').innerHTML=list.length?list.map(function(i){
     return '<li class="card"><button class="open" type="button" data-open="'+i.id+'" aria-label="'+esc(i.title)+', '+fm(i.price)+'"><div class="ph"><img src="'+esc(i.photo)+'" alt="" loading="lazy" width="450" height="450"></div></button>'+
     '<div class="cb"><h3>'+esc(i.title)+'</h3><div class="meta">'+esc(i.dealerName||'')+' &middot; '+esc(i.category)+'</div><div class="price">'+fm(i.price)+'</div>'+
