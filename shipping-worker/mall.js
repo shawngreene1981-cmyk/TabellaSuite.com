@@ -52,6 +52,7 @@ export async function handleMall(request, env, url, json, cors) {
     if (p === '/mall/logout' && request.method === 'POST') { await env.TABELLA.delete('sess:' + m.token); return json({ ok: true }, 200, cors); }
     if (p === '/mall/me' && request.method === 'GET') return json({ mall: publicMall(env, m.mall) }, 200, cors);
     if (p === '/mall/me' && request.method === 'PUT') return json({ mall: publicMall(env, await updateMall(env, m.mall, await body(request))) }, 200, cors);
+    if (p === '/mall/dealers' && request.method === 'POST') return json(await addBooth(env, m.mall, await body(request)), 200, cors);
     if (p === '/mall/dealers' && request.method === 'GET') return json({ dealers: await listDealers(env, m.mall) }, 200, cors);
     const md = p.match(/^\/mall\/dealers\/(d[a-z0-9]{10})$/);
     if (md && request.method === 'PUT') return json(await setBooth(env, m.mall, md[1], await body(request)), 200, cors);
@@ -195,8 +196,19 @@ async function listDealers(env, m) {
   const booths = await boothList(env, m.id);
   const ds = await Promise.all(booths.map(b => env.TABELLA.get('dealer:' + b.dealer)));
   return booths.map((b, i) => { const d = ds[i] ? JSON.parse(ds[i]) : null;
-    return { id: b.dealer, name: d ? d.name : '(removed account)', booth: b.booth, pct: b.pct, payouts: d ? payoutsOk(env, d) : false, joined: b.joined }; })
+    return { id: b.dealer, name: d ? d.name : '(removed account)', booth: b.booth, pct: b.pct, managed: !!(d && d.managed), email: d && d.managed ? d.email || '' : undefined, payouts: d ? payoutsOk(env, d) : false, joined: b.joined }; })
     .sort((a, b) => String(a.booth).localeCompare(String(b.booth), 'en', { numeric: true }));
+}
+// A booth for a dealer who doesn't use Tabella. The mall keeps paying them as it does today; no sign-in, nothing online.
+async function addBooth(env, m, b) {
+  const booth = clean(b.booth, 20), name = clean(b.name, 60), email = b.email ? cleanEmail(b.email) : '';
+  if (!booth) throw err(400, 'Enter the booth number.');
+  if (!name) throw err(400, 'Enter the dealer\u2019s name.');
+  if (b.email && !email) throw err(400, 'That email looks wrong. Leave it blank if you don\u2019t have one.');
+  const id = 'd' + rand(10);
+  await env.TABELLA.put('dealer:' + id, JSON.stringify({ id, name, email, managed: true, mall: { id: m.id, name: m.name, booth }, created: Date.now() }));
+  await env.TABELLA.put('booth:' + m.id + ':' + id, JSON.stringify({ booth, pct: b.pct === '' || b.pct == null ? null : pct(b.pct, 'Commission', 0, 60), joined: Date.now() }));
+  return { ok: true, id };
 }
 async function setBooth(env, m, did, b) {
   const key = 'booth:' + m.id + ':' + did, bt = JSON.parse(await env.TABELLA.get(key) || 'null');
@@ -205,6 +217,11 @@ async function setBooth(env, m, did, b) {
   if (b.pct !== undefined) bt.pct = b.pct === '' || b.pct == null ? null : pct(b.pct, 'Commission', 0, 60);
   await env.TABELLA.put(key, JSON.stringify(bt));
   const d = JSON.parse(await env.TABELLA.get('dealer:' + did) || 'null');
+  if (d && d.managed && d.mall && d.mall.id === m.id && (b.name != null || b.email != null)) {
+    if (b.name != null) { const n = clean(b.name, 60); if (!n) throw err(400, 'Enter the dealer\u2019s name.'); d.name = n; }
+    if (b.email != null) { const e = b.email ? cleanEmail(b.email) : ''; if (b.email && !e) throw err(400, 'That email looks wrong.'); d.email = e; }
+    await env.TABELLA.put('dealer:' + did, JSON.stringify(d));
+  }
   if (d && d.mall && d.mall.id === m.id && d.mall.booth !== bt.booth) { d.mall.booth = bt.booth; await env.TABELLA.put('dealer:' + did, JSON.stringify(d)); }
   return { ok: true };
 }
@@ -246,17 +263,28 @@ function dayOf(m, t) {
 async function priceSale(env, m, ids, method) {
   if (!Array.isArray(ids) || !ids.length) throw err(400, 'Scan at least one item.');
   if (ids.length > 50) throw err(400, 'That’s more than 50 items. Ring them up in two sales.');
-  const uniq = [...new Set(ids.map(tagItemId))];
+  const tagged = ids.filter(x => typeof x === 'string'), lines = ids.filter(x => x && typeof x === 'object');
+  const uniq = [...new Set(tagged.map(tagItemId))];
   if (uniq.some(x => !x)) throw err(400, 'One of the item numbers isn’t valid.');
+  const found = [];
+  for (const id of uniq) found.push(await lookup(env, m, id));
+  // Pieces rung up by booth and price (a paper tag, or a dealer who isn't on Tabella).
+  for (const l of lines) {
+    const did = String(l.dealer || ''), bt = /^d[a-z0-9]{10}$/.test(did) ? JSON.parse(await env.TABELLA.get('booth:' + m.id + ':' + did) || 'null') : null;
+    if (!bt) throw err(400, 'Pick a booth from the list.');
+    const price = Math.round(Number(l.price) * 100) / 100;
+    if (!isFinite(price) || price <= 0 || price > 50000) throw err(400, 'Enter the price on the tag.');
+    const d = JSON.parse(await env.TABELLA.get('dealer:' + did) || 'null');
+    found.push({ id: 'B' + rand(7, CODE_ABC), manual: true, title: clean(l.title, 80) || 'Booth ' + bt.booth + ' item', price, dealer: did, dealerName: d ? d.name : 'Booth ' + bt.booth, booth: bt.booth });
+  }
   const items = [];
-  for (const id of uniq) {
-    const it = await lookup(env, m, id);
+  for (const it of found) {
     const bt = JSON.parse(await env.TABELLA.get('booth:' + m.id + ':' + it.dealer) || 'null');
     const rate = bt && bt.pct != null ? bt.pct : (m.commissionPct || 0);
     const cents = Math.round(it.price * 100);
     const commission = Math.round(cents * rate / 100);
     const cardFee = method === 'card' ? Math.round(cents * (m.cardFeePct || 0) / 100) : 0;
-    items.push({ id: it.id, title: it.title, price: cents, dealer: it.dealer, dealerName: it.dealerName, booth: it.booth, rate, commission, cardFee, owed: cents - commission - cardFee });
+    items.push({ id: it.id, manual: it.manual || undefined, title: it.title, price: cents, dealer: it.dealer, dealerName: it.dealerName, booth: it.booth, rate, commission, cardFee, owed: cents - commission - cardFee });
   }
   const subtotal = items.reduce((a, i) => a + i.price, 0);
   const taxRate = m.taxRate || 0, tax = Math.round(subtotal * taxRate / 100);
@@ -299,8 +327,9 @@ async function startSale(env, m, b) {
   if (!r) throw err(400, 'Set up your card reader first (Settings).');
   if (s.total < 50) throw err(400, 'Card sales need to be at least $0.50.');
   if (env.ORDERS) {
-    for (const it of s.items) { const h = await env.ORDERS.get('hold:' + it.id); if (h && h !== id) throw err(409, it.title + ' is in another checkout right now.'); }
-    await Promise.all(s.items.map(it => env.ORDERS.put('hold:' + it.id, id, { expirationTtl: HOLD_SECONDS })));
+    const tagged = s.items.filter(it => !it.manual);
+    for (const it of tagged) { const h = await env.ORDERS.get('hold:' + it.id); if (h && h !== id) throw err(409, it.title + ' is in another checkout right now.'); }
+    await Promise.all(tagged.map(it => env.ORDERS.put('hold:' + it.id, id, { expirationTtl: HOLD_SECONDS })));
   }
   try {
     const pi = await stripeApi(env, 'POST', '/payment_intents', {
@@ -358,7 +387,7 @@ async function testCard(env, m, id, b) {
 async function retrySale(env, m, id) {
   const s = await getSale(env, m, id), r = readerFor(env, m);
   if (s.status !== 'pending' || !r) return publicSale(s);
-  if (env.ORDERS) await Promise.all(s.items.map(it => env.ORDERS.put('hold:' + it.id, id, { expirationTtl: HOLD_SECONDS })));
+  if (env.ORDERS) await Promise.all(s.items.filter(it => !it.manual).map(it => env.ORDERS.put('hold:' + it.id, id, { expirationTtl: HOLD_SECONDS })));
   try { await stripeApi(env, 'POST', '/terminal/readers/' + r.reader + '/process_payment_intent', { payment_intent: s.pi }); }
   catch (e) { throw err(502, readerProblem(e.message)); }
   return publicSale(s);
@@ -386,6 +415,7 @@ async function releaseHolds(env, s) {
 async function finish(env, m, s) {
   if (s.status === 'paid') return;
   for (const it of s.items) {
+    if (it.manual) continue;
     if (env.ORDERS) { await env.ORDERS.put('sold:' + it.id, s.id); if ((await env.ORDERS.get('hold:' + it.id)) === s.id) await env.ORDERS.delete('hold:' + it.id); }
     const x = await dealerItem(env, it.id);
     if (x) {
@@ -401,12 +431,13 @@ async function finish(env, m, s) {
 }
 async function payOut(env, m, s) {
   s.stripeFee = Math.round(s.total * STRIPE_IN_PERSON_PCT) + STRIPE_IN_PERSON_FIXED;
-  const byDealer = {};
+  const byDealer = {}; let mallExtra = 0;
   for (const it of s.items) byDealer[it.dealer] = (byDealer[it.dealer] || 0) + it.owed;
   s.payouts = {};
   for (const did of Object.keys(byDealer)) {
     const amt = byDealer[did], d = JSON.parse(await env.TABELLA.get('dealer:' + did) || 'null');
     if (amt <= 0) { s.payouts[did] = { amount: amt, status: 'none' }; continue; }
+    if (d && d.managed) { s.payouts[did] = { amount: amt, status: 'mall', why: 'The mall pays this booth' }; mallExtra += amt; continue; }
     if (!s.charge || !d || !payoutsOk(env, d)) { s.payouts[did] = { amount: amt, status: 'waiting', why: 'Dealer hasn’t connected a bank for payouts' }; continue; }
     try {
       const t = await stripeApi(env, 'POST', '/transfers', { amount: String(amt), currency: 'usd', destination: d.stripeAccount, transfer_group: 'mall_' + s.id,
@@ -414,7 +445,7 @@ async function payOut(env, m, s) {
       s.payouts[did] = { amount: amt, status: 'sent', transfer: t.id };
     } catch (e) { s.payouts[did] = { amount: amt, status: 'waiting', why: String(e.message).slice(0, 160) }; }
   }
-  const mallAmt = s.items.reduce((a, i) => a + i.commission + i.cardFee, 0) + s.tax - s.stripeFee;
+  const mallAmt = s.items.reduce((a, i) => a + i.commission + i.cardFee, 0) + s.tax - s.stripeFee + mallExtra;
   if (mallAmt <= 0) s.mallPayout = { amount: mallAmt, status: 'none' };
   else if (!s.charge || !mallPayoutsOk(env, m)) s.mallPayout = { amount: mallAmt, status: 'waiting', why: 'Connect the mall’s bank in Settings' };
   else {
@@ -487,6 +518,7 @@ async function refundSale(env, m, id) {
 async function dropWaiting(env, s) { for (const id of Object.keys(s.payouts || {}).concat([s.mall])) await env.TABELLA.delete('mwait:' + id + ':' + s.id); }
 async function relist(env, s) {
   for (const it of s.items) {
+    if (it.manual) continue;
     if (env.ORDERS && (await env.ORDERS.get('sold:' + it.id)) === s.id) await env.ORDERS.delete('sold:' + it.id);
     const x = await dealerItem(env, it.id);
     if (!x || x.item.status !== 'sold' || !x.item.store || x.item.store.sale !== s.id) continue;
@@ -533,7 +565,8 @@ async function report(env, m, day) {
       if (s.method === 'cash') { d.mallOwes += it.owed; t.mallOwesDealers += it.owed; }
       else {
         const po = s.payouts && s.payouts[it.dealer];
-        if (po && po.status === 'sent') { d.paid += it.owed; t.paidToDealers += it.owed; } else { d.waiting += it.owed; t.waitingForDealers += it.owed; }
+        if (po && po.status === 'mall') { d.mallOwes += it.owed; t.mallOwesDealers += it.owed; }
+        else if (po && po.status === 'sent') { d.paid += it.owed; t.paidToDealers += it.owed; } else { d.waiting += it.owed; t.waitingForDealers += it.owed; }
       }
     }
   }
@@ -543,7 +576,7 @@ async function report(env, m, day) {
 }
 async function reportCsv(env, m, day, cors) {
   const r = await report(env, m, day), c = v => (v / 100).toFixed(2);
-  const rows = [['Booth', 'Dealer', 'Items', 'Sales', 'Mall commission', 'Card fees', 'Dealer share', 'Mall owes dealer (cash)', 'Paid to dealer by Tabella (card)', 'Card payout waiting']];
+  const rows = [['Booth', 'Dealer', 'Items', 'Sales', 'Mall commission', 'Card fees', 'Dealer share', 'Mall owes dealer', 'Paid to dealer by Tabella (card)', 'Card payout waiting']];
   for (const d of r.dealers) rows.push([d.booth, d.name, d.items, c(d.sales), c(d.commission), c(d.cardFees), c(d.owed), c(d.mallOwes), c(d.paid), c(d.waiting)]);
   const t = r.totals;
   rows.push([], ['Totals', '', t.items, c(t.subtotal), c(t.commission), c(t.cardFees), c(t.subtotal - t.commission - t.cardFees), c(t.mallOwesDealers), c(t.paidToDealers), c(t.waitingForDealers)],
