@@ -194,6 +194,7 @@ dialog{max-height:calc(100dvh - 24px);max-height:calc(100vh - 24px)}
  <div id="v-day" class="view" hidden>
   <div class="bar"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><label for="dayPick" style="margin:0">Day</label><input id="dayPick" type="date" style="width:auto"></div><button class="btn sec" type="button" id="csvBtn">Download spreadsheet</button></div>
   <div class="stats" id="dayStats"></div>
+  <div id="waitBox" hidden class="msg warn" style="margin-top:12px"><span id="waitTxt"></span> <button type="button" class="btn sec" id="waitBtn" style="margin-left:6px">Send waiting payouts</button></div>
   <h2 style="font-size:1.5rem;margin:22px 0 6px">What each booth is owed</h2>
   <p class="meta" style="margin:0 0 8px">Cash stays in your drawer, so you pay dealers their share of cash sales. Card sales are paid to each dealer's bank by Tabella.</p>
   <div class="tblwrap"><table class="tbl" id="dayTbl"></table></div>
@@ -406,8 +407,10 @@ async function loadDay(){if(!$('dayPick').value)$('dayPick').value=today();var d
   try{var r=await api('/mall/report?day='+day),t=r.totals;
     $('dayStats').innerHTML=[['Sales',t.sales],['Items sold',t.items],['Taken in',fc(t.total)],['Cash',fc(t.cash)],['Card',fc(t.card)],['Sales tax',fc(t.tax)],['Your commission and card fees',fc(t.mallKeeps)],['You owe dealers (cash)',fc(t.mallOwesDealers)]]
       .map(function(x){return '<div><span class="meta">'+esc(x[0])+'</span><b>'+esc(x[1])+'</b></div>'}).join('');
+    var w=t.waitingForDealers+t.mallWaiting;$('waitBox').hidden=!w;
+    $('waitTxt').textContent=w?fc(w)+' from card sales is waiting'+(t.waitingForDealers&&t.mallWaiting?' for dealers\u2019 banks and yours':t.mallWaiting?' for your bank (Settings > Get paid)':' for dealers to connect a bank')+'. It is sent automatically when the bank is connected, or tap to send it now.':'';
     $('dayTbl').innerHTML=r.dealers.length?'<thead><tr><th>Booth</th><th>Dealer</th><th>Items</th><th>Sales</th><th>Commission</th><th>Card fees</th><th>Dealer share</th><th>You owe (cash)</th><th>Paid by card</th></tr></thead><tbody>'+
-      r.dealers.map(function(d){return '<tr><td>'+esc(d.booth)+'</td><td>'+esc(d.name)+'</td><td>'+d.items+'</td><td>'+fc(d.sales)+'</td><td>'+fc(d.commission)+'</td><td>'+fc(d.cardFees)+'</td><td>'+fc(d.owed)+'</td><td><b>'+fc(d.mallOwes)+'</b></td><td>'+fc(d.paid)+(d.waiting?'<br><span class="meta">'+fc(d.waiting)+' waiting: dealer has no payout bank yet</span>':'')+'</td></tr>'}).join('')+'</tbody>':'<tbody><tr><td class="meta">No sales on this day.</td></tr></tbody>';
+      r.dealers.map(function(d){return '<tr><td>'+esc(d.booth)+'</td><td>'+esc(d.name)+'</td><td>'+d.items+'</td><td>'+fc(d.sales)+'</td><td>'+fc(d.commission)+'</td><td>'+fc(d.cardFees)+'</td><td>'+fc(d.owed)+'</td><td><b>'+fc(d.mallOwes)+'</b></td><td>'+fc(d.paid)+(d.waiting?'<br><span class="meta">'+fc(d.waiting)+' waiting for the dealer\'s bank</span>':'')+'</td></tr>'}).join('')+'</tbody>':'<tbody><tr><td class="meta">No sales on this day.</td></tr></tbody>';
     $('daySales').innerHTML=r.sales.slice().reverse().map(function(s){var st={paid:'',refunded:'Refunded',refunding:'Refund in progress',cancelled:'Cancelled',pending:'Not finished',failed:'Failed'}[s.status];
       return '<li><span><b>'+new Date(s.at).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'})+'</b> &middot; '+(s.method==='cash'?'Cash':'Card')+' &middot; '+s.items.length+' item'+(s.items.length===1?'':'s')+' &middot; '+fc(s.total)+(st?' <span class="pill">'+st+'</span>':'')+
       '<br><span class="meta">'+s.items.map(function(i){return esc(i.title)+' (Booth '+esc(i.booth)+')'}).join(', ')+'</span></span>'+
@@ -418,6 +421,8 @@ async function loadDay(){if(!$('dayPick').value)$('dayPick').value=today();var d
       if(!confirm('Refund '+fc(s.total)+'? '+(s.method==='cash'?'Hand the customer the cash back.':'The money goes back to their card.')+' The pieces go back on sale.'))return;
       try{await api('/mall/sale/'+s.id+'/refund',{json:{}});loadDay()}catch(err){alert(err.message)}}});
   }catch(err){$('dayStats').innerHTML='<div class="msg err">'+esc(err.message)+'</div>'}}
+$('waitBtn').onclick=async function(){var b=this;b.disabled=true;try{var r=await api('/mall/payouts/waiting',{json:{}});
+  alert(r.sent?'Sent '+fc(r.amount)+' ('+r.sent+' payout'+(r.sent===1?'':'s')+').'+(r.left?' '+r.left+' still waiting for a bank.':''):'Nothing could be sent yet: the dealers or your mall still need to connect a bank.');loadDay()}catch(err){alert(err.message)}b.disabled=false};
 $('csvBtn').onclick=async function(){try{var r=await fetch(API+'/mall/report.csv?day='+($('dayPick').value||today()),{headers:{Authorization:'Bearer '+tok}});if(!r.ok)throw new Error('The spreadsheet could not be made.');
   var u=URL.createObjectURL(await r.blob()),a=document.createElement('a');a.href=u;a.download=me.name.replace(/[^A-Za-z0-9]+/g,'-')+'-'+($('dayPick').value||today())+'.csv';document.body.appendChild(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(u)},2000)}catch(err){alert(err.message)}};
 

@@ -68,6 +68,7 @@ export async function handleMall(request, env, url, json, cors) {
     if (p === '/mall/report.csv' && request.method === 'GET') return reportCsv(env, m.mall, url.searchParams.get('day'), cors);
     if (p === '/mall/reader' && request.method === 'POST') return json({ mall: publicMall(env, await setupReader(env, m.mall, await body(request))) }, 200, cors);
     if (p === '/mall/payouts' && request.method === 'POST') return json(await payouts(env, m.mall, url), 200, cors);
+    if (p === '/mall/payouts/waiting' && request.method === 'POST') return json(await sendAllWaiting(env, m.mall), 200, cors);
     if (p === '/mall/payouts' && request.method === 'GET') return json(await payoutStatus(env, m.mall), 200, cors);
     return json({ error: 'Not found' }, 404, cors);
   } catch (e) {
@@ -423,6 +424,52 @@ async function payOut(env, m, s) {
       s.mallPayout = { amount: mallAmt, status: 'sent', transfer: t.id };
     } catch (e) { s.mallPayout = { amount: mallAmt, status: 'waiting', why: String(e.message).slice(0, 160) }; }
   }
+  await noteWaiting(env, s);
+}
+
+// ---------- card money waiting for a bank ----------
+//   mwait:<dealer or mall id>:<sale>   a card sale whose share for that dealer (or mall) hasn't been paid yet
+// Sent as soon as that dealer or mall has a payout bank: when they finish Stripe's payout setup, and from the
+// "Send waiting payouts" button on the mall's day report. A sale from the sandbox is never paid out in live mode.
+async function noteWaiting(env, s) {
+  for (const did of Object.keys(s.payouts || {})) if (s.payouts[did].status === 'waiting') await env.TABELLA.put('mwait:' + did + ':' + s.id, s.key);
+  if (s.mallPayout && s.mallPayout.status === 'waiting') await env.TABELLA.put('mwait:' + s.mall + ':' + s.id, s.key);
+}
+export async function sendWaiting(env, ownerId) {
+  const out = { sent: 0, amount: 0, left: 0, problems: [] };
+  if (!env.TABELLA || !/^[dm][a-z0-9]{10}$/.test(String(ownerId || ''))) return out;
+  const isMall = ownerId[0] === 'm';
+  const owner = JSON.parse(await env.TABELLA.get((isMall ? 'mall:' : 'dealer:') + ownerId) || 'null');
+  const ready = owner && (isMall ? mallPayoutsOk(env, owner) : payoutsOk(env, owner));
+  const live = stripeMode(env) === 'live';
+  let cursor;
+  do {
+    const l = await env.TABELLA.list({ prefix: 'mwait:' + ownerId + ':', cursor });
+    for (const k of l.keys) {
+      const key = await env.TABELLA.get(k.name), s = key ? JSON.parse(await env.TABELLA.get(key) || 'null') : null;
+      const po = s && (isMall ? s.mallPayout : s.payouts && s.payouts[ownerId]);
+      if (!s || !po || po.status !== 'waiting' || s.status !== 'paid') { await env.TABELLA.delete(k.name); continue; }
+      if (!ready || !s.charge || !!s.test === live) { out.left++; continue; }
+      try {
+        const t = await stripeApi(env, 'POST', '/transfers', { amount: String(po.amount), currency: 'usd', destination: owner.stripeAccount, transfer_group: 'mall_' + s.id,
+          source_transaction: s.charge, 'metadata[role]': isMall ? 'mall' : 'dealer', 'metadata[sale]': s.id, 'metadata[late]': 'yes' }, s.id + '-' + ownerId + '-' + owner.stripeAccount);
+        Object.assign(po, { status: 'sent', transfer: t.id, sentLate: Date.now() }); delete po.why;
+        await env.TABELLA.put(key, JSON.stringify(s)); await env.TABELLA.delete(k.name);
+        out.sent++; out.amount += po.amount;
+      } catch (e) { po.why = String(e.message).slice(0, 160); await env.TABELLA.put(key, JSON.stringify(s)); out.left++; out.problems.push(s.id + ': ' + po.why); }
+    }
+    cursor = l.list_complete ? null : l.cursor;
+  } while (cursor);
+  return out;
+}
+// The mall's button: its own waiting money and every booth's.
+async function sendAllWaiting(env, m) {
+  const total = { sent: 0, amount: 0, left: 0, problems: [] };
+  for (const id of [m.id].concat((await boothList(env, m.id)).map(b => b.dealer))) {
+    const r = await sendWaiting(env, id);
+    total.sent += r.sent; total.amount += r.amount; total.left += r.left; total.problems.push(...r.problems);
+  }
+  return total;
 }
 
 // ---------- refunds ----------
@@ -437,6 +484,7 @@ async function refundSale(env, m, id) {
   s.status = 'refunding'; await saveSale(env, s);
   return publicSale(s);
 }
+async function dropWaiting(env, s) { for (const id of Object.keys(s.payouts || {}).concat([s.mall])) await env.TABELLA.delete('mwait:' + id + ':' + s.id); }
 async function relist(env, s) {
   for (const it of s.items) {
     if (env.ORDERS && (await env.ORDERS.get('sold:' + it.id)) === s.id) await env.ORDERS.delete('sold:' + it.id);
@@ -452,7 +500,7 @@ async function relist(env, s) {
 export async function mallAfterRefund(env, saleId, charge, full, out) {
   const key = saleId && await env.TABELLA.get('msaleix:' + saleId);
   const s = key ? JSON.parse(await env.TABELLA.get(key) || 'null') : null;
-  if (s && full && s.status !== 'refunded') { await relist(env, s); s.status = 'refunded'; s.refundedAt = Date.now(); s.reversed = out.reversed; await env.TABELLA.put(key, JSON.stringify(s)); }
+  if (s && full && s.status !== 'refunded') { await relist(env, s); await dropWaiting(env, s); s.status = 'refunded'; s.refundedAt = Date.now(); s.reversed = out.reversed; await env.TABELLA.put(key, JSON.stringify(s)); }
   const amt = '$' + ((charge.amount_refunded || 0) / 100).toFixed(2);
   const text = (full ? 'Full refund of ' + amt + ' on in-store sale ' + saleId + (s ? ' at ' + s.mallName : '') + '. Items back on sale; ' + out.reversed.length + ' payout(s) taken back.'
     : 'Partial refund of ' + amt + ' on in-store sale ' + saleId + '. Settle the dealer and mall shares by hand.') + (out.problems.length ? ' Needs a look: ' + out.problems.join('; ') : '');
@@ -473,9 +521,10 @@ async function salesOn(env, m, day) {
 async function report(env, m, day) {
   day = /^\d{4}-\d{2}-\d{2}$/.test(String(day || '')) ? day : dayOf(m, Date.now());
   const all = await salesOn(env, m, day), paid = all.filter(s => s.status === 'paid');
-  const t = { sales: paid.length, items: 0, subtotal: 0, tax: 0, total: 0, cash: 0, card: 0, commission: 0, cardFees: 0, stripeFees: 0, mallOwesDealers: 0, paidToDealers: 0, waitingForDealers: 0 };
+  const t = { sales: paid.length, items: 0, subtotal: 0, tax: 0, total: 0, cash: 0, card: 0, commission: 0, cardFees: 0, stripeFees: 0, mallOwesDealers: 0, paidToDealers: 0, waitingForDealers: 0, mallWaiting: 0 };
   const dealers = {};
   for (const s of paid) {
+    if (s.mallPayout && s.mallPayout.status === 'waiting') t.mallWaiting += s.mallPayout.amount;
     t.items += s.items.length; t.subtotal += s.subtotal; t.tax += s.tax; t.total += s.total; t[s.method] += s.total; t.stripeFees += s.stripeFee || 0;
     for (const it of s.items) {
       const d = dealers[it.dealer] || (dealers[it.dealer] = { id: it.dealer, name: it.dealerName, booth: it.booth, items: 0, sales: 0, commission: 0, cardFees: 0, owed: 0, mallOwes: 0, paid: 0, waiting: 0 });
@@ -543,5 +592,6 @@ async function payoutStatus(env, m) {
   if (!m.stripeAccount || (m.stripeMode || 'test') !== stripeMode(env)) return { ready: false, started: false };
   const ready = await recipientReady(env, m.stripeAccount);
   if (ready !== !!m.payoutsReady) { m.payoutsReady = ready; await env.TABELLA.put('mall:' + m.id, JSON.stringify(m)); }
-  return { ready, started: true };
+  const waiting = ready ? await sendWaiting(env, m.id) : null;
+  return { ready, started: true, waiting };
 }

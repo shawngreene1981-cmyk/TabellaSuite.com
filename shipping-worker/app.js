@@ -11,6 +11,7 @@
 
 import { createRecipient, recipientLink, recipientReady, stripeMode } from './stripe.js';
 import { sendEmail, resetEmail, shippedEmail } from './mail.js';
+import { sendWaiting } from './mall.js';
 
 const SESSION_TTL = 60 * 60 * 24 * 30;
 export const ITEM_ID = /^(T[0-9A-Z]{6}|SH-\d{4})$/;
@@ -453,7 +454,9 @@ async function payoutStatus(env, d) {
   if (!d.stripeAccount) return { ready: false, started: false };
   const ready = await recipientReady(env, d.stripeAccount);
   if (ready !== !!d.payoutsReady) { d.payoutsReady = ready; await env.TABELLA.put('dealer:' + d.id, JSON.stringify(d)); await refreshListings(env, d); }
-  return { ready, started: true };
+  // Card sales from a mall register that waited for this dealer's bank are paid now.
+  const waiting = ready ? await sendWaiting(env, d.id) : null;
+  return { ready, started: true, waiting };
 }
 
 // ---------- helpers ----------
