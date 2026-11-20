@@ -104,7 +104,7 @@ footer{padding:36px 0 48px;border-top:1px solid var(--line);margin-top:48px;font
  <label for="aEmail">Email, for your receipt and tracking</label><input id="aEmail" type="email" autocomplete="email" required>
  <button class="btn sec" id="getShip" type="submit" style="margin-top:12px">Get shipping options</button>
 </form>
-<div id="rates"></div><div id="totals"></div><div id="cartMsg" aria-live="polite"></div>
+<div id="rates"></div><div id="ptsBox" class="meta" style="margin-top:10px"></div><div id="totals"></div><div id="cartMsg" aria-live="polite"></div>
 <button class="btn" id="payBtn" type="button" hidden style="width:100%;margin-top:8px">Go to secure checkout</button>
 </div></dialog>
 <footer><span>&copy; <span id="y"></span> Tabella Suite &middot; <a href="mailto:contact@tabellasuite.com">contact@tabellasuite.com</a></span><span><a href="../pricing.html">Pricing</a> &middot; <a href="../privacy.html">Privacy</a></span></footer>
@@ -167,16 +167,24 @@ function drawCart(){
   if(METHOD==='pickup'){$('howMsg').textContent='Free. Collect it at '+pm.name+', '+pm.city+' with the code we email you.';$('addr').hidden=true;$('pickForm').hidden=false;pickTotals(sub)}
   else{$('pickForm').hidden=true;$('addr').hidden=false}}
 var METHOD='ship';
-function pickTotals(s0){var pre=Math.round(s0*100),tot=Math.ceil((pre+30)/(1-0.029));
-  $('pickTotals').innerHTML='<div class="line"><span>Items</span><span>'+fm(s0)+'</span></div><div class="line"><span>Pickup</span><span>Free</span></div><div class="line"><span>Card processing</span><span>'+fm((tot-pre)/100)+'</span></div>'+(TAXNOTE?'<div class="line"><span>Sales tax</span><span class="meta">added at checkout</span></div><div class="line"><b>Total before tax</b><b>'+fm(tot/100)+'</b></div>':'<div class="line"><b>Total</b><b>'+fm(tot/100)+'</b></div>')}
+function pickTotals(s0){var d=USEPTS?500:0,pre=Math.round(s0*100)-d,tot=Math.ceil((pre+30)/(1-0.029));
+  $('pickTotals').innerHTML='<div class="line"><span>Items</span><span>'+fm(s0)+'</span></div><div class="line"><span>Pickup</span><span>Free</span></div>'+(d?'<div class="line"><span>Points</span><span>&minus;$5.00</span></div>':'')+'<div class="line"><span>Card processing</span><span>'+fm((tot-pre)/100)+'</span></div>'+(TAXNOTE?'<div class="line"><span>Sales tax</span><span class="meta">added at checkout</span></div><div class="line"><b>Total before tax</b><b>'+fm(tot/100)+'</b></div>':'<div class="line"><b>Total</b><b>'+fm(tot/100)+'</b></div>')}
 $('pickForm').addEventListener('submit',async function(e){e.preventDefault();var b=$('pickPay');b.disabled=true;b.textContent='Opening checkout...';$('cartMsg').innerHTML='';
   try{var d=await post('/shop/checkout',{items:cart,method:'pickup',name:$('pName').value,email:$('pEmail').value});location.href=d.url}
   catch(err){say(err.message,1);b.disabled=false;b.textContent='Go to secure checkout'}});
-function openCart(){$('cartMsg').innerHTML='';drawCart();$('cartDlg').showModal()}
+function openCart(){$('cartMsg').innerHTML='';drawCart();drawPts(sub);$('cartDlg').showModal();loadPts().then(function(){drawPts(sub)})}
 $('cartBtn').onclick=openCart;
 function addr(){return{name:$('aName').value,street1:$('aSt').value,street2:$('aSt2').value,city:$('aCity').value,state:$('aState').value,zip:$('aZip').value}}
 function say(t,bad){$('cartMsg').innerHTML='<div class="msg '+(bad?'err':'ok')+'">'+esc(t)+'</div>'}
-async function post(p,b){var h={'Content-Type':'application/json'};if(OFFER){b.offer=OFFER.id;h.Authorization='Bearer '+BTOK}var r=await fetch(API+p,{method:'POST',headers:h,body:JSON.stringify(b)});var d=await r.json().catch(function(){return{}});if(!r.ok)throw new Error(d.error||'Something went wrong. Try again.');return d}
+// Points: 1 per $1 on online orders; 200 take $5 off an order of $10 or more (signed-in shoppers, from the Swipe page).
+var PTS=null,USEPTS=false;
+async function loadPts(){if(!BTOK)return;try{var r=await fetch(API+'/buyer/me',{headers:{Authorization:'Bearer '+BTOK}});if(r.ok)PTS=(await r.json()).buyer.points||0}catch(e){}}
+function drawPts(s0){var box=$('ptsBox');if(!box)return;
+  if(PTS==null){box.innerHTML='Earn 1 point per $1. <a href="../swipe/">Sign in on Swipe</a> to use them: 200 points take $5 off.';USEPTS=false;return}
+  if(PTS>=200&&s0>=10){box.innerHTML='<label class="check" style="margin:0"><input type="checkbox" id="usePts"'+(USEPTS?' checked':'')+'> Use 200 of your '+PTS+' points for $5 off</label>';$('usePts').onchange=function(){USEPTS=this.checked;refreshTotals()}}
+  else{USEPTS=false;box.textContent='You have '+PTS+' points. '+(PTS>=200?'Points take $5 off orders of $10 or more.':'At 200 points you get $5 off.')}}
+function refreshTotals(){if(METHOD==='pickup')pickTotals(sub);else{var r=document.querySelector('input[name=rate]:checked');if(r)pick(sub)}}
+async function post(p,b){var h={'Content-Type':'application/json'};if(BTOK)h.Authorization='Bearer '+BTOK;if(USEPTS)b.usePoints=true;if(OFFER){b.offer=OFFER.id}var r=await fetch(API+p,{method:'POST',headers:h,body:JSON.stringify(b)});var d=await r.json().catch(function(){return{}});if(!r.ok)throw new Error(d.error||'Something went wrong. Try again.');return d}
 $('addr').addEventListener('submit',async function(e){e.preventDefault();resetShip();$('cartMsg').innerHTML='';
   var b=$('getShip');b.disabled=true;b.textContent='Getting shipping...';
   try{var d=await post('/shop/quote',{items:cart,to:addr()});
@@ -184,8 +192,8 @@ $('addr').addEventListener('submit',async function(e){e.preventDefault();resetSh
     TAXNOTE=!!d.taxAtCheckout;pick(d.subtotal);$('rates').onchange=function(){pick(d.subtotal)};$('payBtn').hidden=false}
   catch(err){say(err.message,1)}
   b.disabled=false;b.textContent='Get shipping options'});
-function pick(s0){var r=document.querySelector('input[name=rate]:checked');if(!r)return;rate=r.value;var s=+r.getAttribute('data-amt'),pre=Math.round((s0+s)*100),tot=Math.ceil((pre+30)/(1-0.029));
-  $('totals').innerHTML='<div class="line"><span>Items</span><span>'+fm(s0)+'</span></div><div class="line"><span>Shipping</span><span>'+fm(s)+'</span></div><div class="line"><span>Card processing</span><span>'+fm((tot-pre)/100)+'</span></div>'+(TAXNOTE?'<div class="line"><span>Sales tax</span><span class="meta">added at checkout</span></div><div class="line"><b>Total before tax</b><b>'+fm(tot/100)+'</b></div>':'<div class="line"><b>Total</b><b>'+fm(tot/100)+'</b></div>')}
+function pick(s0){var r=document.querySelector('input[name=rate]:checked');if(!r)return;rate=r.value;var d=USEPTS?500:0,s=+r.getAttribute('data-amt'),pre=Math.round((s0+s)*100)-d,tot=Math.ceil((pre+30)/(1-0.029));
+  $('totals').innerHTML='<div class="line"><span>Items</span><span>'+fm(s0)+'</span></div><div class="line"><span>Shipping</span><span>'+fm(s)+'</span></div>'+(d?'<div class="line"><span>Points</span><span>&minus;$5.00</span></div>':'')+'<div class="line"><span>Card processing</span><span>'+fm((tot-pre)/100)+'</span></div>'+(TAXNOTE?'<div class="line"><span>Sales tax</span><span class="meta">added at checkout</span></div><div class="line"><b>Total before tax</b><b>'+fm(tot/100)+'</b></div>':'<div class="line"><b>Total</b><b>'+fm(tot/100)+'</b></div>')}
 var TAXNOTE=true;
 $('payBtn').onclick=async function(){var b=this;if(!rate)return;b.disabled=true;b.textContent='Opening checkout...';
   try{var d=await post('/shop/checkout',{items:cart,to:addr(),rateId:rate,email:$('aEmail').value});location.href=d.url}

@@ -106,7 +106,7 @@ export async function buyerSession(env, request) {
   const buyer = JSON.parse(await env.TABELLA.get('buyer:' + id) || 'null');
   return buyer ? { token: t, buyer } : null;
 }
-function pub(b) { return { email: b.email, saved: b.saved || [] }; }
+function pub(b) { return { email: b.email, saved: b.saved || [], points: b.points || 0, pointsLog: (b.pointsLog || []).slice(0, 10) }; }
 async function setSaved(env, buyer, b) {
   const id = String(b.id || '');
   if (!ITEM_ID.test(id)) throw err(400, 'That piece isn’t valid.');

@@ -41,15 +41,17 @@ export function buyerReceipt(o, shopNames) {
   const lines = o.items.map(i => [esc(i.title) + ' <span style="color:#6A6259">' + esc(i.id) + '</span>', fm(i.price)]);
   if (b.shipping) lines.push(['Shipping, ' + esc(o.shipping && (o.shipping.carrier + ' ' + (o.shipping.service || ''))), fm(b.shipping)]);
   if (b.tax) lines.push(['Sales tax', fm(b.tax)]);
+  if (b.discount) lines.push(['Points: $5 off', '&minus;' + fm(b.discount)]);
   if (b.cardProcessing) lines.push(['Card processing', fm(b.cardProcessing)]);
   lines.push(['Total charged', fm(b.total), 1]);
+  const earned = o.pointsEarned && o.pointsEarned.points ? '<p style="margin:10px 0 0">You earned <b>' + o.pointsEarned.points + ' points</b> on this order. 200 points take $5 off your next order of $10 or more.</p>' : '';
   const pk = o.pickup;
   const where = pk ? '<p style="margin:14px 0 4px"><b>Pick it up at</b></p><p style="margin:0">' + esc(pk.name) + '<br>' + addr(Object.assign({}, pk.address, { name: '' })) + '</p>' +
       '<p style="margin:14px 0 4px">Your pickup code</p><p style="margin:0;font:700 26px Georgia,serif;letter-spacing:.14em">' + esc(pk.code) + '</p>' +
       '<p style="margin-top:12px">Show this code at the mall counter during open hours. Please pick it up within 14 days.</p>'
     : '<p style="margin:14px 0 4px"><b>Shipping to</b></p><p style="margin:0">' + addr(o.shipTo) + '</p>' +
       '<p style="margin-top:16px">The shop packs and ships one-of-a-kind pieces by hand. You will get another email with tracking when it ships.</p>';
-  const html = wrap('Thank you for your order', test + '<p>Order <b>' + esc(o.ref) + '</b> from ' + esc(shopNames) + '. Your payment went through.</p>' + rows(lines) + where);
+  const html = wrap('Thank you for your order', test + '<p>Order <b>' + esc(o.ref) + '</b> from ' + esc(shopNames) + '. Your payment went through.</p>' + rows(lines) + earned + where);
   const text = (o.test ? 'TEST ORDER. No real money was charged.\n\n' : '') + 'Thank you for your order ' + o.ref + ' from ' + shopNames + '.\n\n' +
     o.items.map(i => i.title + ' (' + i.id + ')  ' + fm(i.price)).join('\n') + (pk ? '' : '\nShipping  ' + fm(b.shipping)) + (b.tax ? '\nSales tax  ' + fm(b.tax) : '') + '\nCard processing  ' + fm(b.cardProcessing) + '\nTotal charged  ' + fm(b.total) +
     (pk ? '\n\nPick it up at ' + pk.name + ', ' + addrText(Object.assign({}, pk.address, { name: '' })).replace(/^\n/, '').replace(/\n/g, ', ') + '\nYour pickup code: ' + pk.code + '\nShow it at the counter within 14 days.\n\nTabella'

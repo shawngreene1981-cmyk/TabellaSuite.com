@@ -11,6 +11,7 @@
 import { mallAccountFor } from './mall.js';
 import { offerForCheckout, offerOrderStarted, offerCheckoutEnded } from './offers.js';
 import { pickupPaid } from './mall.js';
+import { usePoints, returnPoints, earnPoints, refundPoints, REWARD_CENTS } from './points.js';
 import { buildOrder, createCheckoutSession, stripeMode, stripeApi } from './stripe.js';
 import { dealerListings, dealerItem, markDealerItemSold, markDealerItemAvailable, payoutsOk, shantiquesMoved, ITEM_ID, ways } from './app.js';
 import { sendEmail, buyerReceipt, dealerAlert, opsEmail } from './mail.js';
@@ -92,16 +93,23 @@ export async function handleShop(request, env, url, json, cors, shippoFetch) {
       const email = String(b.email || '').trim().slice(0, 120);
       if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return json({ error: pickupMode ? 'Enter your email so we can send your pickup code.' : 'Enter your email so we can send tracking.' }, 400, cors);
 
+      // Points: 200 take $5 off an order of $10 or more (points.js). Checked now, taken once the order is held.
+      const itemsCents = Math.round(pick.items.reduce((t, i) => t + i.price, 0) * 100);
+      let disc = 0;
+      if (b.usePoints) { try { await usePoints(env, request, itemsCents, null, true); disc = REWARD_CENTS; } catch (e) { return json({ error: e.message }, e.status || 400, cors); } }
       // Sales tax by where the order ships (Stripe Tax applies Missouri's origin rule for in-state orders).
+      // A points discount lowers the price that's taxed: it comes off the priciest piece for the tax math.
+      const taxItems = pick.items.map(i => Object.assign({}, i));
+      if (disc) { const top = taxItems.reduce((a, c) => c.price > a.price ? c : a); top.price = Math.max(0, top.price - disc / 100); }
       const from = pickupMode ? to.addr : (pick.items[0].shipFrom || shipFrom(env));
       let tax = null;
       if (taxOn(env)) {
-        try { tax = await taxCalc(env, pick.items, ship, to.addr, from); }
+        try { tax = await taxCalc(env, taxItems, ship, to.addr, from); }
         catch (e) { return json({ error: 'We could not work out sales tax for that address. Check the address and try again.' }, 400, cors); }
       }
       // A dealer in a Tabella mall: the mall gets 4% of the item price (out of the 9% commission).
       const malls = await Promise.all(pick.items.map(it => mallAccountFor(env, it.dealer).catch(() => undefined)));
-      const order = buildOrder({ items: pick.items.map((it, i) => ({ name: it.title + ' (' + it.id + ')', price: it.price, dealerAccount: it.account || dealerAccount(cat, it), mallAccount: malls[i] })), shipping: ship, taxCents: tax ? tax.cents : 0 });
+      const order = buildOrder({ items: pick.items.map((it, i) => ({ name: it.title + ' (' + it.id + ')', price: it.price, dealerAccount: it.account || dealerAccount(cat, it), mallAccount: malls[i] })), shipping: ship, taxCents: tax ? tax.cents : 0, discountCents: disc });
       if (order.error) return json({ error: order.error }, 400, cors);
 
       // Hold each item so two people can't buy the same one-of-a-kind piece.
@@ -111,6 +119,17 @@ export async function handleShop(request, env, url, json, cors, shippoFetch) {
         if (await env.ORDERS.get('sold:' + it.id) || (h && !(offer && h === 'offer:' + offer.id))) return json({ error: it.title + ' was just bought or is in someone’s checkout. Remove it and try again.' }, 409, cors);
       }
       await Promise.all(pick.items.map(it => env.ORDERS.put('hold:' + it.id, ref, { expirationTtl: HOLD_SECONDS })));
+      let pointsUsed = null, coupon = null;
+      if (disc) {
+        try {
+          pointsUsed = await usePoints(env, request, itemsCents, ref);
+          coupon = await stripeApi(env, 'POST', '/coupons', { amount_off: String(disc), currency: 'usd', duration: 'once', max_redemptions: '1', name: 'Tabella points: $5 off' }, 'cp-' + ref);
+        } catch (e) {
+          await Promise.all(pick.items.map(it => env.ORDERS.delete('hold:' + it.id)));
+          if (pointsUsed) await returnPoints(env, { ref, pointsUsed }, 'Points back: checkout didn\u2019t start');
+          return json({ error: e.message }, e.status || 400, cors);
+        }
+      }
 
       const site = String(env.SITE_URL || 'https://tabellasuite.com').replace(/\/$/, '');
       let session;
@@ -122,15 +141,17 @@ export async function handleShop(request, env, url, json, cors, shippoFetch) {
           expires_at: String(Math.floor(Date.now() / 1000) + 31 * 60),
           'metadata[order]': ref,
           'metadata[items]': pick.items.map(i => i.id).join(','),
-          'payment_intent_data[metadata][order]': ref
+          'payment_intent_data[metadata][order]': ref,
+          ...(coupon ? { 'discounts[0][coupon]': coupon.id } : {})
         });
       } catch (e) {
         await Promise.all(pick.items.map(it => env.ORDERS.delete('hold:' + it.id)));
+        if (pointsUsed) await returnPoints(env, { ref, pointsUsed }, 'Points back: checkout didn\u2019t start');
         if (offer) await offerCheckoutEnded(env, offer.id, offer.item);
         throw e;
       }
       if (offer) await offerOrderStarted(env, offer, ref);
-      await env.ORDERS.put('order:' + ref, JSON.stringify({ ref, status: 'checkout', created: Date.now(), session: session.id, offer: offer ? offer.id : undefined,
+      await env.ORDERS.put('order:' + ref, JSON.stringify({ ref, status: 'checkout', created: Date.now(), session: session.id, offer: offer ? offer.id : undefined, pointsUsed: pointsUsed || undefined,
         items: pick.items.map(i => ({ id: i.id, title: i.title, price: i.price, dealer: i.dealer, booth: i.pickup ? i.pickup.booth : undefined })),
         shipTo: pickupMode ? { name: to.addr.name } : to.addr, email, tax: tax ? { cents: tax.cents, calc: tax.id } : null,
         pickup: pickupMode ? { mall: pick.pickup.mall, name: pick.pickup.name, city: pick.pickup.city, booth: pick.pickup.booth, address: pick.pickup.address, code: pickupCode() } : undefined,
@@ -144,6 +165,7 @@ export async function handleShop(request, env, url, json, cors, shippoFetch) {
       const o = JSON.parse(await env.ORDERS.get('order:' + ref) || 'null');
       if (!o) return json({ error: 'Order not found.' }, 404, cors);
       return json({ ref, status: o.status, items: o.items.map(i => ({ id: i.id, title: i.title, price: i.price })), shipping: o.shipping && { amount: o.shipping.amount, carrier: o.shipping.carrier, service: o.shipping.service }, tax: o.breakdown && o.breakdown.tax, cardProcessing: o.breakdown && o.breakdown.cardProcessing, total: o.breakdown && o.breakdown.total, refunded: o.status === 'refunded',
+        discount: o.breakdown && o.breakdown.discount || 0, pointsEarned: o.pointsEarned && !o.pointsEarned.reversed ? o.pointsEarned.points : 0,
         pickup: o.pickup && o.status === 'paid' ? { name: o.pickup.name, address: o.pickup.address, code: o.pickup.code, pickedUpAt: o.pickup.pickedUpAt || null } : o.pickup ? { name: o.pickup.name } : null }, 200, cors);
     }
     return json({ error: 'Not found' }, 404, cors);
@@ -162,6 +184,7 @@ export async function shopAfterPayment(env, session, paid) {
     await Promise.all(ids.map(id => env.ORDERS.put('sold:' + id, ref)));
     await Promise.all(ids.map(id => markDealerItemSold(env, id, ref)));
     if (o && o.pickup) await pickupPaid(env, o);
+    if (o) await earnPoints(env, o).catch(() => null);
     if (o) {
       o.status = 'paid'; o.paidAt = o.paidAt || Date.now(); o.paymentIntent = session.payment_intent;
       // Record the sale with Stripe Tax so it shows in the tax reports used for filing.
@@ -182,7 +205,7 @@ export async function shopAfterPayment(env, session, paid) {
       await env.ORDERS.put('order:' + ref, JSON.stringify(o), { expirationTtl: 60 * 60 * 24 * 400 });
     }
   } else {
-    if (o && o.status === 'checkout') { o.status = 'expired'; await env.ORDERS.put('order:' + ref, JSON.stringify(o), { expirationTtl: 60 * 60 * 24 * 30 }); }
+    if (o && o.status === 'checkout') { o.status = 'expired'; await returnPoints(env, o, 'Points back: checkout not finished').catch(() => null); await env.ORDERS.put('order:' + ref, JSON.stringify(o), { expirationTtl: 60 * 60 * 24 * 30 }); }
   }
   await Promise.all(ids.map(async id => { if ((await env.ORDERS.get('hold:' + id)) === ref) await env.ORDERS.delete('hold:' + id); }));
   if (o && o.offer && o.status !== 'paid') for (const id of ids) await offerCheckoutEnded(env, o.offer, id);
@@ -193,6 +216,7 @@ export async function shopAfterRefund(env, ref, charge, full, out) {
   const o = ref && env.ORDERS ? JSON.parse(await env.ORDERS.get('order:' + ref) || 'null') : null;
   if (o && full && o.status !== 'refunded') {
     o.status = 'refunded'; o.refundedAt = Date.now();
+    await refundPoints(env, o).catch(() => null);
     for (const it of o.items) { if ((await env.ORDERS.get('sold:' + it.id)) === ref) await env.ORDERS.delete('sold:' + it.id); await markDealerItemAvailable(env, it.id, ref); }
     if (o.tax && o.tax.tx && !o.tax.reversal) {
       try { const r = await stripeApi(env, 'POST', '/tax/transactions/create_reversal', { mode: 'full', original_transaction: o.tax.tx, reference: ref + '-refund' }, 'taxrev-' + ref); o.tax.reversal = r.id; }

@@ -13,6 +13,7 @@
 
 import { shopAfterPayment, shopAfterRefund } from './shop.js';
 import { mallAfterRefund } from './mall.js';
+import { sendEmail } from './mail.js';
 
 const API = 'https://api.stripe.com/v1';
 const COMMISSION = 0.09, MALL_SHARE = 0.04;
@@ -126,13 +127,15 @@ export function buildOrder(b) {
   const tax = Math.round(Number(b.taxCents || 0));
   if (!isFinite(tax) || tax < 0 || tax > 1000000) return { error: 'Sales tax looks wrong.' };
   if (tax) lines.push({ name: 'Sales tax', cents: tax });
-  // Card processing passed to the buyer, grossed up so the fee is covered on the full total.
-  const pre = goods + ship + tax, total = Math.ceil((pre + CARD_FIXED) / (1 - CARD_PCT)), fee = total - pre;
+  // Points discount (points.js): taken off the whole order with a one-time Stripe coupon; Tabella pays for it.
+  const disc = Math.max(0, Math.round(Number(b.discountCents || 0)));
+  // Card processing passed to the buyer, grossed up so the fee is covered on what is actually charged.
+  const pre = goods + ship + tax, total = Math.ceil((pre - disc + CARD_FIXED) / (1 - CARD_PCT)), fee = total - (pre - disc);
   lines.push({ name: 'Card processing', cents: fee });
   const splitsMeta = splits.map(s => s.join(':')).join(',');
   if (splitsMeta.length > 500) return { error: 'Too many dealers in one checkout. Split the order.' };
   const group = 'tab_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-  return { lines, splitsMeta, group, totalCents: total, breakdown: { items: breakdown, shipping: ship / 100, tax: tax / 100, cardProcessing: fee / 100, total: total / 100 } };
+  return { lines, splitsMeta, group, totalCents: total, discountCents: disc, breakdown: { items: breakdown, shipping: ship / 100, tax: tax / 100, discount: disc / 100, cardProcessing: fee / 100, total: total / 100 } };
 }
 
 // Dealer and mall payout accounts (Accounts v2 recipients), used by the dealer app.
@@ -191,16 +194,31 @@ async function webhook(request, env, json) {
   const pi = await stripe(env, 'GET', '/payment_intents/' + s.payment_intent);
   const charge = pi.latest_charge;
   const splits = String((s.metadata && s.metadata.splits) || '').split(',').filter(Boolean).map(x => x.split(':'));
-  const done = [];
+  const done = [], short = [];
+  // A transfer tied to this charge can't be more than the charge. When points took $5 off a small order, the shares can
+  // add up to more than the shopper paid: Tabella covers the rest from its own Stripe balance.
+  let left = Number(s.amount_total) > 0 ? Number(s.amount_total) : Infinity;
+  const send = async (dest, amount, role, key) => {
+    const fromCharge = Math.min(amount, left); left -= fromCharge;
+    if (fromCharge > 0) done.push(await stripe(env, 'POST', '/transfers', { amount: String(fromCharge), currency: 'usd', destination: dest,
+      transfer_group: s.metadata.group, source_transaction: charge, 'metadata[role]': role, 'metadata[session]': s.id }, s.id + key));
+    const rest = amount - fromCharge;
+    if (rest > 0) {
+      try { done.push(await stripe(env, 'POST', '/transfers', { amount: String(rest), currency: 'usd', destination: dest, transfer_group: s.metadata.group,
+        'metadata[role]': role, 'metadata[session]': s.id, 'metadata[covered_by]': 'tabella' }, s.id + key + '-t')); }
+      catch (e) { short.push(role + ' ' + dest + ': $' + (rest / 100).toFixed(2) + ' (' + String(e.message).slice(0, 120) + ')'); }
+    }
+  };
   for (let i = 0; i < splits.length; i++) {
     const [dealer, dc, mall, mc] = splits[i];
     // source_transaction ties each transfer to this charge, so it waits for the funds to be available.
-    if (+dc > 0) done.push(await stripe(env, 'POST', '/transfers', { amount: dc, currency: 'usd', destination: dealer,
-      transfer_group: s.metadata.group, source_transaction: charge, 'metadata[role]': 'dealer', 'metadata[session]': s.id }, s.id + '-d' + i));
-    if (mall && +mc > 0) done.push(await stripe(env, 'POST', '/transfers', { amount: mc, currency: 'usd', destination: mall,
-      transfer_group: s.metadata.group, source_transaction: charge, 'metadata[role]': 'mall', 'metadata[session]': s.id }, s.id + '-m' + i));
+    if (+dc > 0) await send(dealer, +dc, 'dealer', '-d' + i);
+    if (mall && +mc > 0) await send(mall, +mc, 'mall', '-m' + i);
   }
-  return json({ ok: true, transfers: done.map(t => t.id) }, 200);
+  if (short.length) await sendEmail(env, { to: env.OPS_EMAIL || 'contact@tabellasuite.com', subject: (stripeMode(env) === 'test' ? '[Test] ' : '') + 'Points discount: payout to finish by hand',
+    html: '<p>A $5 points discount made this order\u2019s shares more than the shopper paid, and Tabella\u2019s Stripe balance couldn\u2019t cover the rest yet. Send these from the Stripe Dashboard (Connect > the account > Send funds) when the balance allows:</p><p>' + short.join('<br>').replace(/[<>&]/g, '') + '</p><p>Session ' + s.id + '</p>',
+    text: 'Points discount: finish these payouts by hand in Stripe:\n' + short.join('\n') + '\nSession ' + s.id }).catch(() => null);
+  return json({ ok: true, transfers: done.map(t => t.id), short }, 200);
 }
 
 // ---------- refunds (issued in the Stripe Dashboard) ----------

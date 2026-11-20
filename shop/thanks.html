@@ -92,7 +92,7 @@ function load(){fetch(API+'/shop/order?ref='+ref).then(function(r){return r.json
      '<div class="meta" style="margin-top:6px">Show the code at the counter during open hours, within 14 days. It\u2019s in your email too.</div></div>':'')+
    d.items.map(function(i){return row(esc(i.title),fm(i.price))}).join('')+
    (d.pickup?row('Pickup at '+esc(d.pickup.name),'Free'):'')+(d.shipping?row('Shipping, '+esc(d.shipping.carrier)+' '+esc(d.shipping.service||''),fm(d.shipping.amount)):'')+
-   (d.tax?row('Sales tax',fm(d.tax)):'')+(d.cardProcessing?row('Card processing',fm(d.cardProcessing)):'')+(d.total?row('Total charged',fm(d.total),1):'')+(d.refunded?'<p class="meta" style="margin-top:12px">This order was refunded.</p>':'')}).catch(function(){o.textContent='Could not load your order. Refresh to try again.'})}
+   (d.tax?row('Sales tax',fm(d.tax)):'')+(d.discount?row('Points: $5 off','&minus;'+fm(d.discount)):'')+(d.cardProcessing?row('Card processing',fm(d.cardProcessing)):'')+(d.total?row('Total charged',fm(d.total),1):'')+(d.refunded?'<p class="meta" style="margin-top:12px">This order was refunded.</p>':'')+(d.pointsEarned&&!d.refunded?'<p style="margin-top:12px">You earned <b>'+d.pointsEarned+' points</b>. 200 points take $5 off your next order of $10 or more. <a href="../swipe/">See your points</a></p>':'')}).catch(function(){o.textContent='Could not load your order. Refresh to try again.'})}
 load();
 })();
 </script>
