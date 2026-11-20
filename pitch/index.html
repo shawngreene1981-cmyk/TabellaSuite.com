@@ -82,6 +82,8 @@ table.price td.n{font-family:'Cormorant Garamond',serif;font-size:40px;font-weig
  <input id="q" placeholder="Relics, The Maze, or a town" autocomplete="off">
  <label for="nb">Booths in the mall <span style="font-weight:400;color:#A89F90">(for the price slide; a guess is fine)</span></label>
  <input id="nb" type="number" min="1" max="2000" value="100" style="max-width:180px">
+ <label for="dl">A dealer looking for a booth there <span style="font-weight:400;color:#A89F90">(optional, like Shantiques)</span></label>
+ <input id="dl" maxlength="60" placeholder="Shantiques" style="max-width:360px">
  <ul id="res"></ul>
  <p id="pmsg"></p>
 </section>
@@ -123,7 +125,7 @@ function core(n){return n.toLowerCase().normalize('NFKD').replace(/['’]/g,'').
 async function picker(){$('pick').hidden=false;$('pmsg').textContent='Loading the map...';
   await loadOurs();$('pmsg').textContent='';var all=null;
   function draw(list){$('res').innerHTML=list.slice(0,30).map(function(p){return '<li><button type="button" data-id="'+esc(p.id)+'"><b>'+esc(p.name)+'</b>'+(p.ours?'<span class="ours">ON OUR MAP</span>':'')+'<br><span class="t">'+esc(p.town||'')+'</span></button></li>'}).join('')||'<li class="t">No match. Try the town.</li>';
-    $('res').querySelectorAll('button').forEach(function(b){b.onclick=function(){location.search='?shop='+encodeURIComponent(b.dataset.id)+'&booths='+encodeURIComponent($('nb').value||100)}})}
+    $('res').querySelectorAll('button').forEach(function(b){b.onclick=function(){location.search='?shop='+encodeURIComponent(b.dataset.id)+'&booths='+encodeURIComponent($('nb').value||100)+($('dl').value.trim()?'&dealer='+encodeURIComponent($('dl').value.trim()):'')}})}
   function list(){var q=$('q').value.trim().toLowerCase(),ours=Object.values(SHOPS);
     if(!q){draw(ours.filter(function(p){return p.ours}).sort(function(a,b){return a.town.localeCompare(b.town)}));return}
     var m=ours.concat(all||[]).filter(function(p){return (p.name+' '+p.town).toLowerCase().indexOf(q)>=0});draw(m)}
@@ -167,6 +169,14 @@ async function deck(id){
     '<li><b>'+esc(name)+' earns 4% of every online sale</b> from its booths, without lifting a finger.</li>'+
     '<li>Shoppers can pick up at your counter, so online orders bring people through your door.</li></ul>'+
     '<div class="money">If your dealers sell $2,500 a month online, '+esc(name)+' earns <b>$100 a month</b>. That alone covers the Plus plan for about '+(function(){for(var n=200;n>0;n--)if(cost(n,TIERS[1][1])<=100)return n;return 0})()+' booths.</div>'+foot+'</section>');
+  var dealer=String(qs.get('dealer')||'').trim().slice(0,60);
+  S.push('<section class="slide"><div class="cap">Booth finder</div><h2>New dealers arrive with their shop already online.</h2><ul>'+
+    '<li>Anyone can open a Tabella shop online, free, and start selling before they have a booth.</li>'+
+    '<li>When they want a brick-and-mortar home, they find malls like '+esc(short)+' on the Tabella map.</li>'+
+    '<li><b>Before you say yes, you see their pieces and prices</b> in their Tabella shop: exactly what would go in your booth.</li>'+
+    '<li>They arrive with Tabella tags on their pieces, ready to scan at your register.</li></ul>'+
+    (dealer?'<div class="money"><b>'+esc(dealer)+'</b> is a Tabella dealer looking for a booth in '+esc(town)+'. Their shop is ready for you to look through today.</div>'
+           :'<div class="money">Fill an empty booth faster, with a dealer whose pieces you have already seen.</div>')+foot+'</section>');
   S.push('<section class="slide"><div class="cap">In the mall</div><h2>A register made for booths.</h2><ul>'+
     '<li>Scan the tag: price, booth and dealer come up. Paper tags work too, by booth number and price.</li>'+
     '<li>Cash or card on the Tabella reader. The piece comes off the website the moment it sells.</li>'+
@@ -190,6 +200,7 @@ async function deck(id){
   S.push('<section class="slide"><div class="cap">Next steps</div><h2>Next steps for '+esc(name)+'.</h2><ul class="steps">'+
     '<li>'+(p.verified?'Your listing is verified. Add photos and your hours at tabellasuite.com.':'Claim your free listing on the Tabella map and add your website.')+'</li>'+
     '<li>A 30-minute demo at your counter: a sale, a statement and the map, on a tablet.</li>'+
+    (dealer?'<li>Meet '+esc(dealer)+' and look through their Tabella shop for an open booth.</li>':'')+
     '<li>Pick a few dealers to start, and a date.</li></ul>'+
     '<p class="lead" style="margin-top:30px">contact@tabellasuite.com &middot; tabellasuite.com</p>'+foot+'</section>');
   $('deck').innerHTML=S.join('');$('deck').hidden=false;$('bar').hidden=false;document.title=name+' | Tabella pitch';
