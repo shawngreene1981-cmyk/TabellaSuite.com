@@ -214,7 +214,9 @@ async function addBooth(env, m, b) {
   if (b.email && !email) throw err(400, 'That email looks wrong. Leave it blank if you don\u2019t have one.');
   const id = 'd' + rand(10);
   await env.TABELLA.put('dealer:' + id, JSON.stringify({ id, name, email, managed: true, mall: { id: m.id, name: m.name, booth }, created: Date.now() }));
-  await env.TABELLA.put('booth:' + m.id + ':' + id, JSON.stringify({ booth, pct: b.pct === '' || b.pct == null ? null : pct(b.pct, 'Commission', 0, 60), rent: money(b.rent, 'Rent'), joined: Date.now() }));
+  const rent = money(b.rent, 'Rent');
+  await env.TABELLA.put('booth:' + m.id + ':' + id, JSON.stringify({ booth, pct: b.pct === '' || b.pct == null ? null : pct(b.pct, 'Commission', 0, 60), rent,
+    rents: [{ from: dayOf(m, Date.now()).slice(0, 7), cents: rent || 0 }], joined: Date.now() }));
   return { ok: true, id };
 }
 async function setBooth(env, m, did, b) {
@@ -222,7 +224,7 @@ async function setBooth(env, m, did, b) {
   if (!bt) throw err(404, 'That dealer isn’t in your mall.');
   if (b.booth != null) { const v = clean(b.booth, 20); if (!v) throw err(400, 'Enter a booth number.'); bt.booth = v; }
   if (b.pct !== undefined) bt.pct = b.pct === '' || b.pct == null ? null : pct(b.pct, 'Commission', 0, 60);
-  if (b.rent !== undefined) bt.rent = money(b.rent, 'Rent');
+  if (b.rent !== undefined) setRent(bt, money(b.rent, 'Rent'), dayOf(m, Date.now()).slice(0, 7));
   await env.TABELLA.put(key, JSON.stringify(bt));
   const d = JSON.parse(await env.TABELLA.get('dealer:' + did) || 'null');
   if (d && d.managed && d.mall && d.mall.id === m.id && (b.name != null || b.email != null)) {
@@ -445,11 +447,24 @@ async function finish(env, m, s) {
 async function takeRent(env, m, s, did, amt) {
   if (!m.rentFromPayouts) return 0;
   const bt = JSON.parse(await env.TABELLA.get('booth:' + m.id + ':' + did) || 'null');
-  if (!bt || !(bt.rent > 0)) return 0;
+  const rent = rentFor(bt, s.day.slice(0, 7));
+  if (!(rent > 0)) return 0;
   const key = 'mrent:' + m.id + ':' + s.day.slice(0, 7).replace('-', '') + ':' + did, got = Number(await env.TABELLA.get(key)) || 0;
-  const take = Math.max(0, Math.min(amt, bt.rent - got));
+  const take = Math.max(0, Math.min(amt, rent - got));
   if (take) await env.TABELLA.put(key, String(got + take), { expirationTtl: 60 * 60 * 24 * 800 });
   return take;
+}
+// Each booth keeps its rent history ({ from: 'YYYY-MM', cents }), so a change starts in the month it is made and
+// earlier months' statements keep the rent that applied then. A booth from before the history uses its one rent for all months.
+function rentFor(bt, ym) {
+  if (!bt) return 0;
+  if (!Array.isArray(bt.rents) || !bt.rents.length) return bt.rent || 0;
+  let r = 0; for (const h of bt.rents) if (h.from <= ym) r = h.cents; return r;
+}
+function setRent(bt, cents, ym) {
+  if (!Array.isArray(bt.rents) || !bt.rents.length) bt.rents = [{ from: '0000-00', cents: bt.rent || 0 }];
+  bt.rents = bt.rents.filter(h => h.from < ym).concat([{ from: ym, cents: cents || 0 }]);
+  bt.rent = cents;
 }
 async function giveBackRent(env, s) {
   for (const did of Object.keys(s.payouts || {})) {
@@ -693,7 +708,7 @@ async function statements(env, m, month) {
   for (const b of booths) {
     const d = JSON.parse(await env.TABELLA.get('dealer:' + b.dealer) || 'null');
     byId[b.dealer] = { id: b.dealer, name: d ? d.name : 'Booth ' + b.booth, email: d ? d.email || '' : '', managed: !!(d && d.managed), booth: b.booth, lines: [],
-      sales: 0, commission: 0, cardFees: 0, share: 0, mallOwes: 0, paidByTabella: 0, waiting: 0, rent: b.rent || 0, rentTaken: 0 };
+      sales: 0, commission: 0, cardFees: 0, share: 0, mallOwes: 0, paidByTabella: 0, waiting: 0, rent: rentFor(b, month), rentTaken: 0 };
   }
   for (const s of all.filter(x => x.status === 'paid').sort((a, b) => a.at - b.at)) {
     for (const it of s.items) {
