@@ -11,16 +11,20 @@ import { handleShop } from './shop.js';
 import { handleApp } from './app.js';
 import { handleMall, autoStatements } from './mall.js';
 import { handleOffers } from './offers.js';
-import { handleTrips } from './trips.js';
+import { handleTrips, auth as adminAuth } from './trips.js';
+import { billingDaily, opsList, opsSetOff } from './billing.js';
 import { handlePlaces } from './places.js';
 
 const SHIPPO = 'https://api.goshippo.com';
 const DEFAULT_ORIGINS = 'https://tabellasuite.com,https://www.tabellasuite.com';
 
 export default {
-  // Timer (wrangler.toml [triggers]): fills in the nationwide antique shop list one state at a time.
-  // Daily timer (wrangler.toml [triggers]): malls' automatic monthly dealer statements.
-  async scheduled(event, env, ctx) { ctx.waitUntil(autoStatements(env).then(r => console.log('auto statements', JSON.stringify(r)))); },
+  // Daily timer (wrangler.toml [triggers]): malls' automatic monthly dealer statements, and the billing check
+  // (booth counts, card and payment reminders; it never turns a mall off).
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(autoStatements(env).then(r => console.log('auto statements', JSON.stringify(r))));
+    ctx.waitUntil(billingDaily(env).then(r => console.log('billing', JSON.stringify(r))));
+  },
 
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -37,6 +41,17 @@ export default {
 
     const offers = await handleOffers(request, env, url, json, cors);
     if (offers) return offers;
+
+    // Tabella's own ops page: every mall's plan, and pausing a mall by hand (ADMIN_KEY).
+    if (url.pathname.startsWith('/ops/billing')) {
+      try {
+        await adminAuth(request, env);
+        if (url.pathname === '/ops/billing' && request.method === 'GET') return json({ malls: await opsList(env) }, 200, cors);
+        const om = url.pathname.match(/^\/ops\/billing\/(m[a-z0-9]{10})$/);
+        if (om && request.method === 'POST') return json(await opsSetOff(env, om[1], await request.json().catch(() => ({}))), 200, cors);
+        return json({ error: 'Not found' }, 404, cors);
+      } catch (e) { return json({ error: e.message }, e.status || 500, cors); }
+    }
 
     const mall = await handleMall(request, env, url, json, cors);
     if (mall) return mall;

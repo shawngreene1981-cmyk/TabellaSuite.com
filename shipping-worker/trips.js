@@ -112,7 +112,7 @@ export async function handleTrips(request, env, url, json, cors) {
 
 async function load(env) { try { return JSON.parse((await env.TABELLA.get(KEY)) || '[]'); } catch (e) { return []; } }
 
-async function auth(request, env) {
+export async function auth(request, env) {
   if (!env.ADMIN_KEY) throw err(500, 'The ADMIN_KEY secret is not set in Cloudflare yet.');
   const ip = request.headers.get('CF-Connecting-IP') || 'x', rk = 'rlt:' + ip;
   const fails = Number(await env.TABELLA.get(rk)) || 0;

@@ -21,6 +21,7 @@
 import { session as dealerSession, hashPw, rand, cleanEmail, clean, err, body, newSession, dealerItem, listing, payoutsOk, ITEM_ID, refreshListings } from './app.js';
 import { stripeApi, stripeMode, createRecipient, recipientLink, recipientReady } from './stripe.js';
 import { sendEmail, emailFrame } from './mail.js';
+import { handleBilling, mallPaused, boothFee } from './billing.js';
 
 const SESSION_TTL = 60 * 60 * 24 * 30;
 const CODE_ABC = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -49,6 +50,7 @@ export async function handleMall(request, env, url, json, cors) {
     const m = await mallSession(env, request);
     if (!m) return json({ error: 'Please sign in again.', signin: true }, 401, cors);
 
+    if (p.startsWith('/mall/billing')) { const r = await handleBilling(env, m.mall, p, request.method, () => body(request)); if (r) return json(r, 200, cors); }
     if (p === '/mall/logout' && request.method === 'POST') { await env.TABELLA.delete('sess:' + m.token); return json({ ok: true }, 200, cors); }
     if (p === '/mall/me' && request.method === 'GET') return json({ mall: publicMall(env, m.mall) }, 200, cors);
     if (p === '/mall/me' && request.method === 'PUT') return json({ mall: publicMall(env, await updateMall(env, m.mall, await body(request))) }, 200, cors);
@@ -58,6 +60,7 @@ export async function handleMall(request, env, url, json, cors) {
     if (md && request.method === 'PUT') return json(await setBooth(env, m.mall, md[1], await body(request)), 200, cors);
     if (md && request.method === 'DELETE') return json(await removeDealer(env, m.mall, md[1]), 200, cors);
     if (p === '/mall/item' && request.method === 'GET') return json({ item: await lookup(env, m.mall, url.searchParams.get('code')) }, 200, cors);
+    if (p === '/mall/sale' && request.method === 'POST') { const off = await mallPaused(env, m.mall); if (off) return json({ error: off, paused: true }, 403, cors); }
     if (p === '/mall/sale' && request.method === 'POST') return json({ sale: await startSale(env, m.mall, await body(request)) }, 200, cors);
     const ms = p.match(/^\/mall\/sale\/(S[0-9A-Z]{8,16})(\/[a-z-]+)?$/);
     if (ms && request.method === 'GET' && !ms[2]) return json({ sale: await checkSale(env, m.mall, ms[1]) }, 200, cors);
@@ -134,7 +137,7 @@ function publicMall(env, m) {
   if (!m) return null;
   const r = readerFor(env, m);
   return { id: m.id, name: m.name, email: m.email, city: m.city, state: m.state, commissionPct: m.commissionPct, cardFeePct: m.cardFeePct, taxRate: m.taxRate,
-    tz: m.tz, code: m.code, autoStatements: m.autoStatements || { on: false, day: 1 }, rentFromPayouts: !!m.rentFromPayouts, address: m.address || null, payouts: mallPayoutsOk(env, m), reader: r ? { label: r.label, simulated: !!r.simulated } : null,
+    tz: m.tz, code: m.code, autoStatements: m.autoStatements || { on: false, day: 1 }, rentFromPayouts: !!m.rentFromPayouts, feeInRent: !!m.feeInRent, address: m.address || null, payouts: mallPayoutsOk(env, m), reader: r ? { label: r.label, simulated: !!r.simulated } : null,
     mode: stripeMode(env), live: stripeMode(env) === 'live' && String(env.ALLOW_LIVE_PAYMENTS).toLowerCase() === 'true' };
 }
 async function updateMall(env, m, b) {
@@ -145,6 +148,7 @@ async function updateMall(env, m, b) {
   if (b.cardFeePct !== undefined) m.cardFeePct = pct(b.cardFeePct, 'Card fee', 0, 10);
   if (b.taxRate !== undefined) m.taxRate = b.taxRate === '' || b.taxRate == null ? null : pct(b.taxRate, 'Sales tax rate', 0, 15, 3);
   if (b.rentFromPayouts !== undefined) m.rentFromPayouts = !!b.rentFromPayouts;
+  if (b.feeInRent !== undefined) m.feeInRent = !!b.feeInRent;
   if (b.tz != null) { if (!ZONES.includes(b.tz)) throw err(400, 'Pick a time zone from the list.'); m.tz = b.tz; }
   if (b.address) {
     const a = {};
@@ -454,7 +458,7 @@ async function finish(env, m, s) {
 async function takeRent(env, m, s, did, amt) {
   if (!m.rentFromPayouts) return 0;
   const bt = JSON.parse(await env.TABELLA.get('booth:' + m.id + ':' + did) || 'null');
-  const rent = rentFor(bt, s.day.slice(0, 7));
+  const rent = bt ? rentFor(bt, s.day.slice(0, 7)) + await boothFee(env, m, s.day.slice(0, 7)) : 0;
   if (!(rent > 0)) return 0;
   const key = 'mrent:' + m.id + ':' + s.day.slice(0, 7).replace('-', '') + ':' + did, got = Number(await env.TABELLA.get(key)) || 0;
   const take = Math.max(0, Math.min(amt, rent - got));
@@ -712,10 +716,11 @@ async function statements(env, m, month) {
     cursor = l.list_complete ? null : l.cursor;
   } while (cursor);
   const booths = await boothList(env, m.id), byId = {};
+  const fee = await boothFee(env, m, month, booths.length); // Tabella's booth fee, when the mall adds it to rent
   for (const b of booths) {
     const d = JSON.parse(await env.TABELLA.get('dealer:' + b.dealer) || 'null');
     byId[b.dealer] = { id: b.dealer, name: d ? d.name : 'Booth ' + b.booth, email: d ? d.email || '' : '', managed: !!(d && d.managed), booth: b.booth, lines: [],
-      sales: 0, commission: 0, cardFees: 0, share: 0, mallOwes: 0, paidByTabella: 0, waiting: 0, rent: rentFor(b, month), rentTaken: 0 };
+      sales: 0, commission: 0, cardFees: 0, share: 0, mallOwes: 0, paidByTabella: 0, waiting: 0, rent: rentFor(b, month) + fee, boothFee: fee || undefined, rentTaken: 0 };
   }
   for (const s of all.filter(x => x.status === 'paid').sort((a, b) => a.at - b.at)) {
     for (const it of s.items) {
@@ -743,7 +748,7 @@ async function statements(env, m, month) {
   const tot = list.reduce((t, st) => { for (const k of ['sales', 'commission', 'cardFees', 'share', 'mallOwes', 'paidByTabella', 'waiting', 'rent', 'rentTaken']) t[k] += st[k];
     if (st.net > 0) t.netOwed += st.net; else t.rentDue += -st.net; return t; },
     { sales: 0, commission: 0, cardFees: 0, share: 0, mallOwes: 0, paidByTabella: 0, waiting: 0, rent: 0, rentTaken: 0, netOwed: 0, rentDue: 0 });
-  return { month, mall: m.name, totals: tot, dealers: list };
+  return { month, mall: m.name, totals: tot, dealers: list, boothFee: fee };
 }
 async function markPaid(env, m, b) {
   const month = monthOf(m, b.month), did = String(b.dealer || '');
@@ -771,13 +776,13 @@ async function emailStatement(env, m, r, st) {
     '<p style="margin:14px 0 4px">Sales ' + c(st.sales) + ' &middot; mall commission ' + c(st.commission) + (st.cardFees ? ' &middot; card fees ' + c(st.cardFees) : '') + '</p>' +
     '<p style="margin:0 0 4px"><b>Your share: ' + c(st.share) + '</b></p>' +
     (st.paidByTabella ? '<p style="margin:0 0 4px">Already sent to your bank by Tabella (card sales): ' + c(st.paidByTabella) + '</p>' : '') +
-    (st.rent ? '<p style="margin:0 0 4px">Booth rent: ' + c(st.rent) + (st.rentTaken ? ' (' + c(st.rentTaken) + ' taken from card sales)' : '') + '</p>' : '') +
+    (st.rent ? '<p style="margin:0 0 4px">Booth rent: ' + c(st.rent) + (st.boothFee ? ', including the ' + c(st.boothFee) + ' Tabella booth fee' : '') + (st.rentTaken ? ' (' + c(st.rentTaken) + ' taken from card sales)' : '') + '</p>' : '') +
     (st.net > 0 ? '<p style="margin:0 0 4px"><b>Paid by ' + e(m.name) + ': ' + c(st.net) + '</b>' + (st.paid ? ' (paid ' + e(new Date(st.paid.at).toLocaleDateString('en-US')) + (st.paid.note ? ', ' + e(st.paid.note) : '') + ')' : '') + '</p>' : '') +
     (st.net < 0 ? '<p style="margin:0 0 4px"><b>Rent still due to ' + e(m.name) + ': ' + c(-st.net) + '</b></p>' : '') +
     (st.waiting ? '<p style="margin:0 0 4px">Waiting for you to connect a bank in the Tabella dealer app: ' + c(st.waiting) + '</p>' : '');
   const text = m.name + ', booth ' + st.booth + ', ' + label + '\n' + st.lines.map(l => l.day + '  ' + l.title + '  ' + c(l.price) + '  share ' + c(l.share)).join('\n') +
     '\nSales ' + c(st.sales) + ', commission ' + c(st.commission) + ', card fees ' + c(st.cardFees) + '\nYour share ' + c(st.share) +
-    (st.rent ? '\nBooth rent ' + c(st.rent) + (st.rentTaken ? ' (' + c(st.rentTaken) + ' taken from card sales)' : '') : '') +
+    (st.rent ? '\nBooth rent ' + c(st.rent) + (st.boothFee ? ' incl. ' + c(st.boothFee) + ' Tabella booth fee' : '') + (st.rentTaken ? ' (' + c(st.rentTaken) + ' taken from card sales)' : '') : '') +
     (st.net > 0 ? '\nPaid by ' + m.name + ' ' + c(st.net) : st.net < 0 ? '\nRent still due ' + c(-st.net) : '');
   const r2 = await sendEmail(env, { to: st.email, replyTo: m.email, subject: m.name + ' statement, ' + label + ', booth ' + st.booth, html: emailFrame('Your ' + label + ' statement', inner), text });
   if (r2.skipped) throw err(503, 'Email isn\u2019t switched on yet. Print the statement instead.');

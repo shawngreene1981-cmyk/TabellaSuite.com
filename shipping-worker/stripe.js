@@ -13,6 +13,7 @@
 
 import { shopAfterPayment, shopAfterRefund } from './shop.js';
 import { mallAfterRefund } from './mall.js';
+import { isBillingEvent, billingWebhook } from './billing.js';
 import { sendEmail } from './mail.js';
 
 const API = 'https://api.stripe.com/v1';
@@ -186,6 +187,7 @@ async function webhook(request, env, json) {
   if (!ok) return json({ error: 'Bad signature.' }, 400);
   const evt = JSON.parse(raw);
   const s = evt.data.object;
+  if (isBillingEvent(evt)) return json(await billingWebhook(env, evt), 200);
   if (evt.type === 'checkout.session.expired') { await shopAfterPayment(env, s, false); return json({ ok: true, released: true }, 200); }
   if (evt.type === 'charge.refunded') return json(await refunded(env, s), 200);
   if (evt.type !== 'checkout.session.completed') return json({ ignored: evt.type }, 200);

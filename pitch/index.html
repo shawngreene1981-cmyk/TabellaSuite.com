@@ -142,9 +142,9 @@ async function picker(){$('pick').hidden=false;$('pmsg').textContent='Loading th
 }
 
 // ---------- pricing (same as pricing.html): first 30 booths at the top rate, next 30 at the middle, the rest at the lowest
-var TIERS=[['Basic',[1.30,.80,.50],'$199'],['Plus',[1.80,1.10,.70],'$99'],['Complete',[2.20,1.40,.90],'free']];
+var RATES=[1.80,1.10,.70],YEAR_MONTHS=10; // one transparent price, everything included
 function cost(n,r){return Math.min(n,30)*r[0]+Math.min(Math.max(n-30,0),30)*r[1]+Math.max(n-60,0)*r[2]}
-function $m(v){return '$'+(Math.round(v*100)/100).toFixed(v%1?2:0)}
+function $m(v){v=Math.round(v*100)/100;return '$'+v.toLocaleString('en-US',{minimumFractionDigits:v%1?2:0,maximumFractionDigits:2})}
 
 // ---------- the deck
 async function deck(id){
@@ -174,7 +174,7 @@ async function deck(id){
     '<li>Dealers photograph a piece and it’s in the Tabella shop, with the booth it sits in.</li>'+
     '<li><b>'+esc(name)+' earns 4% of every online sale</b> from its booths, without lifting a finger.</li>'+
     '<li>Shoppers can pick up at your counter, so online orders bring people through your door.</li></ul>'+
-    '<div class="money">If your dealers sell $2,500 a month online, '+esc(name)+' earns <b>$100 a month</b>. That alone covers the Plus plan for about '+(function(){for(var n=200;n>0;n--)if(cost(n,TIERS[1][1])<=100)return n;return 0})()+' booths.</div>'+'</div><figure class="shot"><img src="img/dealer.jpg" alt="The dealer app: add a piece with a photo and price"></figure></div>'+foot+'</section>');
+    '<div class="money">If your dealers sell $2,500 a month online, '+esc(name)+' earns <b>$100 a month</b>. That alone covers Tabella for about '+(function(){for(var n=200;n>0;n--)if(cost(n,RATES)<=100)return n;return 0})()+' booths.</div>'+'</div><figure class="shot"><img src="img/dealer.jpg" alt="The dealer app: add a piece with a photo and price"></figure></div>'+foot+'</section>');
   var dealer=String(qs.get('dealer')||'').trim().slice(0,60);
   S.push('<section class="slide wide"><div class="cap">Booth finder</div><h2>New dealers arrive with their shop already online.</h2><div class="shotgrid"><div><ul>'+
     '<li>Anyone can open a Tabella shop online, free, and start selling before they have a booth.</li>'+
@@ -194,11 +194,12 @@ async function deck(id){
     '<li>Statements email themselves on the day you pick. Mark a booth paid when you write the check.</li>'+
     '<li>A spreadsheet of the month for your books.</li></ul>'+'</div><figure class="shot"><img src="img/statements.jpg" alt="Month end: every booth’s statement, rent and what you owe"></figure></div>'+foot+'</section>');
   S.push('<section class="slide"><div class="cap">What it costs</div><h2>For '+booths+' booths at '+esc(short)+'.</h2>'+
-    '<table class="price"><thead><tr><th></th>'+TIERS.map(function(t){return '<th>'+t[0]+'</th>'}).join('')+'</tr></thead><tbody>'+
-    '<tr><td>Per month</td>'+TIERS.map(function(t){return '<td class="n">'+$m(cost(booths,t[1]))+'</td>'}).join('')+'</tr>'+
-    '<tr><td>Per booth, on average</td>'+TIERS.map(function(t){return '<td>'+$m(cost(booths,t[1])/booths)+'</td>'}).join('')+'</tr>'+
-    '<tr><td>Concierge setup</td>'+TIERS.map(function(t){return '<td>'+t[2]+'</td>'}).join('')+'</tr></tbody></table>'+
-    '<p class="note"><b>The first 6 months are free on any plan.</b> Plus adds rent taken from payouts, dealer statements and 1099s; Complete adds a punch card and sync with the register you already use. Free for dealers to join; 9% commission on their online sales only.</p>'+foot+'</section>');
+    '<table class="price"><tbody>'+
+    '<tr><td>Per month</td><td class="n">'+$m(cost(booths,RATES))+'</td></tr>'+
+    '<tr><td>Per year (2 months free)</td><td class="n">'+$m(cost(booths,RATES)*YEAR_MONTHS)+'</td></tr>'+
+    '<tr><td>Per booth, on average</td><td>'+$m(cost(booths,RATES)/booths)+'</td></tr>'+
+    '<tr><td>Setup help</td><td>Free</td></tr></tbody></table>'+
+    '<p class="note"><b>Transparent pricing: one price per booth, every feature included.</b> $1.80 a booth for the first 30, $1.10 for the next 30, $0.70 after that. Months 1 to 3 free with no card, months 4 to 6 free with a card on file, and a decision date before the first charge: cancel by then and pay nothing. Tabella can add the fee to each booth\u2019s rent so dealers cover it. Free for dealers to join; 9% commission on their online sales only.</p>'+foot+'</section>');
   S.push('<section class="slide"><div class="cap">Start small</div><h2>Keep what works. Add what doesn’t.</h2><ul>'+
     '<li>Keep the register you have, if you like. Tabella works alongside it.</li>'+
     '<li>Start with a few dealers who already sell online, then add booths as they ask.</li>'+

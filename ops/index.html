@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Mall plans | Tabella ops</title>
+<meta name="robots" content="noindex">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600&family=Cormorant+Garamond:wght@600&family=Inter:wght@400;500;600&display=swap">
+<style>
+:root{--bg:#F4EFE6;--ink:#231F1A;--muted:#6A6259;--line:#D5CCBA;--terra:#9A4A2E;--terra-ink:#FFF8F0;--gold:#A8842F;--card:#FBF8F2;--focus:#2F6FA8;--green:#3F6B45;--red:#9B2C2C}
+@media (prefers-color-scheme:dark){:root{--bg:#1A1714;--ink:#EFE8DB;--muted:#A89F90;--line:#3A342D;--terra:#D98A66;--terra-ink:#1A1714;--gold:#D2B15E;--card:#25211C;--focus:#7FB8E6;--green:#8FC096;--red:#E58A8A}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 Inter,system-ui,sans-serif;padding:0 max(20px,env(safe-area-inset-left,0px))}
+.w{max-width:1180px;margin:0 auto;padding:24px 0 60px}
+h1{font-family:'Cormorant Garamond',Georgia,serif;font-weight:600;font-size:2.6rem;margin:6px 0 4px}
+.cap{font-family:Cinzel,serif;letter-spacing:.18em;text-transform:uppercase;font-size:.78rem;color:var(--gold);font-weight:600}
+.meta{color:var(--muted);font-size:.9rem}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px}
+input{font:inherit;width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)}
+.btn{font:inherit;font-weight:600;border:0;border-radius:8px;padding:9px 14px;background:var(--terra);color:var(--terra-ink);cursor:pointer}
+.btn.sec{background:transparent;color:var(--ink);border:1px solid var(--line)}
+table{width:100%;border-collapse:collapse;font-size:.92rem}th,td{text-align:left;padding:9px 8px;border-bottom:1px solid var(--line);vertical-align:top}th{font-size:.78rem;color:var(--muted);font-weight:600}
+.pill{display:inline-block;font-size:.78rem;font-weight:600;padding:2px 8px;border-radius:99px;border:1px solid var(--line)}
+.pill.ok{color:var(--green);border-color:var(--green)}.pill.bad{color:var(--red);border-color:var(--red)}.pill.warn{color:var(--gold);border-color:var(--gold)}
+.err{color:var(--red);margin-top:8px}.tw{overflow-x:auto}
+[hidden]{display:none!important}
+button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+</style>
+</head>
+<body><div class="w">
+<div class="cap">Tabella ops</div>
+<h1>Mall plans</h1>
+<p class="meta" style="margin:0 0 18px">Every mall's plan and warnings. Nothing turns off by itself: pause a mall here only after warnings and a call. A paused mall can still see its reports and statements; its register stops.</p>
+
+<form id="keyForm" class="panel" hidden novalidate style="max-width:460px">
+ <label for="kIn">Your Tabella admin key</label><input id="kIn" type="password" autocomplete="current-password">
+ <button class="btn" type="submit" style="margin-top:12px">Continue</button><div id="keyMsg" class="err" aria-live="polite"></div>
+</form>
+
+<div id="list" hidden>
+ <div style="display:flex;gap:8px;margin:0 0 12px"><button class="btn sec" type="button" id="reload">Refresh</button><button class="btn sec" type="button" id="forget">Forget key on this device</button></div>
+ <div class="panel tw"><table><thead><tr><th>Mall</th><th>Status</th><th>Booths</th><th>Price</th><th>Card by</th><th>First charge</th><th>Warnings sent</th><th></th></tr></thead><tbody id="rows"></tbody></table></div>
+ <div id="listMsg" class="err" aria-live="polite"></div>
+</div>
+</div>
+<script>
+var API='https://tabella-shipping.shawn-greene1981.workers.dev',$=function(i){return document.getElementById(i)};
+var key='';try{key=localStorage.getItem('tabAdmin')||''}catch(e){}
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
+function fc(c){return '$'+(Number(c||0)/100).toFixed(2)}
+function dd(t){return t?new Date(t).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric',timeZone:'UTC'}):''}
+async function call(path,body){var r=await fetch(API+path,{method:body?'POST':'GET',headers:Object.assign({'Content-Type':'application/json'},key?{Authorization:'Bearer '+key}:{}),body:body?JSON.stringify(body):undefined});
+  var d=await r.json().catch(function(){return{}});if(!r.ok){var e=new Error(d.error||('Error '+r.status));e.status=r.status;throw e}return d}
+var LABEL={free:['Free, no card yet','ok'],card_due:['Card due','warn'],trialing:['Card on file, free','ok'],active:['Paying','ok'],past_due:['Payment failed','bad'],unpaid:['Unpaid','bad'],canceled:['Canceled','warn'],incomplete:['Card not finished','warn'],off:['Paused by Tabella','bad']};
+var WARN={card14:'Card reminder',card0:'Card due',card14late:'Card 2 weeks late',decide:'Decision day',late7:'Payment 1 week late',late14:'Payment 2 weeks late'};
+async function load(){$('listMsg').textContent='';
+  try{var d=await call('/ops/billing');$('keyForm').hidden=true;$('list').hidden=false;
+    $('rows').innerHTML=d.malls.length?d.malls.map(function(m){var l=LABEL[m.status]||[m.status,'warn'];
+      return '<tr><td><b>'+esc(m.name)+'</b><br><span class="meta">'+esc(m.city)+', '+esc(m.state)+' &middot; <a href="mailto:'+esc(m.email)+'">'+esc(m.email)+'</a><br>Joined '+dd(m.created)+'</span></td>'+
+        '<td><span class="pill '+l[1]+'">'+esc(l[0])+'</span>'+(m.failedAt?'<br><span class="meta">Failed '+dd(m.failedAt)+'</span>':'')+'</td><td>'+m.booths+'</td>'+
+        '<td>'+fc(m.monthly)+'/mo'+(m.plan==='year'?'<br><span class="meta">yearly plan</span>':'')+'</td><td>'+dd(m.cardBy)+'</td><td>'+dd(m.firstCharge)+'</td>'+
+        '<td class="meta">'+esc(m.warnings.map(function(w){return WARN[w]||w}).join(', '))+'</td>'+
+        '<td><button class="btn '+(m.off?'':'sec')+'" type="button" data-id="'+m.id+'" data-off="'+(m.off?'0':'1')+'" data-name="'+esc(m.name)+'">'+(m.off?'Turn back on':'Pause')+'</button></td></tr>'}).join(''):'<tr><td colspan="8" class="meta">No malls yet.</td></tr>';
+  }catch(e){if(e.status===401){key='';$('list').hidden=true;$('keyForm').hidden=false;$('keyMsg').textContent=e.message}else $('listMsg').textContent=e.message}}
+$('rows').onclick=async function(e){var b=e.target.closest('button[data-id]');if(!b)return;var off=b.dataset.off==='1';
+  if(off&&!confirm('Pause '+b.dataset.name+'? Its register stops taking sales until you turn it back on. Reports and statements stay open.'))return;
+  b.disabled=true;try{await call('/ops/billing/'+b.dataset.id,{off:off});await load()}catch(err){$('listMsg').textContent=err.message;b.disabled=false}};
+$('keyForm').onsubmit=function(e){e.preventDefault();key=$('kIn').value.trim();if(!key)return;$('keyMsg').textContent='';
+  call('/ops/billing').then(function(){try{localStorage.setItem('tabAdmin',key)}catch(e){}load()}).catch(function(err){key='';$('keyMsg').textContent=err.message})};
+$('reload').onclick=load;$('forget').onclick=function(){try{localStorage.removeItem('tabAdmin')}catch(e){}key='';$('list').hidden=true;$('keyForm').hidden=false};
+if(key)load();else $('keyForm').hidden=false;
+</script>
+</body>
+</html>

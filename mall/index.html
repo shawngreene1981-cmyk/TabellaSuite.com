@@ -113,6 +113,7 @@ dialog{max-height:calc(100dvh - 24px);max-height:calc(100vh - 24px)}
 .bybooth{margin-top:8px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:8px 12px}.bybooth summary{cursor:pointer;font-weight:600}
 .bbrow{display:grid;grid-template-columns:1.3fr 1fr 1.6fr auto;gap:8px;align-items:end;margin-top:6px}.bbrow label{margin-top:0}@media(max-width:600px){.bbrow{grid-template-columns:1fr 1fr}.bbdesc{grid-column:1/-1}}
 .msg.warn{background:#FBF0D9;color:#6B4A10}
+.plansteps{margin:12px 0 0;padding-left:20px}.plansteps li{margin:0 0 6px}.plansteps li.done{opacity:.55}#planPanel[hidden]{display:none!important}
 .reg{display:grid;grid-template-columns:1fr 320px;gap:18px;align-items:start;margin-top:12px}
 @media(max-width:820px){.reg{grid-template-columns:1fr}}
 .scanrow{display:flex;gap:8px}.scanrow input{font-size:1.15rem;padding:12px}
@@ -174,6 +175,7 @@ dialog{max-height:calc(100dvh - 24px);max-height:calc(100vh - 24px)}
 
  <!-- Register -->
  <div id="v-reg" class="view">
+  <div id="planNote"></div>
   <div id="setupNote"></div>
   <div class="reg">
    <div>
@@ -253,6 +255,26 @@ dialog{max-height:calc(100dvh - 24px);max-height:calc(100vh - 24px)}
 
  <!-- Settings -->
  <div id="v-set" class="view" hidden>
+  <div class="panel" id="planPanel" style="max-width:640px;margin-bottom:14px">
+   <h2 style="font-size:1.5rem;margin:0 0 6px">Tabella plan</h2>
+   <p class="meta" style="margin:0 0 10px">Transparent pricing: one price per booth, the same for every mall, with everything included.</p>
+   <div id="planNow" aria-live="polite"></div>
+   <ol class="plansteps" id="planSteps"></ol>
+   <fieldset style="border:0;padding:0;margin:10px 0 0"><legend class="meta" style="padding:0">Pay</legend>
+    <label class="check"><input type="radio" name="plan" value="month" id="plMonth"> <span id="plMonthTxt">Monthly</span></label>
+    <label class="check"><input type="radio" name="plan" value="year" id="plYear"> <span id="plYearTxt">Yearly (2 months free)</span></label>
+   </fieldset>
+   <div class="planbtns" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:12px">
+    <button class="btn" type="button" id="plCard">Add a card</button>
+    <a class="btn sec" id="plCal" target="_blank" rel="noopener">Add decision date to Google Calendar</a>
+    <button class="btn sec" type="button" id="plIcs">Download for other calendars</button>
+    <button class="btn sec" type="button" id="plCancel">Cancel plan</button>
+   </div>
+   <label class="check" style="margin-top:14px"><input type="checkbox" id="plRent"> Add the Tabella booth fee to each booth's rent</label>
+   <p class="meta" id="plRentTxt" style="margin:2px 0 0"></p>
+   <p class="meta" style="margin:10px 0 0" id="plRates"></p>
+   <div id="plMsg" aria-live="polite"></div>
+  </div>
   <form id="setForm" class="panel" novalidate style="max-width:640px">
    <h2 style="font-size:1.5rem;margin:0 0 6px">Mall</h2>
    <label for="sName">Mall name</label><input id="sName">
@@ -351,7 +373,8 @@ document.querySelectorAll('#viewTabs button').forEach(function(b){b.onclick=func
 function go(v){view=v;document.querySelectorAll('#viewTabs button').forEach(function(b){b.setAttribute('aria-selected',b.dataset.v===v)});
   var pane=v==='month'?'day':v;document.querySelectorAll('.view').forEach(function(x){x.hidden=x.id!=='v-'+pane});
   if(v==='reg'){drawSetupNote();loadBooths();setTimeout(function(){$('scanIn').focus()},50)}if(v==='day'||v==='month'){dayMode=v;loadDay()}if(v==='dealers')loadDealers();if(v==='pick')loadPickups();if(v==='stmt')loadStmts();if(v==='set')drawSettings()}
-function enter(){show('app');$('mallName').textContent=me.name;drawCart();go(view);loadPickups();
+function enter(){show('app');$('mallName').textContent=me.name;drawCart();go(view);loadPickups();loadBill();
+  if(/billing=(done|back)/.test(location.search)){var done=/billing=done/.test(location.search);history.replaceState(null,'',location.pathname);go('set');if(done)setTimeout(function(){loadBill();msg('plMsg','Card saved. Nothing is charged until your first charge date.')},1500)}
   if(/payouts=back/.test(location.search)){history.replaceState(null,'',location.pathname);checkPayouts()}}
 function drawSetupNote(){var need=[];if(me.taxRate==null)need.push('your sales tax rate');if(!me.reader)need.push('a card reader');
   $('setupNote').innerHTML=need.length?'<div class="msg warn">To finish setting up, add '+esc(need.join(' and '))+' in <button type="button" class="linkbtn" id="toSet">Settings</button>. Cash sales work now.</div>':'';
@@ -515,7 +538,7 @@ async function loadStmts(){if(!$('monPick').value)$('monPick').value=thisMonth()
     $('stStats').innerHTML=[['Sales',fc(t.sales)],['Your commission',fc(t.commission)],['Card fees',fc(t.cardFees)],['Dealers\u2019 share',fc(t.share)],['Sent by Tabella',fc(t.paidByTabella)],['Booth rent',fc(t.rent)],['You owe dealers',fc(t.netOwed)],['Rent due to you',fc(t.rentDue)]].map(function(x){return '<div><span class="meta">'+esc(x[0])+'</span><b>'+esc(x[1])+'</b></div>'}).join('');
     $('stList').innerHTML=stm.dealers.length?stm.dealers.map(function(d){var paid=d.paid;
       return '<li data-id="'+d.id+'"><div class="sth"><b>Booth '+esc(d.booth)+' &middot; '+esc(d.name)+'</b><span class="meta">'+d.lines.length+' sale'+(d.lines.length===1?'':'s')+' &middot; sales '+fc(d.sales)+' &middot; share '+fc(d.share)+'</span>'+
-        '<span>'+(d.rent?'<span class="meta">Rent '+fc(d.rent)+(d.rentTaken?' ('+fc(d.rentTaken)+' from card sales)':'')+'</span> ':'')+(d.net>0?'You owe <b>'+fc(d.net)+'</b> ':d.net<0?'Rent due to you <b>'+fc(-d.net)+'</b> ':'')+(paid?'<span class="pill ok">Paid '+esc(new Date(paid.at).toLocaleDateString())+(paid.note?' &middot; '+esc(paid.note):'')+'</span>':d.net>0?'<span class="pill warn">Not paid yet</span>':'')+(d.sent?' <span class="pill">Emailed '+esc(new Date(d.sent).toLocaleDateString())+'</span>':'')+(d.paidByTabella?' <span class="meta">'+fc(d.paidByTabella)+' sent to their bank by Tabella</span>':'')+(d.waiting?' <span class="meta">'+fc(d.waiting)+' waiting for their bank</span>':'')+'</span></div>'+
+        '<span>'+(d.rent?'<span class="meta">Rent '+fc(d.rent)+(d.boothFee?' incl. '+fc(d.boothFee)+' Tabella fee':'')+(d.rentTaken?' ('+fc(d.rentTaken)+' from card sales)':'')+'</span> ':'')+(d.net>0?'You owe <b>'+fc(d.net)+'</b> ':d.net<0?'Rent due to you <b>'+fc(-d.net)+'</b> ':'')+(paid?'<span class="pill ok">Paid '+esc(new Date(paid.at).toLocaleDateString())+(paid.note?' &middot; '+esc(paid.note):'')+'</span>':d.net>0?'<span class="pill warn">Not paid yet</span>':'')+(d.sent?' <span class="pill">Emailed '+esc(new Date(d.sent).toLocaleDateString())+'</span>':'')+(d.paidByTabella?' <span class="meta">'+fc(d.paidByTabella)+' sent to their bank by Tabella</span>':'')+(d.waiting?' <span class="meta">'+fc(d.waiting)+' waiting for their bank</span>':'')+'</span></div>'+
         '<div class="stb"><button type="button" class="btn sec" data-a="view">View and print</button><button type="button" class="btn sec" data-a="mail"'+(d.email?'':' title="Add an email on the Dealers tab"')+'>Email</button>'+(paid?'<button type="button" class="rm" data-a="undo">Undo paid</button>':d.net>0?'<button type="button" class="btn" data-a="paid">Mark paid</button>':'')+'</div></li>'}).join(''):'<li class="empty">No booths yet.</li>';
     $('stList').querySelectorAll('[data-a]').forEach(function(b){b.onclick=function(){stAction(b.closest('li').dataset.id,b.dataset.a,b)}});
   }catch(err){msg('stMsg',err.message,1)}}
@@ -534,7 +557,7 @@ function printStatement(d){var who={mall:'You',tabella:'Tabella',waiting:'Waitin
     (rows?'<table><thead><tr><th>Date</th><th>Item</th><th>Paid by</th><th class="r">Sold for</th><th class="r">Commission</th><th class="r">Card fee</th><th class="r">Your share</th></tr></thead><tbody>'+rows+'</tbody></table>':'<p>No sales this month.</p>')+
     '<table class="sum"><tr><td>Sales</td><td class="r">'+fc(d.sales)+'</td></tr><tr><td>Mall commission</td><td class="r">&minus;'+fc(d.commission)+'</td></tr><tr><td>Card fees</td><td class="r">&minus;'+fc(d.cardFees)+'</td></tr><tr class="big"><td>Your share</td><td class="r">'+fc(d.share)+'</td></tr>'+
     (d.paidByTabella?'<tr><td>Sent to your bank by Tabella</td><td class="r">'+fc(d.paidByTabella)+'</td></tr>':'')+(d.waiting?'<tr><td>Waiting for your bank (Tabella app)</td><td class="r">'+fc(d.waiting)+'</td></tr>':'')+
-    (d.rent?'<tr><td>Booth rent'+(d.rentTaken?' ('+fc(d.rentTaken)+' taken from card sales)':'')+'</td><td class="r">'+fc(d.rent)+'</td></tr>':'')+
+    (d.rent?'<tr><td>Booth rent'+(d.boothFee?', including the '+fc(d.boothFee)+' Tabella booth fee':'')+(d.rentTaken?' ('+fc(d.rentTaken)+' taken from card sales)':'')+'</td><td class="r">'+fc(d.rent)+'</td></tr>':'')+
     (d.net>=0?'<tr class="big"><td>Paid by '+esc(me.name)+'</td><td class="r">'+fc(d.net)+'</td></tr>':'<tr class="big"><td>Rent still due to '+esc(me.name)+'</td><td class="r">'+fc(-d.net)+'</td></tr>')+(d.paid?'<tr><td colspan="2" class="m">Paid '+esc(new Date(d.paid.at).toLocaleDateString())+(d.paid.note?' &middot; '+esc(d.paid.note):'')+'</td></tr>':'')+'</table></body></html>';
   var f=document.createElement('iframe');f.style.cssText='position:fixed;width:0;height:0;border:0;right:0;bottom:0';document.body.appendChild(f);var dd=f.contentDocument;dd.open();dd.write(html);dd.close();
   setTimeout(function(){f.contentWindow.focus();f.contentWindow.print();setTimeout(function(){f.remove()},1000)},150)}
@@ -556,7 +579,41 @@ async function loadDealers(){$('joinCode').textContent=me.code;
   }catch(err){msg('dMsg',err.message,1)}}
 
 // ----- settings
-function drawSettings(){var a=me.address||{};$('sName').value=me.name;$('sCity').value=me.city||'';$('sState').value=me.state||'';$('sTz').value=me.tz||'America/Chicago';
+
+// ----- Tabella plan (what the mall pays Tabella)
+var bill=null;
+function dd(t){return new Date(t).toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric',timeZone:'UTC'})}
+async function loadBill(){try{bill=await api('/mall/billing')}catch(e){bill=null}drawPlanNote();if(view==='set')drawBill()}
+function drawPlanNote(){var b=bill,t='',cls='warn';if(!b){$('planNote').innerHTML='';return}
+  if(b.status==='off'){t=b.offNote||'Your Tabella account is paused.';cls='err'}
+  else if(b.status==='past_due'||b.status==='unpaid')t='Your last Tabella payment didn’t go through. Everything keeps working; please update your card in Settings.';
+  else if(b.status==='card_due')t='Please add a card for your Tabella plan in Settings. Nothing is charged until '+dd(b.firstCharge)+'.';
+  $('planNote').innerHTML=t?'<div class="msg '+cls+'">'+esc(t)+' <button type="button" class="linkbtn" id="toPlan">Open</button></div>':'';var o=$('toPlan');if(o)o.onclick=function(){go('set')}}
+function drawBill(){var b=bill;if(!b){$('planPanel').hidden=true;return}$('planPanel').hidden=false;
+  var n=b.booths,cost=b.plan==='year'?fc(b.yearly)+' a year':fc(b.monthly)+' a month',now={
+    free:'Free now. No card needed until '+dd(b.cardBy)+'.',card_due:'Free now. Please add a card: nothing is charged until '+dd(b.firstCharge)+'.',
+    trialing:'Card on file. Free until '+dd(b.firstCharge)+'.',active:'Active. '+cost+'.',past_due:'Your last payment didn’t go through. Everything keeps working while you update your card.',
+    unpaid:'Your last payment didn’t go through. Everything keeps working while you update your card.',canceled:'Canceled. Write to contact@tabellasuite.com to start again.',off:b.offNote||'Paused.'}[b.status]||'';
+  if(b.cancelAt&&b.status!=='canceled')now='Canceled: it ends '+dd(b.cancelAt*1000)+'. Changed your mind? Tap Undo cancel.';
+  $('planNow').innerHTML='<p style="margin:0 0 4px"><b>'+esc(now)+'</b></p><p class="meta" style="margin:0">'+(n?n+' booth'+(n===1?'':'s')+' today: '+fc(b.monthly)+' a month, or '+fc(b.yearly)+' a year. That’s about '+fc(b.perBooth)+' a booth a month.':'No booths yet. Add them on the Dealers tab to see your price.')+'</p>';
+  var past=Date.now();$('planSteps').innerHTML=[['Months 1 to 3','Free, no card',b.cardBy],['Months 4 to 6','Still free. Add a card by '+dd(b.cardBy),b.firstCharge],['Decision date, '+dd(b.decision),'We email you. Keep going, switch plans, or cancel and pay nothing',b.decision],['First charge, '+dd(b.firstCharge),'Then '+(b.plan==='year'?'yearly':'monthly')+' at your booth count',b.firstCharge+864e5]].map(function(x){return '<li'+(x[2]<past?' class="done"':'')+'><b>'+esc(x[0])+'</b> <span class="meta">'+esc(x[1])+'</span></li>'}).join('');
+  $('plMonth').checked=b.plan!=='year';$('plYear').checked=b.plan==='year';
+  $('plMonthTxt').textContent='Monthly, '+fc(b.monthly)+' a month';$('plYearTxt').textContent='Yearly, '+fc(b.yearly)+' a year ('+(12-b.yearMonths)+' months free)';
+  var card=b.hasCard;$('plCard').textContent=card?'Update card':'Add a card';$('plCard').hidden=b.status==='canceled'||b.status==='off';
+  $('plCancel').hidden=!card;$('plCancel').textContent=b.cancelAt?'Undo cancel':'Cancel plan';
+  $('plCal').href='https://calendar.google.com/calendar/render?action=TEMPLATE&text='+encodeURIComponent('Tabella decision day for '+me.name)+'&dates='+ymd(b.decision)+'/'+ymd(b.decision+864e5)+'&details='+encodeURIComponent('First Tabella charge is '+dd(b.firstCharge)+'. Keep going, switch plans or cancel at tabellasuite.com/mall/ (Settings > Tabella plan).');
+  $('plRent').checked=!!me.feeInRent;
+  $('plRentTxt').textContent='Splits your Tabella bill evenly across your booths and adds it to each booth’s rent on statements (about '+fc(b.feeNow||b.perBooth)+' a booth a month), so your dealers cover it. It starts '+new Date(b.firstCharge).toLocaleDateString('en-US',{month:'long',year:'numeric',timeZone:'UTC'})+'; free months add nothing.';
+  $('plRates').textContent='The price: '+b.rates.map(function(r,i){var from=i?b.rates[i-1][0]+1:1;return fc(r[1])+' a booth for booths '+from+(r[0]?' to '+r[0]:' and up')}).join(', ')+'. Booths are counted every day, so adding or removing one changes the next bill.'}
+function ymd(t){return new Date(t).toISOString().slice(0,10).replace(/-/g,'')}
+$('plIcs').onclick=function(){if(!bill)return;var ics=['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Tabella//Plan//EN','BEGIN:VEVENT','UID:tabella-decision-'+me.id+'@tabellasuite.com','DTSTAMP:'+new Date().toISOString().replace(/[-:]/g,'').slice(0,15)+'Z','DTSTART;VALUE=DATE:'+ymd(bill.decision),'DTEND;VALUE=DATE:'+ymd(bill.decision+864e5),'SUMMARY:Tabella decision day for '+me.name.replace(/[,;\\]/g,' '),'DESCRIPTION:First Tabella charge is '+dd(bill.firstCharge).replace(/,/g,'\\,')+'. Keep going\\, switch plans or cancel at tabellasuite.com/mall/','END:VEVENT','END:VCALENDAR'].join('\r\n');
+  var a=document.createElement('a');a.href=URL.createObjectURL(new Blob([ics],{type:'text/calendar'}));a.download='tabella-decision-day.ics';document.body.appendChild(a);a.click();a.remove()};
+document.querySelectorAll('input[name=plan]').forEach(function(r){r.onchange=async function(){msg('plMsg','');try{bill=await api('/mall/billing',{method:'PUT',json:{plan:this.value}});drawBill();msg('plMsg',bill.hasCard?'Plan switched.':'Saved. You’ll add a card for this plan.')}catch(err){msg('plMsg',err.message,1)}}});
+$('plCard').onclick=async function(){var b=this;b.disabled=true;msg('plMsg','');try{location.href=(await api(bill.hasCard?'/mall/billing/update-card':'/mall/billing/card',{json:{plan:$('plYear').checked?'year':'month'}})).url}catch(err){msg('plMsg',err.message,1);b.disabled=false}};
+$('plCancel').onclick=async function(){var undo=!!bill.cancelAt;if(!undo&&!confirm(bill.status==='trialing'?'Cancel your Tabella plan? You won’t be charged anything.':'Cancel your Tabella plan? It stays on until the end of what you’ve paid for.'))return;
+  try{bill=await api(undo?'/mall/billing/resume':'/mall/billing/cancel',{json:{}});drawBill();drawPlanNote();msg('plMsg',undo?'You’re back on.':'Canceled. We’d love to hear what we could do better: reply to any Tabella email.')}catch(err){msg('plMsg',err.message,1)}};
+$('plRent').onchange=async function(){try{me=(await api('/mall/me',{method:'PUT',json:{feeInRent:this.checked}})).mall;msg('plMsg',this.checked?'The booth fee will be added to rent on statements.':'The booth fee won’t be added to rent.');await loadBill()}catch(err){msg('plMsg',err.message,1)}};
+function drawSettings(){drawBill();loadBill();var a=me.address||{};$('sName').value=me.name;$('sCity').value=me.city||'';$('sState').value=me.state||'';$('sTz').value=me.tz||'America/Chicago';
   $('sComm').value=me.commissionPct;$('sRent').checked=!!me.rentFromPayouts;$('sCard').value=me.cardFeePct;$('sTax').value=me.taxRate==null?'':me.taxRate;
   $('aSt').value=a.street1||'';$('aCity2').value=a.city||'';$('aSt2').value=a.state||'';$('aZip').value=a.zip||'';
   var test=me.mode==='test';$('rdTest').hidden=!test;$('rdForm').hidden=test;
