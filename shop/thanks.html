@@ -86,9 +86,12 @@ function load(){fetch(API+'/shop/order?ref='+ref).then(function(r){return r.json
   if(d.status!=='paid'&&tries++<6){o.textContent='Confirming your payment...';setTimeout(load,2500);return}
   if(d.status==='paid'){try{localStorage.removeItem('tabCart')}catch(e){}}
   document.getElementById('h').textContent=d.status==='paid'?'Thank you, your order is in':'Your order';
-  o.innerHTML='<p>Order <b>'+esc(d.ref)+'</b>. '+(d.status==='paid'?'Payment received. We will email tracking when it ships.':'We are still confirming your payment. Check your email for the receipt.')+'</p>'+
+  o.innerHTML='<p>Order <b>'+esc(d.ref)+'</b>. '+(d.status==='paid'?(d.pickup?'Payment received. It\u2019s waiting for you at '+esc(d.pickup.name)+'.':'Payment received. We will email tracking when it ships.'):'We are still confirming your payment. Check your email for the receipt.')+'</p>'+
+   (d.pickup&&d.pickup.code?'<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin:0 0 14px"><div class="meta">Your pickup code</div><div style="font:700 2rem Georgia,serif;letter-spacing:.14em">'+esc(d.pickup.code)+'</div>'+
+     '<div>'+esc(d.pickup.name)+'<br>'+esc(d.pickup.address.street1)+(d.pickup.address.street2?', '+esc(d.pickup.address.street2):'')+'<br>'+esc(d.pickup.address.city)+', '+esc(d.pickup.address.state)+' '+esc(d.pickup.address.zip)+'</div>'+
+     '<div class="meta" style="margin-top:6px">Show the code at the counter during open hours, within 14 days. It\u2019s in your email too.</div></div>':'')+
    d.items.map(function(i){return row(esc(i.title),fm(i.price))}).join('')+
-   (d.shipping?row('Shipping, '+esc(d.shipping.carrier)+' '+esc(d.shipping.service||''),fm(d.shipping.amount)):'')+
+   (d.pickup?row('Pickup at '+esc(d.pickup.name),'Free'):'')+(d.shipping?row('Shipping, '+esc(d.shipping.carrier)+' '+esc(d.shipping.service||''),fm(d.shipping.amount)):'')+
    (d.tax?row('Sales tax',fm(d.tax)):'')+(d.cardProcessing?row('Card processing',fm(d.cardProcessing)):'')+(d.total?row('Total charged',fm(d.total),1):'')+(d.refunded?'<p class="meta" style="margin-top:12px">This order was refunded.</p>':'')}).catch(function(){o.textContent='Could not load your order. Refresh to try again.'})}
 load();
 })();

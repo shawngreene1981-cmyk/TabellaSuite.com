@@ -10,8 +10,9 @@
 
 import { mallAccountFor } from './mall.js';
 import { offerForCheckout, offerOrderStarted, offerCheckoutEnded } from './offers.js';
+import { pickupPaid } from './mall.js';
 import { buildOrder, createCheckoutSession, stripeMode, stripeApi } from './stripe.js';
-import { dealerListings, dealerItem, markDealerItemSold, markDealerItemAvailable, payoutsOk, shantiquesMoved, ITEM_ID } from './app.js';
+import { dealerListings, dealerItem, markDealerItemSold, markDealerItemAvailable, payoutsOk, shantiquesMoved, ITEM_ID, ways } from './app.js';
 import { sendEmail, buyerReceipt, dealerAlert, opsEmail } from './mail.js';
 
 const HOLD_SECONDS = 35 * 60; // Stripe checkout pages last 30 minutes minimum; hold a little longer.
@@ -42,11 +43,13 @@ export async function handleShop(request, env, url, json, cors, shippoFetch) {
     if (p === '/shop/quote' && request.method === 'POST') {
       const b = await body(request);
       const cat = await catalog(env);
-      const pick = await pickItems(env, cat, b.items, null);
+      const pick = await pickItems(env, cat, b.items, b.method === 'pickup' ? 'pickup' : 'ship');
       if (pick.error) return json({ error: pick.error }, 400, cors);
       // Buying at an accepted offer's price (offers.js): the signed-in shopper who made it, that one piece only.
       let offer = null;
       try { offer = await withOffer(env, request, b, pick); } catch (e) { return json({ error: e.message }, e.status || 400, cors); }
+      // Pickup at the mall: no shipping to quote.
+      if (b.method === 'pickup') return json({ rates: [], pickup: publicPickup(pick.pickup), items: pick.items.map(publicItem), subtotal: pick.items.reduce((t, i) => t + i.price, 0), taxAtCheckout: taxOn(env) }, 200, cors);
       const to = checkAddress(b.to);
       if (to.error) return json({ error: to.error }, 400, cors);
       const from = pick.items[0].shipFrom || shipFrom(env);
@@ -65,23 +68,32 @@ export async function handleShop(request, env, url, json, cors, shippoFetch) {
       if (stripeMode(env) === 'live' && String(env.ALLOW_LIVE_PAYMENTS).toLowerCase() !== 'true') return json({ error: 'The shop is not open for real payments yet.' }, 403, cors);
       const b = await body(request);
       const cat = await catalog(env);
-      const pick = await pickItems(env, cat, b.items, null);
+      const pickupMode = b.method === 'pickup';
+      const pick = await pickItems(env, cat, b.items, pickupMode ? 'pickup' : 'ship');
       if (pick.error) return json({ error: pick.error }, 400, cors);
       // Buying at an accepted offer's price (offers.js): the signed-in shopper who made it, that one piece only.
       let offer = null;
       try { offer = await withOffer(env, request, b, pick); } catch (e) { return json({ error: e.message }, e.status || 400, cors); }
-      const to = checkAddress(b.to);
-      if (to.error) return json({ error: to.error }, 400, cors);
-      if (!/^[a-f0-9]{32}$/.test(String(b.rateId || ''))) return json({ error: 'Pick a shipping option first.' }, 400, cors);
-      // Shipping price comes from Shippo, not the browser.
-      const rate = await shippoFetch('/rates/' + b.rateId, 'GET');
-      const ship = Number(rate.amount);
-      if (!isFinite(ship) || ship <= 0) return json({ error: 'That shipping option has expired. Get shipping again.' }, 400, cors);
+      let to, rate = null, ship = 0;
+      if (pickupMode) {
+        // Picked up at the mall: the sale happens at the mall, so sales tax is figured for the mall's address.
+        const nm = String(b.name || '').trim().slice(0, 80);
+        if (!nm) return json({ error: 'Enter the name the mall should ask for at pickup.' }, 400, cors);
+        to = { addr: Object.assign({ country: 'US' }, pick.pickup.address, { name: nm }) };
+      } else {
+        to = checkAddress(b.to);
+        if (to.error) return json({ error: to.error }, 400, cors);
+        if (!/^[a-f0-9]{32}$/.test(String(b.rateId || ''))) return json({ error: 'Pick a shipping option first.' }, 400, cors);
+        // Shipping price comes from Shippo, not the browser.
+        rate = await shippoFetch('/rates/' + b.rateId, 'GET');
+        ship = Number(rate.amount);
+        if (!isFinite(ship) || ship <= 0) return json({ error: 'That shipping option has expired. Get shipping again.' }, 400, cors);
+      }
       const email = String(b.email || '').trim().slice(0, 120);
-      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return json({ error: 'Enter your email so we can send tracking.' }, 400, cors);
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return json({ error: pickupMode ? 'Enter your email so we can send your pickup code.' : 'Enter your email so we can send tracking.' }, 400, cors);
 
       // Sales tax by where the order ships (Stripe Tax applies Missouri's origin rule for in-state orders).
-      const from = pick.items[0].shipFrom || shipFrom(env);
+      const from = pickupMode ? to.addr : (pick.items[0].shipFrom || shipFrom(env));
       let tax = null;
       if (taxOn(env)) {
         try { tax = await taxCalc(env, pick.items, ship, to.addr, from); }
@@ -119,8 +131,10 @@ export async function handleShop(request, env, url, json, cors, shippoFetch) {
       }
       if (offer) await offerOrderStarted(env, offer, ref);
       await env.ORDERS.put('order:' + ref, JSON.stringify({ ref, status: 'checkout', created: Date.now(), session: session.id, offer: offer ? offer.id : undefined,
-        items: pick.items.map(i => ({ id: i.id, title: i.title, price: i.price, dealer: i.dealer })), shipTo: to.addr, email, tax: tax ? { cents: tax.cents, calc: tax.id } : null,
-        shipping: { rateId: b.rateId, amount: ship, carrier: rate.provider, service: rate.servicelevel && rate.servicelevel.name, token: rate.servicelevel && rate.servicelevel.token }, breakdown: order.breakdown }), { expirationTtl: 60 * 60 * 24 * 400 });
+        items: pick.items.map(i => ({ id: i.id, title: i.title, price: i.price, dealer: i.dealer, booth: i.pickup ? i.pickup.booth : undefined })),
+        shipTo: pickupMode ? { name: to.addr.name } : to.addr, email, tax: tax ? { cents: tax.cents, calc: tax.id } : null,
+        pickup: pickupMode ? { mall: pick.pickup.mall, name: pick.pickup.name, city: pick.pickup.city, booth: pick.pickup.booth, address: pick.pickup.address, code: pickupCode() } : undefined,
+        shipping: pickupMode ? null : { rateId: b.rateId, amount: ship, carrier: rate.provider, service: rate.servicelevel && rate.servicelevel.name, token: rate.servicelevel && rate.servicelevel.token }, breakdown: order.breakdown }), { expirationTtl: 60 * 60 * 24 * 400 });
       return json({ url: session.url, order: ref, breakdown: order.breakdown, testMode: stripeMode(env) === 'test' }, 200, cors);
     }
     if (p === '/shop/order' && request.method === 'GET') {
@@ -129,7 +143,8 @@ export async function handleShop(request, env, url, json, cors, shippoFetch) {
       if (!env.ORDERS || !/^o_[a-z0-9]+$/.test(ref)) return json({ error: 'Order not found.' }, 404, cors);
       const o = JSON.parse(await env.ORDERS.get('order:' + ref) || 'null');
       if (!o) return json({ error: 'Order not found.' }, 404, cors);
-      return json({ ref, status: o.status, items: o.items.map(i => ({ id: i.id, title: i.title, price: i.price })), shipping: o.shipping && { amount: o.shipping.amount, carrier: o.shipping.carrier, service: o.shipping.service }, tax: o.breakdown && o.breakdown.tax, cardProcessing: o.breakdown && o.breakdown.cardProcessing, total: o.breakdown && o.breakdown.total, refunded: o.status === 'refunded' }, 200, cors);
+      return json({ ref, status: o.status, items: o.items.map(i => ({ id: i.id, title: i.title, price: i.price })), shipping: o.shipping && { amount: o.shipping.amount, carrier: o.shipping.carrier, service: o.shipping.service }, tax: o.breakdown && o.breakdown.tax, cardProcessing: o.breakdown && o.breakdown.cardProcessing, total: o.breakdown && o.breakdown.total, refunded: o.status === 'refunded',
+        pickup: o.pickup && o.status === 'paid' ? { name: o.pickup.name, address: o.pickup.address, code: o.pickup.code, pickedUpAt: o.pickup.pickedUpAt || null } : o.pickup ? { name: o.pickup.name } : null }, 200, cors);
     }
     return json({ error: 'Not found' }, 404, cors);
   } catch (e) {
@@ -146,6 +161,7 @@ export async function shopAfterPayment(env, session, paid) {
   if (paid) {
     await Promise.all(ids.map(id => env.ORDERS.put('sold:' + id, ref)));
     await Promise.all(ids.map(id => markDealerItemSold(env, id, ref)));
+    if (o && o.pickup) await pickupPaid(env, o);
     if (o) {
       o.status = 'paid'; o.paidAt = o.paidAt || Date.now(); o.paymentIntent = session.payment_intent;
       // Record the sale with Stripe Tax so it shows in the tax reports used for filing.
@@ -220,7 +236,9 @@ async function catalog(env) {
   CAT = await r.json(); CAT_AT = Date.now();
   return CAT;
 }
-async function pickItems(env, cat, ids) {
+// method: 'ship' (default) or 'pickup' (every piece at the same Tabella mall, collected at its counter).
+async function pickItems(env, cat, ids, method) {
+  const pickup = method === 'pickup';
   if (!Array.isArray(ids) || !ids.length) return { error: 'Your cart is empty.' };
   if (ids.length > 10) return { error: 'Up to 10 items per order.' };
   const uniq = [...new Set(ids.map(String))], out = [];
@@ -230,20 +248,23 @@ async function pickItems(env, cat, ids) {
     if (x || /^T[0-9A-Z]{6}$/.test(id)) {
       // Dealer-app item: everything comes from the server record, never the browser.
       if (!x || x.item.status !== 'available' || !x.item.online || !(x.item.price > 0)) return { error: 'An item in your cart is no longer listed.' };
-      const d = x.dealer;
-      if (!(x.item.weightLb && x.item.box && payoutsOk(env, d) && d.shipFrom)) return { error: x.item.title + ' can\u2019t ship yet.' };
-      it = { id, title: x.item.title, price: x.item.price, dealer: d.id, shippable: true, weightLb: x.item.weightLb, box: x.item.box, account: d.stripeAccount, shipFrom: Object.assign({ country: 'US', name: d.name }, d.shipFrom) };
+      const d = x.dealer, w = await ways(env, d, x.item);
+      if (pickup && !w.pickup) return { error: x.item.title + ' can\u2019t be picked up at a mall. Choose shipping.' };
+      if (!pickup && !w.ships) return { error: x.item.title + (w.pickup ? ' is pickup only, at ' + w.pickup.name + '.' : ' can\u2019t ship yet.') };
+      it = { id, title: x.item.title, price: x.item.price, dealer: d.id, shippable: w.ships, pickup: w.pickup, weightLb: x.item.weightLb, box: x.item.box, account: d.stripeAccount, shipFrom: d.shipFrom ? Object.assign({ country: 'US', name: d.name }, d.shipFrom) : null };
     } else {
       it = (cat.items || []).find(x => x.id === id);
       if (!it) return { error: 'An item in your cart is no longer listed.' };
     }
-    if (!it.shippable) return { error: it.title + ' can’t ship yet.' };
+    if (pickup && !it.pickup) return { error: it.title + ' can\u2019t be picked up at a mall. Choose shipping.' };
+    if (!pickup && !it.shippable) return { error: it.title + ' can’t ship yet.' };
     if (env.ORDERS && await env.ORDERS.get('sold:' + id)) return { error: it.title + ' has sold.' };
     out.push(it);
   }
   const dealers = new Set(out.map(i => i.dealer));
   if (dealers.size > 1) return { error: 'For now, each order can hold items from one shop.' };
-  return { items: out };
+  if (pickup && new Set(out.map(i => i.pickup.mall)).size > 1) return { error: 'Pickup pieces need to be at the same mall.' };
+  return { items: out, pickup: pickup ? out[0].pickup : null };
 }
 async function withOffer(env, request, b, pick) {
   if (!b.offer) return null;
@@ -251,6 +272,8 @@ async function withOffer(env, request, b, pick) {
   pick.items[0].price = o.agreed / 100;
   return o;
 }
+function publicPickup(p) { return p ? { name: p.name, city: p.city, booth: p.booth } : null; }
+function pickupCode() { const a = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let c = ''; const r = crypto.getRandomValues(new Uint8Array(6)); for (const x of r) c += a[x % a.length]; return c; }
 function dealerAccount(cat, it) { const d = (cat.dealers || {})[it.dealer]; return d && d.account; }
 function publicItem(i) { return { id: i.id, title: i.title, price: i.price }; }
 function shipFrom(env) { try { const a = JSON.parse(env.SHIP_FROM || ''); return a && a.zip ? Object.assign({ country: 'US' }, a) : null; } catch (e) { return null; } }

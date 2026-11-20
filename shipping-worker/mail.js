@@ -43,12 +43,17 @@ export function buyerReceipt(o, shopNames) {
   if (b.tax) lines.push(['Sales tax', fm(b.tax)]);
   if (b.cardProcessing) lines.push(['Card processing', fm(b.cardProcessing)]);
   lines.push(['Total charged', fm(b.total), 1]);
-  const html = wrap('Thank you for your order', test + '<p>Order <b>' + esc(o.ref) + '</b> from ' + esc(shopNames) + '. Your payment went through.</p>' + rows(lines) +
-    '<p style="margin:14px 0 4px"><b>Shipping to</b></p><p style="margin:0">' + addr(o.shipTo) + '</p>' +
-    '<p style="margin-top:16px">The shop packs and ships one-of-a-kind pieces by hand. You will get another email with tracking when it ships.</p>');
+  const pk = o.pickup;
+  const where = pk ? '<p style="margin:14px 0 4px"><b>Pick it up at</b></p><p style="margin:0">' + esc(pk.name) + '<br>' + addr(Object.assign({}, pk.address, { name: '' })) + '</p>' +
+      '<p style="margin:14px 0 4px">Your pickup code</p><p style="margin:0;font:700 26px Georgia,serif;letter-spacing:.14em">' + esc(pk.code) + '</p>' +
+      '<p style="margin-top:12px">Show this code at the mall counter during open hours. Please pick it up within 14 days.</p>'
+    : '<p style="margin:14px 0 4px"><b>Shipping to</b></p><p style="margin:0">' + addr(o.shipTo) + '</p>' +
+      '<p style="margin-top:16px">The shop packs and ships one-of-a-kind pieces by hand. You will get another email with tracking when it ships.</p>';
+  const html = wrap('Thank you for your order', test + '<p>Order <b>' + esc(o.ref) + '</b> from ' + esc(shopNames) + '. Your payment went through.</p>' + rows(lines) + where);
   const text = (o.test ? 'TEST ORDER. No real money was charged.\n\n' : '') + 'Thank you for your order ' + o.ref + ' from ' + shopNames + '.\n\n' +
-    o.items.map(i => i.title + ' (' + i.id + ')  ' + fm(i.price)).join('\n') + '\nShipping  ' + fm(b.shipping) + (b.tax ? '\nSales tax  ' + fm(b.tax) : '') + '\nCard processing  ' + fm(b.cardProcessing) + '\nTotal charged  ' + fm(b.total) +
-    '\n\nShipping to:\n' + addrText(o.shipTo) + '\n\nYou will get tracking when it ships.\n\nTabella';
+    o.items.map(i => i.title + ' (' + i.id + ')  ' + fm(i.price)).join('\n') + (pk ? '' : '\nShipping  ' + fm(b.shipping)) + (b.tax ? '\nSales tax  ' + fm(b.tax) : '') + '\nCard processing  ' + fm(b.cardProcessing) + '\nTotal charged  ' + fm(b.total) +
+    (pk ? '\n\nPick it up at ' + pk.name + ', ' + addrText(Object.assign({}, pk.address, { name: '' })).replace(/^\n/, '').replace(/\n/g, ', ') + '\nYour pickup code: ' + pk.code + '\nShow it at the counter within 14 days.\n\nTabella'
+        : '\n\nShipping to:\n' + addrText(o.shipTo) + '\n\nYou will get tracking when it ships.\n\nTabella');
   return { subject: (o.test ? '[Test] ' : '') + 'Your Tabella order ' + o.ref, html, text };
 }
 
@@ -58,6 +63,14 @@ export function dealerAlert(o, shopName) {
   const test = o.test ? '<p style="background:#F6E7B8;padding:8px 10px;border-radius:8px;font-size:14px">Test order. No real money moved.</p>' : '';
   const lines = o.items.map(i => [esc(i.title) + ' <span style="color:#6A6259">' + esc(i.id) + '</span>', fm(i.price)]);
   lines.push(['You get after commission', fm(youGet), 1]);
+  if (o.pickup) {
+    const html = wrap('You made a sale', test + '<p>' + esc(shopName) + ', a buyer just paid for:</p>' + rows(lines) +
+      '<p style="margin-top:12px"><b>They\u2019re picking it up at ' + esc(o.pickup.name) + '</b>, so there\u2019s nothing to ship. The mall has been told to pull it from booth ' + esc(o.pickup.booth) + ' and hold it at the counter. If it\u2019s somewhere else, let the mall know.</p>' +
+      '<p>Your share goes to your bank through Stripe. Order <b>' + esc(o.ref) + '</b>.</p>');
+    const text = (o.test ? 'TEST ORDER. No real money moved.\n\n' : '') + shopName + ', you made a sale (order ' + o.ref + ').\n\n' + o.items.map(i => i.title + ' (' + i.id + ')  ' + fm(i.price)).join('\n') +
+      '\nYou get after commission: ' + fm(youGet) + '\n\nPickup at ' + o.pickup.name + ': nothing to ship. The mall will pull it from booth ' + o.pickup.booth + '.\n\nTabella';
+    return { subject: (o.test ? '[Test] ' : '') + 'Sold for pickup: ' + o.items.map(i => i.title).join(', ').slice(0, 70), html, text };
+  }
   const html = wrap('You made a sale', test + '<p>' + esc(shopName) + ', a buyer just paid for:</p>' + rows(lines) +
     '<p style="margin:14px 0 4px"><b>Ship to</b></p><p style="margin:0">' + addr(o.shipTo) + '</p>' +
     '<p style="margin:12px 0 0"><b>Service they paid for:</b> ' + esc(o.shipping && (o.shipping.carrier + ' ' + (o.shipping.service || ''))) + ' (' + fm(o.shipping && o.shipping.amount) + ')</p>' +

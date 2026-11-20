@@ -127,7 +127,7 @@ function msg(id,t,bad){$(id).innerHTML=t?'<div class="msg '+(bad?'err':'ok')+'">
 async function api(p,o){o=o||{};var h={};if(tok)h.Authorization='Bearer '+tok;if(o.json!==undefined){h['Content-Type']='application/json';o.body=JSON.stringify(o.json)}
   var r=await fetch(API+p,{method:o.method||(o.body?'POST':'GET'),headers:h,body:o.body});var d=await r.json().catch(function(){return{}});
   if(r.status===401&&d.signin){tok=null;ls('tabBuyer',null);me=null;drawWho()}if(!r.ok)throw new Error(d.error||'Something went wrong. Try again.');return d}
-function offerable(i){return /^d[a-z0-9]{10}$/.test(String(i.dealer||''))&&i.shippable!==false}
+function offerable(i){return /^d[a-z0-9]{10}$/.test(String(i.dealer||''))&&(i.shippable||!!i.pickup)}
 function item(id){return ITEMS.filter(function(i){return i.id===id})[0]}
 
 // ----- views
@@ -150,7 +150,7 @@ async function finishLogin(t){try{var d=await api('/buyer/login',{json:{token:t,
 
 // ----- the deck
 function build(){deck=ITEMS.filter(function(i){return !GONE[i.id]&&saved.indexOf(i.id)<0&&passed.indexOf(i.id)<0});draw()}
-function cardHtml(i,back){return '<div class="card'+(back?' back':'')+'" data-id="'+i.id+'"><span class="stamp yes">SAVE</span><span class="stamp no">PASS</span><div class="ph"><img src="'+esc(i.photo)+'" alt="'+esc(i.title)+'" draggable="false"></div><div class="tx"><h2>'+esc(i.title)+'</h2><div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px"><span class="meta">'+esc(i.dealerName||'')+(i.category?' &middot; '+esc(i.category):'')+'</span><span class="pr">'+fm(i.price)+'</span></div></div></div>'}
+function cardHtml(i,back){return '<div class="card'+(back?' back':'')+'" data-id="'+i.id+'"><span class="stamp yes">SAVE</span><span class="stamp no">PASS</span><div class="ph"><img src="'+esc(i.photo)+'" alt="'+esc(i.title)+'" draggable="false"></div><div class="tx"><h2>'+esc(i.title)+'</h2><div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px"><span class="meta">'+esc(i.dealerName||'')+(i.category?' &middot; '+esc(i.category):'')+'</span><span class="pr">'+fm(i.price)+'</span></div>'+(i.pickup?'<div class="meta" style="color:var(--green);font-weight:500">'+(i.shippable?'Ships, or pick up at ':'Pickup only, at ')+esc(i.pickup.name)+', '+esc(i.pickup.city)+'</div>':'')+'</div></div>'}
 function draw(){var st=$('stack');
   if(!deck.length){st.innerHTML='<div class="empty">You’ve seen every piece for now.<br><br><button class="btn sec" type="button" id="again">Start over</button></div>';$('acts').style.visibility='hidden';
     $('again').onclick=function(){passed=[];ls('tabPass',passed);build()};return}

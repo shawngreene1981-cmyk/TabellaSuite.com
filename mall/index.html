@@ -106,6 +106,7 @@ dialog{max-height:calc(100dvh - 24px);max-height:calc(100vh - 24px)}
 #salesBar[hidden],#invBar[hidden]{display:none}
 
 [hidden]{display:none!important}
+.pkd{display:flex;gap:6px;align-items:center}.pkd input{width:110px;text-transform:uppercase;letter-spacing:.1em}
 .autorow{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 14px;margin:0 0 12px}
 .stl{list-style:none;padding:0;margin:14px 0 0}.stl li{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-bottom:10px;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center}.stl li.empty{color:var(--muted)}
 .sth{display:flex;flex-direction:column;gap:2px}.stb{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
@@ -168,7 +169,7 @@ dialog{max-height:calc(100dvh - 24px);max-height:calc(100vh - 24px)}
 <section id="appView" hidden>
  <div class="bar"><div><div class="cap">Your mall</div><h1 id="mallName" style="font-size:clamp(2rem,5vw,3rem);margin:4px 0 0"></h1></div><button class="btn sec" id="signOut" type="button">Sign out</button></div>
  <div class="tabs" role="tablist" id="viewTabs" style="margin-top:14px">
-  <button type="button" role="tab" data-v="reg" aria-selected="true">Register</button><button type="button" role="tab" data-v="day" aria-selected="false">Today</button><button type="button" role="tab" data-v="month" aria-selected="false">This month</button><button type="button" role="tab" data-v="stmt" aria-selected="false">Statements</button><button type="button" role="tab" data-v="dealers" aria-selected="false">Dealers</button><button type="button" role="tab" data-v="set" aria-selected="false">Settings</button>
+  <button type="button" role="tab" data-v="reg" aria-selected="true">Register</button><button type="button" role="tab" data-v="pick" aria-selected="false">Pickups <span id="nPick"></span></button><button type="button" role="tab" data-v="day" aria-selected="false">Today</button><button type="button" role="tab" data-v="month" aria-selected="false">This month</button><button type="button" role="tab" data-v="stmt" aria-selected="false">Statements</button><button type="button" role="tab" data-v="dealers" aria-selected="false">Dealers</button><button type="button" role="tab" data-v="set" aria-selected="false">Settings</button>
  </div>
 
  <!-- Register -->
@@ -201,6 +202,12 @@ dialog{max-height:calc(100dvh - 24px);max-height:calc(100vh - 24px)}
     <button class="linkbtn" type="button" id="clearBtn" hidden>Clear the sale</button>
    </aside>
   </div>
+ </div>
+
+ <!-- Pickups: online orders paid for and collected at the counter -->
+ <div id="v-pick" class="view" hidden>
+  <p class="meta" style="margin:12px 0">Shoppers who buy online for pickup show a 6-letter code. Pull the piece from its booth, hold it at the counter, and mark it picked up when they show the code. It’s already paid: don’t ring it up again.</p>
+  <ul class="sales" id="pickList"></ul><div id="pickMsg" aria-live="polite"></div>
  </div>
 
  <!-- Today -->
@@ -258,7 +265,7 @@ dialog{max-height:calc(100dvh - 24px);max-height:calc(100vh - 24px)}
    <p class="meta" style="margin:2px 0 0">Set each booth's monthly rent on the Dealers tab. Card sales pay the month's rent first, then the dealer gets the rest. Any rent still unpaid comes off what you owe on the statement.</p>
    <p class="meta" style="margin:6px 0 0">Commission and the card fee come out of each dealer's share. You can set a different commission for one booth on the Dealers tab. Use your combined local rate for sales tax; you file it under your own sales tax license.</p>
    <h2 style="font-size:1.5rem;margin:18px 0 6px">Street address</h2>
-   <p class="meta" style="margin:0">Only used to register your card reader with Stripe. It isn't shown on the website.</p>
+   <p class="meta" style="margin:0">Used to register your card reader, and shown to shoppers who buy online for pickup at your counter. Your dealers' pieces can be picked up here once it's filled in.</p>
    <label for="aSt">Street</label><input id="aSt" autocomplete="address-line1">
    <div class="row2"><div><label for="aCity2">City</label><input id="aCity2"></div><div class="row2"><div><label for="aSt2">State</label><input id="aSt2" maxlength="2"></div><div><label for="aZip">ZIP</label><input id="aZip" inputmode="numeric"></div></div></div>
    <button class="btn" type="submit" style="margin-top:12px">Save settings</button><div id="setMsg" aria-live="polite"></div>
@@ -343,8 +350,8 @@ var view='reg';
 document.querySelectorAll('#viewTabs button').forEach(function(b){b.onclick=function(){go(b.dataset.v)}});
 function go(v){view=v;document.querySelectorAll('#viewTabs button').forEach(function(b){b.setAttribute('aria-selected',b.dataset.v===v)});
   var pane=v==='month'?'day':v;document.querySelectorAll('.view').forEach(function(x){x.hidden=x.id!=='v-'+pane});
-  if(v==='reg'){drawSetupNote();loadBooths();setTimeout(function(){$('scanIn').focus()},50)}if(v==='day'||v==='month'){dayMode=v;loadDay()}if(v==='dealers')loadDealers();if(v==='stmt')loadStmts();if(v==='set')drawSettings()}
-function enter(){show('app');$('mallName').textContent=me.name;drawCart();go(view);
+  if(v==='reg'){drawSetupNote();loadBooths();setTimeout(function(){$('scanIn').focus()},50)}if(v==='day'||v==='month'){dayMode=v;loadDay()}if(v==='dealers')loadDealers();if(v==='pick')loadPickups();if(v==='stmt')loadStmts();if(v==='set')drawSettings()}
+function enter(){show('app');$('mallName').textContent=me.name;drawCart();go(view);loadPickups();
   if(/payouts=back/.test(location.search)){history.replaceState(null,'',location.pathname);checkPayouts()}}
 function drawSetupNote(){var need=[];if(me.taxRate==null)need.push('your sales tax rate');if(!me.reader)need.push('a card reader');
   $('setupNote').innerHTML=need.length?'<div class="msg warn">To finish setting up, add '+esc(need.join(' and '))+' in <button type="button" class="linkbtn" id="toSet">Settings</button>. Cash sales work now.</div>':'';
@@ -475,6 +482,15 @@ $('waitBtn').onclick=async function(){var b=this;b.disabled=true;try{var r=await
   alert(r.sent?'Sent '+fc(r.amount)+' ('+r.sent+' payout'+(r.sent===1?'':'s')+').'+(r.left?' '+r.left+' still waiting for a bank.':''):'Nothing could be sent yet: the dealers or your mall still need to connect a bank.');loadDay()}catch(err){alert(err.message)}b.disabled=false};
 $('csvBtn').onclick=async function(){try{var r=await fetch(API+'/mall/report.csv?day='+period(),{headers:{Authorization:'Bearer '+tok}});if(!r.ok)throw new Error('The spreadsheet could not be made.');
   var u=URL.createObjectURL(await r.blob()),a=document.createElement('a');a.href=u;a.download=me.name.replace(/[^A-Za-z0-9]+/g,'-')+'-'+period()+'.csv';document.body.appendChild(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(u)},2000)}catch(err){alert(err.message)}};
+
+// ----- pickups
+async function loadPickups(){try{var ps=(await api('/mall/pickups')).pickups,n=ps.filter(function(x){return x.status==='waiting'}).length;$('nPick').textContent=n?'('+n+')':'';
+  if(view!=='pick')return;
+  $('pickList').innerHTML=ps.length?ps.map(function(x){return '<li data-ref="'+x.ref+'"><span><b>'+esc(x.name||'Shopper')+'</b> &middot; '+x.items.map(function(i){return esc(i.title)+' <span class="meta">('+esc(i.id)+', booth '+esc(i.booth)+')</span>'}).join(', ')+
+    '<br><span class="meta">Paid '+new Date(x.paidAt).toLocaleDateString()+(x.test?' &middot; test order':'')+'</span></span>'+
+    (x.status==='waiting'?'<span class="pkd"><input class="sm" maxlength="8" placeholder="Code" aria-label="Pickup code for '+esc(x.name||'shopper')+'" autocapitalize="characters"><button type="button" class="btn">Picked up</button></span>':'<span class="pill'+(x.status==='picked'?' ok':'')+'">'+(x.status==='picked'?'Picked up '+new Date(x.pickedUpAt).toLocaleDateString():'Refunded')+'</span>')+'</li>'}).join(''):'<li class="empty">No pickup orders yet.</li>';
+  $('pickList').querySelectorAll('.pkd button').forEach(function(b){b.onclick=async function(){var li=b.closest('li'),c=li.querySelector('input').value;if(!c){li.querySelector('input').focus();return}
+    b.disabled=true;try{await api('/mall/pickups/'+li.dataset.ref+'/done',{json:{code:c}});msg('pickMsg','Marked picked up.');loadPickups()}catch(err){msg('pickMsg',err.message,1);b.disabled=false}}})}catch(e){}}
 
 // ----- statements
 var stm=null;

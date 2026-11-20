@@ -60,6 +60,7 @@ input{font:inherit;width:100%;padding:9px 10px;border:1px solid var(--line);bord
 .empty{color:var(--muted);padding:20px 0}
 footer{padding:36px 0 48px;border-top:1px solid var(--line);margin-top:48px;font-size:.88rem;color:var(--muted);display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px}
 .modes{display:inline-flex;border:1px solid var(--line);border-radius:999px;padding:3px;background:var(--card);gap:2px;margin:0 0 14px}.modes a{font:600 .92rem Inter,sans-serif;padding:8px 18px;border-radius:999px;text-decoration:none;color:var(--muted)}.modes a[aria-current]{background:var(--ink);color:var(--bg)}
+.card .pk{color:var(--green);font-weight:500;margin-top:2px}
 .dnote{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 14px;margin:0 0 12px}
 </style>
 </head>
@@ -85,6 +86,13 @@ footer{padding:36px 0 48px;border-top:1px solid var(--line);margin-top:48px;font
 <dialog id="cartDlg" aria-labelledby="cartH"><div class="dlg"><button class="x" type="button" data-close aria-label="Close">&times;</button>
 <h2 id="cartH" style="font-size:1.7rem;margin:0 0 10px">Your cart</h2>
 <div id="cartList"></div>
+<div id="howBox" hidden><div class="chips" id="howPick" role="group" aria-label="How to get it" style="margin-top:12px"></div><p class="meta" id="howMsg" style="margin:4px 0 0"></p></div>
+<form id="pickForm" hidden novalidate>
+ <label for="pName">Name for pickup</label><input id="pName" autocomplete="name">
+ <label for="pEmail">Email, for your receipt and pickup code</label><input id="pEmail" type="email" autocomplete="email">
+ <div id="pickTotals"></div>
+ <button class="btn" id="pickPay" type="submit" style="width:100%;margin-top:12px">Go to secure checkout</button>
+</form>
 <form id="addr" hidden novalidate>
  <h3 style="font-size:1.3rem;margin:14px 0 2px">Ship to</h3>
  <label for="aName">Full name</label><input id="aName" autocomplete="name" required>
@@ -127,7 +135,7 @@ function draw(){
   $('grid').innerHTML=list.length?list.map(function(i){
     return '<li class="card"><button class="open" type="button" data-open="'+i.id+'" aria-label="'+esc(i.title)+', '+fm(i.price)+'"><div class="ph"><img src="'+esc(i.photo)+'" alt="" loading="lazy" width="450" height="450"></div></button>'+
     '<div class="cb"><h3>'+esc(i.title)+'</h3><div class="meta">'+esc(i.dealerName||'')+' &middot; '+esc(i.category)+'</div><div class="price">'+fm(i.price)+'</div>'+
-    (i.shippable?'':'<span class="soonb">Shipping coming soon</span>')+'</div></li>'}).join(''):'<li class="empty">Nothing here right now. Check back soon.</li>';
+    (i.pickup?'<div class="meta pk">'+(i.shippable?'Ships, or pick up at ':'Pickup only, at ')+esc(i.pickup.name)+', '+esc(i.pickup.city)+'</div>':i.shippable?'':'<span class="soonb">Shipping coming soon</span>')+'</div></li>'}).join(''):'<li class="empty">Nothing here right now. Check back soon.</li>';
   save()}
 document.addEventListener('click',function(e){
   var t=e.target.closest('[data-c],[data-open],[data-add],[data-rm],[data-close]');if(!t)return;
@@ -139,16 +147,31 @@ document.addEventListener('click',function(e){
 function openItem(id){var i=item(id);if(!i)return;
   $('itImg').src=i.photo;$('itImg').alt=i.title;$('itTitle').textContent=i.title;$('itMeta').textContent=i.category+' · '+i.id+' · Sold by '+(i.dealerName||'a Tabella dealer');
   $('itPrice').textContent=fm(i.price);
-  $('itAct').innerHTML=i.shippable?(cart.indexOf(id)>=0?'<button class="btn sec" type="button" data-close>In your cart</button>':'<button class="btn" type="button" data-add="'+id+'">Add to cart</button>'):'<p class="meta">This piece is being measured for shipping. It can be bought online soon.</p>';
+  var buyable=i.shippable||i.pickup;
+  $('itAct').innerHTML=(i.pickup?'<p class="meta" style="margin:0 0 8px">'+(i.shippable?'Ships, or pick up at ':'Pickup only, at ')+esc(i.pickup.name)+', '+esc(i.pickup.city)+' (booth '+esc(i.pickup.booth)+').</p>':'')+(buyable?(cart.indexOf(id)>=0?'<button class="btn sec" type="button" data-close>In your cart</button>':'<button class="btn" type="button" data-add="'+id+'">Add to cart</button>'):'<p class="meta">This piece is being measured for shipping. It can be bought online soon.</p>');
   $('itemDlg').showModal()}
 function resetShip(){rate=null;$('rates').innerHTML='';$('totals').innerHTML='';$('payBtn').hidden=true}
 function drawCart(){
-  cart=cart.filter(function(id){var i=item(id);return i&&i.shippable&&!GONE[id]});save();
-  if(!cart.length){$('cartList').innerHTML='<p class="empty">Your cart is empty.</p>';$('addr').hidden=true;resetShip();return}
+  cart=cart.filter(function(id){var i=item(id);return i&&(i.shippable||i.pickup)&&!GONE[id]});save();
+  if(!cart.length){$('cartList').innerHTML='<p class="empty">Your cart is empty.</p>';$('addr').hidden=true;$('howBox').hidden=true;$('pickForm').hidden=true;resetShip();return}
   sub=0;$('cartList').innerHTML=(OFFER?'<div class="msg ok">Your accepted offer: '+fm(OFFER.agreed/100)+' (listed at '+fm(OFFER.price/100)+'). Pay within '+Math.max(1,Math.round((OFFER.expires-Date.now())/3600e3))+' hours.</div>':'')+cart.map(function(id){var i=item(id);sub+=priceOf(i);
     return '<div class="line"><span>'+esc(i.title)+' <span class="meta">'+i.id+'</span></span><span>'+fm(priceOf(i))+' <button type="button" class="rm" data-rm="'+id+'" aria-label="Remove '+esc(i.title)+'">Remove</button></span></div>'}).join('')+
     '<div class="line"><b>Items</b><b>'+fm(sub)+'</b></div>';
-  $('addr').hidden=false}
+  // Ship or pick up: shipping needs every piece to ship; pickup needs every piece at the same mall.
+  var its=cart.map(item),canShip=its.every(function(i){return i.shippable}),pm=its[0].pickup,canPick=!!pm&&its.every(function(i){return i.pickup&&i.pickup.mall===pm.mall});
+  if(!canShip&&!canPick){$('howBox').hidden=false;$('howPick').innerHTML='';$('howMsg').textContent='Some of these pieces ship and some are pickup only. Check out the pickup pieces on their own.';$('addr').hidden=true;$('pickForm').hidden=true;return}
+  if(METHOD==='pickup'&&!canPick)METHOD='ship';if(METHOD==='ship'&&!canShip)METHOD='pickup';
+  $('howBox').hidden=false;$('howMsg').textContent='';
+  $('howPick').innerHTML=(canShip?'<button type="button" data-m="ship" aria-pressed="'+(METHOD==='ship')+'">Ship to me</button>':'')+(canPick?'<button type="button" data-m="pickup" aria-pressed="'+(METHOD==='pickup')+'">Pick up at '+esc(pm.name)+'</button>':'');
+  $('howPick').querySelectorAll('button').forEach(function(b){b.onclick=function(){METHOD=b.dataset.m;resetShip();drawCart()}});
+  if(METHOD==='pickup'){$('howMsg').textContent='Free. Collect it at '+pm.name+', '+pm.city+' with the code we email you.';$('addr').hidden=true;$('pickForm').hidden=false;pickTotals(sub)}
+  else{$('pickForm').hidden=true;$('addr').hidden=false}}
+var METHOD='ship';
+function pickTotals(s0){var pre=Math.round(s0*100),tot=Math.ceil((pre+30)/(1-0.029));
+  $('pickTotals').innerHTML='<div class="line"><span>Items</span><span>'+fm(s0)+'</span></div><div class="line"><span>Pickup</span><span>Free</span></div><div class="line"><span>Card processing</span><span>'+fm((tot-pre)/100)+'</span></div>'+(TAXNOTE?'<div class="line"><span>Sales tax</span><span class="meta">added at checkout</span></div><div class="line"><b>Total before tax</b><b>'+fm(tot/100)+'</b></div>':'<div class="line"><b>Total</b><b>'+fm(tot/100)+'</b></div>')}
+$('pickForm').addEventListener('submit',async function(e){e.preventDefault();var b=$('pickPay');b.disabled=true;b.textContent='Opening checkout...';$('cartMsg').innerHTML='';
+  try{var d=await post('/shop/checkout',{items:cart,method:'pickup',name:$('pName').value,email:$('pEmail').value});location.href=d.url}
+  catch(err){say(err.message,1);b.disabled=false;b.textContent='Go to secure checkout'}});
 function openCart(){$('cartMsg').innerHTML='';drawCart();$('cartDlg').showModal()}
 $('cartBtn').onclick=openCart;
 function addr(){return{name:$('aName').value,street1:$('aSt').value,street2:$('aSt2').value,city:$('aCity').value,state:$('aState').value,zip:$('aZip').value}}
@@ -163,7 +186,7 @@ $('addr').addEventListener('submit',async function(e){e.preventDefault();resetSh
   b.disabled=false;b.textContent='Get shipping options'});
 function pick(s0){var r=document.querySelector('input[name=rate]:checked');if(!r)return;rate=r.value;var s=+r.getAttribute('data-amt'),pre=Math.round((s0+s)*100),tot=Math.ceil((pre+30)/(1-0.029));
   $('totals').innerHTML='<div class="line"><span>Items</span><span>'+fm(s0)+'</span></div><div class="line"><span>Shipping</span><span>'+fm(s)+'</span></div><div class="line"><span>Card processing</span><span>'+fm((tot-pre)/100)+'</span></div>'+(TAXNOTE?'<div class="line"><span>Sales tax</span><span class="meta">added at checkout</span></div><div class="line"><b>Total before tax</b><b>'+fm(tot/100)+'</b></div>':'<div class="line"><b>Total</b><b>'+fm(tot/100)+'</b></div>')}
-var TAXNOTE=false;
+var TAXNOTE=true;
 $('payBtn').onclick=async function(){var b=this;if(!rate)return;b.disabled=true;b.textContent='Opening checkout...';
   try{var d=await post('/shop/checkout',{items:cart,to:addr(),rateId:rate,email:$('aEmail').value});location.href=d.url}
   catch(err){say(err.message,1);b.disabled=false;b.textContent='Go to secure checkout'}};

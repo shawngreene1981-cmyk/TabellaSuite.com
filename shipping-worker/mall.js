@@ -18,7 +18,7 @@
 // its commission, the card fees and the tax, less Stripe's in-person processing fee. Tabella keeps nothing from
 // in-store sales; malls pay Tabella by the booth.
 
-import { session as dealerSession, hashPw, rand, cleanEmail, clean, err, body, newSession, dealerItem, listing, payoutsOk, ITEM_ID } from './app.js';
+import { session as dealerSession, hashPw, rand, cleanEmail, clean, err, body, newSession, dealerItem, listing, payoutsOk, ITEM_ID, refreshListings } from './app.js';
 import { stripeApi, stripeMode, createRecipient, recipientLink, recipientReady } from './stripe.js';
 import { sendEmail, emailFrame } from './mail.js';
 
@@ -71,6 +71,9 @@ export async function handleMall(request, env, url, json, cors) {
     if (p === '/mall/statements/send-all' && request.method === 'POST') return json(await sendAll(env, m.mall, await body(request)), 200, cors);
     if (p === '/mall/statements/auto' && request.method === 'PUT') return json({ mall: publicMall(env, await setAuto(env, m.mall, await body(request))) }, 200, cors);
     if (p === '/mall/statements/send' && request.method === 'POST') return json(await sendStatement(env, m.mall, await body(request)), 200, cors);
+    if (p === '/mall/pickups' && request.method === 'GET') return json({ pickups: await pickups(env, m.mall) }, 200, cors);
+    const mp = p.match(/^\/mall\/pickups\/(o_[a-z0-9]+)\/done$/);
+    if (mp && request.method === 'POST') return json(await pickedUp(env, m.mall, mp[1], await body(request)), 200, cors);
     if (p === '/mall/report' && request.method === 'GET') return json(await report(env, m.mall, url.searchParams.get('month') || url.searchParams.get('day')), 200, cors);
     if (p === '/mall/report.csv' && request.method === 'GET') return reportCsv(env, m.mall, url.searchParams.get('month') || url.searchParams.get('day'), cors);
     if (p === '/mall/reader' && request.method === 'POST') return json({ mall: publicMall(env, await setupReader(env, m.mall, await body(request))) }, 200, cors);
@@ -151,11 +154,13 @@ async function updateMall(env, m, b) {
     a.state = a.state.toUpperCase(); if (!/^[A-Z]{2}$/.test(a.state)) throw err(400, 'Use the two-letter state code, like MO.');
     if (JSON.stringify(a) !== JSON.stringify(m.address || {})) { m.address = a; if (m.terminal) m.terminal.locationStale = true; }
   }
-  const renamed = b.name != null;
+  const renamed = b.name != null, moved = !!b.address;
   await env.TABELLA.put('mall:' + m.id, JSON.stringify(m));
-  if (renamed) for (const bt of await boothList(env, m.id)) {
+  if (renamed || moved) for (const bt of await boothList(env, m.id)) {
     const d = JSON.parse(await env.TABELLA.get('dealer:' + bt.dealer) || 'null');
-    if (d && d.mall && d.mall.id === m.id && d.mall.name !== m.name) { d.mall.name = m.name; await env.TABELLA.put('dealer:' + d.id, JSON.stringify(d)); }
+    if (!d || !d.mall || d.mall.id !== m.id) continue;
+    if (d.mall.name !== m.name) { d.mall.name = m.name; await env.TABELLA.put('dealer:' + d.id, JSON.stringify(d)); }
+    if (!d.managed) await refreshListings(env, d); // pickup shows the mall's name and town
   }
   return m;
 }
@@ -180,6 +185,7 @@ async function joinMall(env, d, b) {
   await env.TABELLA.put('booth:' + mid + ':' + d.id, JSON.stringify({ booth, pct: prev ? prev.pct : null, joined: prev ? prev.joined : Date.now() }));
   d.mall = { id: mid, name: m.name, booth };
   await env.TABELLA.put('dealer:' + d.id, JSON.stringify(d));
+  await refreshListings(env, d); // pieces can now be picked up at this mall
   return { mall: { name: m.name, booth } };
 }
 async function leaveMall(env, d) {
@@ -187,6 +193,7 @@ async function leaveMall(env, d) {
   await env.TABELLA.delete('booth:' + d.mall.id + ':' + d.id);
   delete d.mall;
   await env.TABELLA.put('dealer:' + d.id, JSON.stringify(d));
+  await refreshListings(env, d);
   return { mall: null };
 }
 async function boothList(env, mid) {
@@ -232,13 +239,13 @@ async function setBooth(env, m, did, b) {
     if (b.email != null) { const e = b.email ? cleanEmail(b.email) : ''; if (b.email && !e) throw err(400, 'That email looks wrong.'); d.email = e; }
     await env.TABELLA.put('dealer:' + did, JSON.stringify(d));
   }
-  if (d && d.mall && d.mall.id === m.id && d.mall.booth !== bt.booth) { d.mall.booth = bt.booth; await env.TABELLA.put('dealer:' + did, JSON.stringify(d)); }
+  if (d && d.mall && d.mall.id === m.id && d.mall.booth !== bt.booth) { d.mall.booth = bt.booth; await env.TABELLA.put('dealer:' + did, JSON.stringify(d)); if (!d.managed) await refreshListings(env, d); }
   return { ok: true };
 }
 async function removeDealer(env, m, did) {
   await env.TABELLA.delete('booth:' + m.id + ':' + did);
   const d = JSON.parse(await env.TABELLA.get('dealer:' + did) || 'null');
-  if (d && d.mall && d.mall.id === m.id) { delete d.mall; await env.TABELLA.put('dealer:' + did, JSON.stringify(d)); }
+  if (d && d.mall && d.mall.id === m.id) { delete d.mall; await env.TABELLA.put('dealer:' + did, JSON.stringify(d)); if (!d.managed) await refreshListings(env, d); }
   return { ok: true };
 }
 
@@ -863,4 +870,50 @@ export async function mallAccountFor(env, dealerId) {
   if (!d || !d.mall || !d.mall.id) return undefined;
   const m = JSON.parse(await env.TABELLA.get('mall:' + d.mall.id) || 'null');
   return m && mallPayoutsOk(env, m) ? m.stripeAccount : undefined;
+}
+
+// ---------- pickup at the mall (online orders collected at the mall counter) ----------
+//   mpick:<mall>:<order ref>    a paid pickup order waiting at (or collected from) the mall
+// After payment, the mall is emailed which booth to pull each piece from; the shopper shows their pickup code.
+export async function pickupPaid(env, o) {
+  const p = o.pickup; if (!p || !p.mall) return;
+  if (await env.TABELLA.get('mpick:' + p.mall + ':' + o.ref)) return;
+  await env.TABELLA.put('mpick:' + p.mall + ':' + o.ref, String(Date.now()), { expirationTtl: 60 * 60 * 24 * 400 });
+  for (const i of o.items) {
+    const x = await dealerItem(env, i.id);
+    if (x) { x.item.pickup = { mall: p.name, booth: p.booth }; await env.TABELLA.put('item:' + x.dealer.id + ':' + i.id, JSON.stringify(x.item)); }
+  }
+  const m = JSON.parse(await env.TABELLA.get('mall:' + p.mall) || 'null');
+  if (!m || !m.email) return;
+  const test = stripeMode(env) === 'test' ? '[Test] ' : '', e = v => String(v == null ? '' : v).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const lines = o.items.map(i => e(i.title) + ' (' + e(i.id) + ') from booth ' + e(i.booth || p.booth));
+  await sendEmail(env, { to: m.email, subject: test + 'Pickup order: ' + o.items.map(i => i.title).join(', ').slice(0, 60),
+    html: emailFrame('A shopper is coming to pick up', '<p style="margin:0 0 12px">' + e(o.shipTo && o.shipTo.name) + ' bought this online for pickup at ' + e(m.name) + ':</p><ul>' + lines.map(l => '<li>' + l + '</li>').join('') + '</ul>' +
+      '<p style="margin:12px 0">Pull it from the booth and hold it at the counter. They\u2019ll show pickup code <b style="font-size:18px;letter-spacing:.12em">' + e(p.code) + '</b>. Then mark it picked up on the <b>Pickups</b> tab at tabellasuite.com/mall.</p><p style="margin:0">It\u2019s already paid. Don\u2019t ring it up again.</p>'),
+    text: o.shipTo.name + ' bought this online for pickup:\n' + lines.join('\n').replace(/&amp;/g, '&') + '\n\nPickup code ' + p.code + '. Mark it picked up on the Pickups tab at tabellasuite.com/mall. Already paid: don\'t ring it up again.' }).catch(() => null);
+}
+async function pickups(env, m) {
+  const out = []; let cursor;
+  do {
+    const l = await env.TABELLA.list({ prefix: 'mpick:' + m.id + ':', cursor });
+    for (const k of l.keys) {
+      const ref = k.name.split(':')[2], o = env.ORDERS ? JSON.parse(await env.ORDERS.get('order:' + ref) || 'null') : null;
+      if (!o || !o.pickup) continue;
+      out.push({ ref, name: o.shipTo && o.shipTo.name, items: o.items.map(i => ({ id: i.id, title: i.title, booth: i.booth || o.pickup.booth })), paidAt: o.paidAt,
+        status: o.status === 'refunded' ? 'refunded' : o.pickup.pickedUpAt ? 'picked' : 'waiting', pickedUpAt: o.pickup.pickedUpAt || null, test: !!o.test });
+    }
+    cursor = l.list_complete ? null : l.cursor;
+  } while (cursor);
+  return out.sort((a, b) => (a.status === 'waiting' ? 0 : 1) - (b.status === 'waiting' ? 0 : 1) || (b.paidAt || 0) - (a.paidAt || 0)).slice(0, 200);
+}
+async function pickedUp(env, m, ref, b) {
+  if (!(await env.TABELLA.get('mpick:' + m.id + ':' + ref))) throw err(404, 'That pickup isn\u2019t for your mall.');
+  const o = JSON.parse(await env.ORDERS.get('order:' + ref) || 'null');
+  if (!o || !o.pickup || o.status !== 'paid') throw err(409, 'That order isn\u2019t waiting for pickup.');
+  if (o.pickup.pickedUpAt) return { ok: true, already: true };
+  if (String(b.code || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '') !== o.pickup.code) throw err(400, 'That code doesn\u2019t match. Ask the shopper for the code in their email.');
+  o.pickup.pickedUpAt = Date.now();
+  await env.ORDERS.put('order:' + ref, JSON.stringify(o), { expirationTtl: 60 * 60 * 24 * 400 });
+  for (const i of o.items) { const x = await dealerItem(env, i.id); if (x && x.item.pickup) { x.item.pickup.done = Date.now(); x.item.shippedAt = Date.now(); await env.TABELLA.put('item:' + x.dealer.id + ':' + i.id, JSON.stringify(x.item)); } }
+  return { ok: true };
 }

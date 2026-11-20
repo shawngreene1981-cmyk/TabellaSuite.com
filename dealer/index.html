@@ -203,6 +203,9 @@ dialog{max-height:calc(100dvh - 24px);max-height:calc(100vh - 24px)}
   <div class="row3" id="dims" hidden><input id="fL" type="number" inputmode="decimal" step="0.5" min="0" placeholder="L in" aria-label="Box length, inches"><input id="fW" type="number" inputmode="decimal" step="0.5" min="0" placeholder="W in" aria-label="Box width, inches"><input id="fH" type="number" inputmode="decimal" step="0.5" min="0" placeholder="H in" aria-label="Box height, inches"></div>
  </fieldset>
  <label class="check"><input type="checkbox" id="fOnline" checked> List it in the Tabella shop</label>
+ <div class="lbl" id="howL">How shoppers can buy it online</div>
+ <div class="chips" id="fHow" role="group" aria-labelledby="howL"><button type="button" data-how="both" aria-pressed="true">Ship or pick up</button><button type="button" data-how="ship" aria-pressed="false">Ship only</button><button type="button" data-how="pickup" aria-pressed="false">Pickup at my mall only</button></div>
+ <p class="meta" id="howNote" style="margin:2px 0 8px"></p>
  <label for="fNotes">Notes <span class="meta">optional, private</span></label><input id="fNotes" maxlength="500" placeholder="Maker's mark on base, small chip on rim">
  <div id="orderBox"></div>
  <div id="itMsg" aria-live="polite"></div>
@@ -270,9 +273,18 @@ $('payBtn').onclick=async function(){var b=this;b.disabled=true;b.textContent='O
   try{var d=await api('/app/payouts',{method:'POST',json:{}});location.href=d.url}catch(err){b.disabled=false;drawSetup();alertMsg(err.message)}};
 function alertMsg(t){var p=$('setup');var m=document.createElement('div');m.className='msg err';m.textContent=t;p.appendChild(m);setTimeout(function(){m.remove()},8000)}
 // ----- items
-function why(it){if(it.status==='sold'&&it.store)return['sold','Sold in store at '+it.store.mall];if(it.status==='sold')return it.shippedAt?['ok','Shipped']:it.order?['sold','Sold: print the shipping label']:['sold','Sold'];if(!it.online)return['off','Not listed'];if(!(it.price>0))return['warn','Add a price to list it'];
-  var miss=[];if(!(it.weightLb&&it.box))miss.push('ship size');if(!me.hasShipFrom)miss.push('ship-from address');if(!me.payouts)miss.push('payouts');
-  return miss.length?['warn','Listed. To sell online, add '+miss.join(', ')]:['ok','Listed and ready to sell']}
+function why(it){if(it.status==='sold'&&it.store)return['sold','Sold in store at '+it.store.mall];
+  if(it.status==='sold'&&it.pickup)return it.pickup.done?['ok','Picked up at '+it.pickup.mall]:['sold','Sold: pickup at '+it.pickup.mall+', booth '+it.pickup.booth];
+  if(it.status==='sold')return it.shippedAt?['ok','Shipped']:it.order?['sold','Sold: print the shipping label']:['sold','Sold'];if(!it.online)return['off','Not listed'];if(!(it.price>0))return['warn','Add a price to list it'];
+  var how=it.how||'both',inMall=!!me.mall,shipMiss=[];if(!(it.weightLb&&it.box))shipMiss.push('ship size');if(!me.hasShipFrom)shipMiss.push('ship-from address');
+  if(!me.payouts)return['warn','Listed. To sell online, set up payouts'];
+  if(how==='pickup')return inMall?['ok','Listed for pickup at '+me.mall.name]:['warn','Pickup only: join your mall to sell it online'];
+  if(how==='ship')return shipMiss.length?['warn','Listed. To ship, add '+shipMiss.join(', ')]:['ok','Listed and ready to ship'];
+  if(!shipMiss.length)return['ok',inMall?'Ships or pickup at '+me.mall.name:'Listed and ready to ship'];
+  return inMall?['ok','Pickup at '+me.mall.name+'. To ship too, add '+shipMiss.join(', ')]:['warn','Listed. To sell online, add '+shipMiss.join(', ')]}
+var fHow='both';function drawHow(){document.querySelectorAll('#fHow button').forEach(function(b){b.setAttribute('aria-pressed',b.dataset.how===fHow)});
+  $('howNote').textContent=fHow==='ship'?'Shoppers pay shipping, and you ship it with a label from the app.':me.mall?(fHow==='pickup'?'Good for big pieces. The shopper pays online and collects it at '+me.mall.name+'\u2019s counter; nothing to ship.':'Shoppers choose shipping, or picking it up at '+me.mall.name+'.'):'Pickup needs your booth to be in a Tabella mall (see Your mall above).'}
+document.querySelectorAll('#fHow button').forEach(function(b){b.onclick=function(){fHow=b.dataset.how;drawHow()}});
 var view='inv';
 function card(it){var w=why(it);return '<li class="it"><button type="button" class="itb" data-edit="'+it.id+'"><img src="'+API+'/img/'+esc(it.photos[0])+'" alt="" loading="lazy" width="72" height="72"><span class="itt"><b>'+esc(it.title)+'</b><span class="meta">'+it.id+(it.price>0?' &middot; '+fm(it.price):'')+(it.status==='sold'&&it.soldAt?' &middot; sold '+new Date(it.soldAt).toLocaleDateString():'')+'</span><span class="pill '+w[0]+'">'+esc(w[1])+'</span></span></button></li>'}
 function drawItems(){var u=$('items'),inv=items.filter(function(i){return i.status!=='sold'}),sold=items.filter(function(i){return i.status==='sold'});
@@ -318,11 +330,12 @@ function openItem(it){editing=it;photoBlob=null;photoKey=null;$('scanOut').inner
   $('fWt').value=it&&it.weightLb?it.weightLb:'';var bx=it&&it.box?it.box.join(','):'';$('fL').value=$('fW').value=$('fH').value='';
   document.querySelectorAll('.boxsz button').forEach(function(b){b.setAttribute('aria-pressed','false')});
   if(bx){var preset=[].some.call(document.querySelectorAll('.boxsz button'),function(b){return b.getAttribute('data-box')===bx});if(preset)setBox(bx);else{var d=it.box;$('fL').value=d[0];$('fW').value=d[1];$('fH').value=d[2];$('dims').hidden=false;document.querySelector('.boxsz button[data-box=""]').setAttribute('aria-pressed','true')}}else $('dims').hidden=true;
-  $('fOnline').checked=it?it.online!==false:true;$('fNotes').value=it&&it.notes?it.notes:'';
+  $('fOnline').checked=it?it.online!==false:true;fHow=it&&it.how||'both';drawHow();$('fNotes').value=it&&it.notes?it.notes:'';
   if(it&&it.photos[0]){$('photoPrev').src=API+'/img/'+it.photos[0];$('photoPrev').hidden=false;$('photoEmpty').hidden=true}else{$('photoPrev').hidden=true;$('photoEmpty').hidden=false;$('photo').value=''}
   $('orderBox').innerHTML='';if(it&&it.status==='sold')showOrder(it.id);
   $('soldBtn').hidden=!it;scanReady();$('soldBtn').textContent=it&&it.status==='sold'?'Mark as available':'Mark as sold';profit();$('itemDlg').showModal()}
 async function showOrder(id){try{var d=await api('/app/items/'+id+'/order');var o=d.order;if(!o)return;var a=o.shipTo||{};
+  if(o.pickup){$('orderBox').innerHTML='<div class="scan" style="margin-top:12px"><b>Sold, order '+esc(o.ref)+'</b><div>'+esc(o.pickup.buyer||'The buyer')+' is picking it up at <b>'+esc(o.pickup.name)+'</b>. The mall pulls it from booth '+esc(o.pickup.booth)+' and holds it at the counter. Nothing to ship.</div><div class="meta">'+(o.pickup.pickedUpAt?'Picked up '+new Date(o.pickup.pickedUpAt).toLocaleDateString():'Waiting for pickup')+'</div></div>';return}
   $('orderBox').innerHTML='<div class="scan" style="margin-top:12px"><b>Sold, order '+esc(o.ref)+'</b><div><b>Ship to</b><br>'+[a.name,a.street1,a.street2,a.city+', '+a.state+' '+a.zip].filter(Boolean).map(esc).join('<br>')+'</div>'+
   (o.shipping?'<div class="meta">They paid for '+esc(o.shipping.carrier+' '+(o.shipping.service||''))+' ('+fm(o.shipping.amount)+')</div>':'')+
   (o.label?labelHtml(o.label):'<button type="button" class="btn" id="labelBtn" style="margin-top:6px">Print shipping label</button><div class="meta">Tabella pays for the label from the shipping the buyer paid. The buyer gets tracking by email.</div><div id="labelMsg" aria-live="polite"></div>')+'</div>';
@@ -352,7 +365,7 @@ $('itemForm').addEventListener('submit',async function(e){e.preventDefault();var
   var box=[+$('fL').value,+$('fW').value,+$('fH').value];var hasBox=box.every(function(v){return v>0});
   b.disabled=true;b.textContent='Saving...';
   try{var photos;if(photoBlob){b.textContent='Uploading photo...';photos=[await upload()]}
-    var body={title:$('fTitle').value,category:$('fCat').value,paid:$('fPaid').value,price:$('fPrice').value,weightLb:$('fWt').value,box:hasBox?box:null,online:$('fOnline').checked,notes:$('fNotes').value};
+    var body={title:$('fTitle').value,category:$('fCat').value,paid:$('fPaid').value,price:$('fPrice').value,weightLb:$('fWt').value,box:hasBox?box:null,online:$('fOnline').checked,how:fHow,notes:$('fNotes').value};
     if(photos)body.photos=photos;
     var d=await api(editing?'/app/items/'+editing.id:'/app/items',{method:editing?'PUT':'POST',json:body});
     $('itemDlg').close();await loadItems()}

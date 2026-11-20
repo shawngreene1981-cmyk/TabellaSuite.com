@@ -124,7 +124,8 @@ async function itemOrder(env, d, id) {
   if (!it.order || !env.ORDERS) return { order: null };
   const o = JSON.parse(await env.ORDERS.get('order:' + it.order) || 'null');
   if (!o) return { order: null };
-  return { order: { ref: o.ref, paidAt: o.paidAt, shipTo: o.shipTo, shipping: o.shipping, label: o.label || null, items: o.items.map(i => ({ id: i.id, title: i.title, price: i.price })) } };
+  return { order: { ref: o.ref, paidAt: o.paidAt, shipTo: o.shipTo, shipping: o.shipping, label: o.label || null,
+    pickup: o.pickup ? { name: o.pickup.name, booth: o.pickup.booth, pickedUpAt: o.pickup.pickedUpAt || null, buyer: o.shipTo && o.shipTo.name } : null, items: o.items.map(i => ({ id: i.id, title: i.title, price: i.price })) } };
 }
 // Buy the shipping label for a paid order. Uses the rate the buyer paid for; if Shippo has expired it,
 // gets fresh rates for the same boxes and picks the same service (or the closest match, cheapest first).
@@ -135,6 +136,7 @@ async function buyLabel(env, d, id, shippo) {
   if (!it.order) throw err(400, 'This item doesn\u2019t have an online order to ship.');
   const key = 'order:' + it.order, o = JSON.parse(await env.ORDERS.get(key) || 'null');
   if (!o || o.status !== 'paid') throw err(400, 'That order isn\u2019t paid yet.');
+  if (o.pickup) throw err(400, 'This order is a pickup at ' + o.pickup.name + '. Nothing to ship.');
   if (o.label && o.label.url) return { label: o.label, already: true };
   if (!d.shipFrom || !d.shipFrom.zip) throw err(400, 'Add your ship-from address first.');
   const lock = 'lbl:' + o.ref;
@@ -287,6 +289,8 @@ async function saveItem(env, d, id, b) {
   if (b.weightLb !== undefined) { const w = b.weightLb === '' || b.weightLb == null ? null : Number(b.weightLb); if (w != null && !(w > 0 && w <= 150)) throw err(400, 'Packed weight should be between 0.1 and 150 pounds.'); it.weightLb = w; }
   if (b.box !== undefined) { const bx = Array.isArray(b.box) ? b.box.map(Number) : null; if (bx && !(bx.length === 3 && bx.every(v => v > 0 && v <= 108))) throw err(400, 'Box size needs three measurements in inches.'); it.box = bx; }
   if (b.online !== undefined) it.online = !!b.online;
+  // How shoppers can buy it online: shipped, picked up at the dealer's mall, or either. Big pieces are often pickup only.
+  if (b.how !== undefined) it.how = ['ship', 'pickup', 'both'].includes(b.how) ? b.how : 'both';
   if (b.notes !== undefined) it.notes = clean(b.notes, 500);
   if (b.status !== undefined && ['available', 'sold', 'hold'].includes(b.status)) it.status = b.status;
   if (Array.isArray(b.photos)) {
@@ -309,10 +313,24 @@ async function newItemId(env) {
 export async function listing(env, d, it) {
   const show = it.online && it.status === 'available' && it.price > 0 && it.photos.length;
   if (!show) { await env.TABELLA.delete('pub:' + it.id); return; }
-  const ships = !!(it.weightLb && it.box && payoutsOk(env, d) && d.shipFrom && d.shipFrom.zip);
-  await env.TABELLA.put('pub:' + it.id, '', { metadata: { t: it.title.slice(0, 120), p: it.price, c: it.category || 'Other', d: d.id, n: d.name.slice(0, 60), ph: it.photos[0], s: ships ? 1 : 0 } });
+  const w = await ways(env, d, it);
+  const md = { t: it.title.slice(0, 120), p: it.price, c: it.category || 'Other', d: d.id, n: d.name.slice(0, 60), ph: it.photos[0], s: w.ships ? 1 : 0 };
+  if (w.pickup) Object.assign(md, { k: w.pickup.mall, mn: w.pickup.name.slice(0, 60), mc: w.pickup.city.slice(0, 40), bo: String(w.pickup.booth).slice(0, 12) });
+  await env.TABELLA.put('pub:' + it.id, '', { metadata: md });
 }
-async function refreshListings(env, d) { for (const it of await listItems(env, d.id)) await listing(env, d, it); }
+// Whether a piece can ship, be picked up at the dealer's mall, or both, right now.
+// Pickup needs the dealer to be in a Tabella mall that has entered its street address, and payouts set up.
+export async function ways(env, d, it) {
+  const how = it.how || 'both';
+  const ships = how !== 'pickup' && !!(it.weightLb && it.box && payoutsOk(env, d) && d.shipFrom && d.shipFrom.zip);
+  let pickup = null;
+  if (how !== 'ship' && d.mall && d.mall.id && payoutsOk(env, d)) {
+    const m = JSON.parse(await env.TABELLA.get('mall:' + d.mall.id) || 'null');
+    if (m && m.address && m.address.street1) pickup = { mall: m.id, name: m.name, city: m.address.city + ', ' + m.address.state, booth: d.mall.booth, address: m.address, email: m.email };
+  }
+  return { how, ships, pickup };
+}
+export async function refreshListings(env, d) { for (const it of await listItems(env, d.id)) await listing(env, d, it); }
 
 // Used by the shop: all listed dealer items, from listing metadata alone.
 export async function dealerListings(env) {
@@ -320,7 +338,8 @@ export async function dealerListings(env) {
   const out = []; let cursor;
   do {
     const l = await env.TABELLA.list({ prefix: 'pub:', cursor });
-    l.keys.forEach(k => { const m = k.metadata || {}; out.push({ id: k.name.slice(4), title: m.t, price: m.p, category: m.c, dealer: m.d, dealerName: m.n, photo: '/img/' + m.ph, shippable: !!m.s }); });
+    l.keys.forEach(k => { const m = k.metadata || {}; out.push({ id: k.name.slice(4), title: m.t, price: m.p, category: m.c, dealer: m.d, dealerName: m.n, photo: '/img/' + m.ph, shippable: !!m.s,
+      pickup: m.k ? { mall: m.k, name: m.mn, city: m.mc, booth: m.bo } : null }); });
     cursor = l.list_complete ? null : l.cursor;
   } while (cursor);
   return out;
