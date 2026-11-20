@@ -474,11 +474,12 @@ function drawAuto(){var a=me.autoStatements||{on:false,day:1};$('autoOn').checke
 async function saveAuto(){try{me=(await api('/mall/statements/auto',{method:'PUT',json:{on:$('autoOn').checked,day:$('autoDay').value}})).mall;drawAuto();
   $('autoMsg').textContent=me.autoStatements.on?'On. Each month you get an email saying what went out.':'Off.'}catch(err){$('autoMsg').textContent=err.message}}
 $('autoOn').onchange=saveAuto;$('autoDay').onchange=saveAuto;
-$('stAll').onclick=async function(){if(!stm)return;var todo=stm.dealers.filter(function(d){return d.lines.length&&d.email&&!d.sent}).length;
-  if(!todo){msg('stMsg','Every booth with sales and an email already has this month\u2019s statement.'+(stm.dealers.some(function(d){return d.lines.length&&!d.email})?' Booths without an email need a printed one.':''));return}
-  if(!confirm('Email '+todo+' statement'+(todo===1?'':'s')+' for '+monLabel(stm.month)+'? Booths already emailed this month are skipped.'))return;
-  var b=this;b.disabled=true;var sent=0,failed=[],noEmail=[];
-  try{for(var i=0;i<30;i++){b.textContent='Sending... '+sent+' of '+todo;var r=await api('/mall/statements/send-all',{json:{month:stm.month}});sent+=r.sent;failed=failed.concat(r.failed);noEmail=r.noEmail;if(!r.left||!r.sent)break}
+$('stAll').onclick=async function(){if(!stm)return;var withMail=stm.dealers.filter(function(d){return d.lines.length&&d.email}),todo=withMail.filter(function(d){return !d.sent}).length,resend=false;
+  if(!withMail.length){msg('stMsg','No booth with sales this month has an email. Add emails on the Dealers tab, or print the statements.',1);return}
+  if(!todo){if(!confirm('Every booth already got its '+monLabel(stm.month)+' statement. Send all '+withMail.length+' again? Use this after a correction, like a refund.'))return;resend=true;todo=withMail.length}
+  else if(!confirm('Email '+todo+' statement'+(todo===1?'':'s')+' for '+monLabel(stm.month)+'? Booths already emailed this month are skipped. To send one again, use its own Email button.'))return;
+  var b=this;b.disabled=true;var sent=0,failed=[],noEmail=[],since=Date.now();
+  try{for(var i=0;i<30;i++){b.textContent='Sending... '+sent+' of '+todo;var r=await api('/mall/statements/send-all',{json:{month:stm.month,resend:resend,since:since}});sent+=r.sent;failed=failed.concat(r.failed);noEmail=r.noEmail;if(!r.left||!r.sent)break}
     msg('stMsg','Sent '+sent+' statement'+(sent===1?'':'s')+'.'+(noEmail.length?' No email for: '+noEmail.join(', ')+'. Print those.':'')+(failed.length?' Didn\u2019t send: '+failed.join('; '):''),failed.length>0)}
   catch(err){msg('stMsg',err.message,1)}b.disabled=false;b.textContent='Email all statements';loadStmts()};
 async function loadStmts(){if(!$('monPick').value)$('monPick').value=thisMonth();drawAuto();

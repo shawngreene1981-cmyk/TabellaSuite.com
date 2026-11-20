@@ -729,7 +729,9 @@ async function statementsCsv(env, m, month, cors) {
 const SEND_BATCH = 15;
 async function sendAll(env, m, b) {
   const r = await statements(env, m, b.month);
-  const todo = r.dealers.filter(st => st.lines.length && st.email && !st.sent);
+  // resend: "send them all again". since = when the mall tapped the button, so each booth gets exactly one new copy.
+  const since = b.resend ? Number(b.since) || Date.now() : 0;
+  const todo = r.dealers.filter(st => st.lines.length && st.email && (!st.sent || (since && st.sent < since)));
   const out = { month: r.month, sent: 0, failed: [], noEmail: r.dealers.filter(st => st.lines.length && !st.email).map(st => 'Booth ' + st.booth + ' ' + st.name) };
   for (const st of todo.slice(0, SEND_BATCH)) {
     try { await emailStatement(env, m, r, st); out.sent++; } catch (e) { out.failed.push('Booth ' + st.booth + ' ' + st.name + ': ' + e.message); if (e.status === 503) break; }
