@@ -58,6 +58,12 @@ table.price td.n{font-family:'Cormorant Garamond',serif;font-size:40px;font-weig
 .note{font-size:18px;color:var(--muted);margin-top:16px;max-width:52em}
 .steps{counter-reset:s}.steps li::before{counter-increment:s;content:counter(s);background:var(--terra);color:var(--terra-ink);width:26px;height:26px;top:14px;left:0;font-size:15px;display:flex;align-items:center;justify-content:center;font-weight:600}
 .steps li{padding-left:44px}
+.slide.wide h2{font-size:46px;max-width:none;margin-bottom:18px}
+.shotgrid{display:grid;grid-template-columns:1fr 1.1fr;gap:34px;align-items:start}
+.shotgrid ul{font-size:19px}.shotgrid ul li{padding:8px 0 8px 30px}.shotgrid ul li::before{top:17px}.shotgrid .money{font-size:18px;margin-top:16px;padding:14px 16px}
+.shotgrid .steps li{padding-left:40px}
+.shot{margin:0;border:1px solid var(--line);border-radius:12px;overflow:hidden;box-shadow:0 12px 32px rgba(35,31,26,.14);background:#fff}
+.shot img{display:block;width:100%;max-height:440px;object-fit:cover;object-position:top}
 .money{font-size:22px;margin-top:22px;padding:18px 22px;background:var(--card);border:1px solid var(--line);border-radius:12px;max-width:40em}
 /* controls */
 #bar{position:fixed;left:0;right:0;bottom:0;display:flex;gap:8px;justify-content:center;align-items:center;padding:10px;color:#A89F90;font-size:14px}
@@ -164,29 +170,29 @@ async function deck(id){
     '<li>Most malls can’t show what’s on the shelves, so shoppers guess, or don’t come.</li>'+
     '<li>Dealers sell their best pieces online elsewhere, and the mall earns nothing from it.</li>'+
     '<li>Month end is paper tags, a register tape and an evening of math for every booth.</li></ul>'+foot+'</section>');
-  S.push('<section class="slide"><div class="cap">Online</div><h2>Every booth at '+esc(short)+', online.</h2><ul>'+
+  S.push('<section class="slide wide"><div class="cap">Online</div><h2>Every booth at '+esc(short)+', online.</h2><div class="shotgrid"><div><ul>'+
     '<li>Dealers photograph a piece and it’s in the Tabella shop, with the booth it sits in.</li>'+
     '<li><b>'+esc(name)+' earns 4% of every online sale</b> from its booths, without lifting a finger.</li>'+
     '<li>Shoppers can pick up at your counter, so online orders bring people through your door.</li></ul>'+
-    '<div class="money">If your dealers sell $2,500 a month online, '+esc(name)+' earns <b>$100 a month</b>. That alone covers the Plus plan for about '+(function(){for(var n=200;n>0;n--)if(cost(n,TIERS[1][1])<=100)return n;return 0})()+' booths.</div>'+foot+'</section>');
+    '<div class="money">If your dealers sell $2,500 a month online, '+esc(name)+' earns <b>$100 a month</b>. That alone covers the Plus plan for about '+(function(){for(var n=200;n>0;n--)if(cost(n,TIERS[1][1])<=100)return n;return 0})()+' booths.</div>'+'</div><figure class="shot"><img src="img/dealer.jpg" alt="The dealer app: add a piece with a photo and price"></figure></div>'+foot+'</section>');
   var dealer=String(qs.get('dealer')||'').trim().slice(0,60);
-  S.push('<section class="slide"><div class="cap">Booth finder</div><h2>New dealers arrive with their shop already online.</h2><ul>'+
+  S.push('<section class="slide wide"><div class="cap">Booth finder</div><h2>New dealers arrive with their shop already online.</h2><div class="shotgrid"><div><ul>'+
     '<li>Anyone can open a Tabella shop online, free, and start selling before they have a booth.</li>'+
     '<li>When they want a brick-and-mortar home, they find malls like '+esc(short)+' on the Tabella map.</li>'+
     '<li><b>Before you say yes, you see their pieces and prices</b> in their Tabella shop: exactly what would go in your booth.</li>'+
     '<li>They arrive with Tabella tags on their pieces, ready to scan at your register.</li></ul>'+
     (dealer?'<div class="money"><b>'+esc(dealer)+'</b> is a Tabella dealer looking for a booth in '+esc(town)+'. See their pieces today: <b>tabellasuite.com/shop/?dealer='+esc(slug(dealer))+'</b></div>'
-           :'<div class="money">Fill an empty booth faster, with a dealer whose pieces you have already seen.</div>')+foot+'</section>');
-  S.push('<section class="slide"><div class="cap">In the mall</div><h2>A register made for booths.</h2><ul>'+
+           :'<div class="money">Fill an empty booth faster, with a dealer whose pieces you have already seen.</div>')+'</div><figure class="shot"><img src="img/shop.jpg" alt="A dealer’s Tabella shop, the way a mall sees it"></figure></div>'+foot+'</section>');
+  S.push('<section class="slide wide"><div class="cap">In the mall</div><h2>A register made for booths.</h2><div class="shotgrid"><div><ul>'+
     '<li>Scan the tag: price, booth and dealer come up. Paper tags work too, by booth number and price.</li>'+
     '<li>Cash or card on the Tabella reader. The piece comes off the website the moment it sells.</li>'+
     '<li>Card money for dealers on Tabella goes straight to their bank. No more checks for those booths.</li>'+
-    '<li>Runs on a tablet in the browser. Nothing to install.</li></ul>'+foot+'</section>');
-  S.push('<section class="slide"><div class="cap">Month end</div><h2>Month end takes minutes, not an evening.</h2><ul>'+
+    '<li>Runs on a tablet in the browser. Nothing to install.</li></ul>'+'</div><figure class="shot"><img src="img/register.jpg" alt="The register: tagged pieces and paper-tag booths in one sale"></figure></div>'+foot+'</section>');
+  S.push('<section class="slide wide"><div class="cap">Month end</div><h2>Month end takes minutes, not an evening.</h2><div class="shotgrid"><div><ul>'+
     '<li>A statement for every booth: each sale, your commission, card fees and booth rent.</li>'+
     '<li>Rent can come out of card sales first, so you aren’t chasing it.</li>'+
     '<li>Statements email themselves on the day you pick. Mark a booth paid when you write the check.</li>'+
-    '<li>A spreadsheet of the month for your books.</li></ul>'+foot+'</section>');
+    '<li>A spreadsheet of the month for your books.</li></ul>'+'</div><figure class="shot"><img src="img/statements.jpg" alt="Month end: every booth’s statement, rent and what you owe"></figure></div>'+foot+'</section>');
   S.push('<section class="slide"><div class="cap">What it costs</div><h2>For '+booths+' booths at '+esc(short)+'.</h2>'+
     '<table class="price"><thead><tr><th></th>'+TIERS.map(function(t){return '<th>'+t[0]+'</th>'}).join('')+'</tr></thead><tbody>'+
     '<tr><td>Per month</td>'+TIERS.map(function(t){return '<td class="n">'+$m(cost(booths,t[1]))+'</td>'}).join('')+'</tr>'+
