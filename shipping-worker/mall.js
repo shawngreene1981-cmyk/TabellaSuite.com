@@ -131,7 +131,7 @@ function publicMall(env, m) {
   if (!m) return null;
   const r = readerFor(env, m);
   return { id: m.id, name: m.name, email: m.email, city: m.city, state: m.state, commissionPct: m.commissionPct, cardFeePct: m.cardFeePct, taxRate: m.taxRate,
-    tz: m.tz, code: m.code, autoStatements: m.autoStatements || { on: false, day: 1 }, address: m.address || null, payouts: mallPayoutsOk(env, m), reader: r ? { label: r.label, simulated: !!r.simulated } : null,
+    tz: m.tz, code: m.code, autoStatements: m.autoStatements || { on: false, day: 1 }, rentFromPayouts: !!m.rentFromPayouts, address: m.address || null, payouts: mallPayoutsOk(env, m), reader: r ? { label: r.label, simulated: !!r.simulated } : null,
     mode: stripeMode(env), live: stripeMode(env) === 'live' && String(env.ALLOW_LIVE_PAYMENTS).toLowerCase() === 'true' };
 }
 async function updateMall(env, m, b) {
@@ -141,6 +141,7 @@ async function updateMall(env, m, b) {
   if (b.commissionPct !== undefined) m.commissionPct = pct(b.commissionPct, 'Commission', 0, 60);
   if (b.cardFeePct !== undefined) m.cardFeePct = pct(b.cardFeePct, 'Card fee', 0, 10);
   if (b.taxRate !== undefined) m.taxRate = b.taxRate === '' || b.taxRate == null ? null : pct(b.taxRate, 'Sales tax rate', 0, 15, 3);
+  if (b.rentFromPayouts !== undefined) m.rentFromPayouts = !!b.rentFromPayouts;
   if (b.tz != null) { if (!ZONES.includes(b.tz)) throw err(400, 'Pick a time zone from the list.'); m.tz = b.tz; }
   if (b.address) {
     const a = {};
@@ -202,7 +203,7 @@ async function listDealers(env, m) {
   const booths = await boothList(env, m.id);
   const ds = await Promise.all(booths.map(b => env.TABELLA.get('dealer:' + b.dealer)));
   return booths.map((b, i) => { const d = ds[i] ? JSON.parse(ds[i]) : null;
-    return { id: b.dealer, name: d ? d.name : '(removed account)', booth: b.booth, pct: b.pct, managed: !!(d && d.managed), email: d && d.managed ? d.email || '' : undefined, payouts: d ? payoutsOk(env, d) : false, joined: b.joined }; })
+    return { id: b.dealer, name: d ? d.name : '(removed account)', booth: b.booth, pct: b.pct, rent: b.rent || null, managed: !!(d && d.managed), email: d && d.managed ? d.email || '' : undefined, payouts: d ? payoutsOk(env, d) : false, joined: b.joined }; })
     .sort((a, b) => String(a.booth).localeCompare(String(b.booth), 'en', { numeric: true }));
 }
 // A booth for a dealer who doesn't use Tabella. The mall keeps paying them as it does today; no sign-in, nothing online.
@@ -213,7 +214,7 @@ async function addBooth(env, m, b) {
   if (b.email && !email) throw err(400, 'That email looks wrong. Leave it blank if you don\u2019t have one.');
   const id = 'd' + rand(10);
   await env.TABELLA.put('dealer:' + id, JSON.stringify({ id, name, email, managed: true, mall: { id: m.id, name: m.name, booth }, created: Date.now() }));
-  await env.TABELLA.put('booth:' + m.id + ':' + id, JSON.stringify({ booth, pct: b.pct === '' || b.pct == null ? null : pct(b.pct, 'Commission', 0, 60), joined: Date.now() }));
+  await env.TABELLA.put('booth:' + m.id + ':' + id, JSON.stringify({ booth, pct: b.pct === '' || b.pct == null ? null : pct(b.pct, 'Commission', 0, 60), rent: money(b.rent, 'Rent'), joined: Date.now() }));
   return { ok: true, id };
 }
 async function setBooth(env, m, did, b) {
@@ -221,6 +222,7 @@ async function setBooth(env, m, did, b) {
   if (!bt) throw err(404, 'That dealer isn’t in your mall.');
   if (b.booth != null) { const v = clean(b.booth, 20); if (!v) throw err(400, 'Enter a booth number.'); bt.booth = v; }
   if (b.pct !== undefined) bt.pct = b.pct === '' || b.pct == null ? null : pct(b.pct, 'Commission', 0, 60);
+  if (b.rent !== undefined) bt.rent = money(b.rent, 'Rent');
   await env.TABELLA.put(key, JSON.stringify(bt));
   const d = JSON.parse(await env.TABELLA.get('dealer:' + did) || 'null');
   if (d && d.managed && d.mall && d.mall.id === m.id && (b.name != null || b.email != null)) {
@@ -435,6 +437,33 @@ async function finish(env, m, s) {
   if (s.method === 'card') await payOut(env, m, s);
   await saveSale(env, s);
 }
+// ---------- booth rent ----------
+//   booth:<mall>:<dealer>.rent          monthly rent in cents (null = none)
+//   mrent:<mall>:<yyyymm>:<dealer>      rent already taken from that month's card payouts, in cents
+// With "take rent from card payouts" on, each card sale pays the booth's unpaid rent for the month before the dealer
+// gets the rest. Whatever is still unpaid at month end comes off what the mall owes on the statement.
+async function takeRent(env, m, s, did, amt) {
+  if (!m.rentFromPayouts) return 0;
+  const bt = JSON.parse(await env.TABELLA.get('booth:' + m.id + ':' + did) || 'null');
+  if (!bt || !(bt.rent > 0)) return 0;
+  const key = 'mrent:' + m.id + ':' + s.day.slice(0, 7).replace('-', '') + ':' + did, got = Number(await env.TABELLA.get(key)) || 0;
+  const take = Math.max(0, Math.min(amt, bt.rent - got));
+  if (take) await env.TABELLA.put(key, String(got + take), { expirationTtl: 60 * 60 * 24 * 800 });
+  return take;
+}
+async function giveBackRent(env, s) {
+  for (const did of Object.keys(s.payouts || {})) {
+    const r = s.payouts[did].rent; if (!r) continue;
+    const key = 'mrent:' + s.mall + ':' + s.day.slice(0, 7).replace('-', '') + ':' + did, got = Number(await env.TABELLA.get(key)) || 0;
+    await env.TABELLA.put(key, String(Math.max(0, got - r)), { expirationTtl: 60 * 60 * 24 * 800 });
+  }
+}
+function money(v, label) {
+  if (v === '' || v == null) return null;
+  const n = Math.round(Number(String(v).replace(/[$,]/g, '')) * 100);
+  if (!isFinite(n) || n < 0 || n > 1000000) throw err(400, label + ' looks wrong.');
+  return n || null;
+}
 async function payOut(env, m, s) {
   s.stripeFee = Math.round(s.total * STRIPE_IN_PERSON_PCT) + STRIPE_IN_PERSON_FIXED;
   const byDealer = {}; let mallExtra = 0;
@@ -444,12 +473,16 @@ async function payOut(env, m, s) {
     const amt = byDealer[did], d = JSON.parse(await env.TABELLA.get('dealer:' + did) || 'null');
     if (amt <= 0) { s.payouts[did] = { amount: amt, status: 'none' }; continue; }
     if (d && d.managed) { s.payouts[did] = { amount: amt, status: 'mall', why: 'The mall pays this booth' }; mallExtra += amt; continue; }
-    if (!s.charge || !d || !payoutsOk(env, d)) { s.payouts[did] = { amount: amt, status: 'waiting', why: 'Dealer hasn’t connected a bank for payouts' }; continue; }
+    // Booth rent: when the mall takes rent from card payouts, this month's unpaid rent comes off the dealer's share first.
+    const take = await takeRent(env, m, s, did, amt), net = amt - take; mallExtra += take;
+    const base = { share: amt, rent: take || undefined, amount: net };
+    if (net <= 0) { s.payouts[did] = Object.assign(base, { status: 'sent', why: 'All of it went to booth rent' }); continue; }
+    if (!s.charge || !d || !payoutsOk(env, d)) { s.payouts[did] = Object.assign(base, { status: 'waiting', why: 'Dealer hasn’t connected a bank for payouts' }); continue; }
     try {
-      const t = await stripeApi(env, 'POST', '/transfers', { amount: String(amt), currency: 'usd', destination: d.stripeAccount, transfer_group: 'mall_' + s.id,
+      const t = await stripeApi(env, 'POST', '/transfers', { amount: String(net), currency: 'usd', destination: d.stripeAccount, transfer_group: 'mall_' + s.id,
         source_transaction: s.charge, 'metadata[role]': 'dealer', 'metadata[sale]': s.id }, s.id + '-d-' + did);
-      s.payouts[did] = { amount: amt, status: 'sent', transfer: t.id };
-    } catch (e) { s.payouts[did] = { amount: amt, status: 'waiting', why: String(e.message).slice(0, 160) }; }
+      s.payouts[did] = Object.assign(base, { status: 'sent', transfer: t.id });
+    } catch (e) { s.payouts[did] = Object.assign(base, { status: 'waiting', why: String(e.message).slice(0, 160) }); }
   }
   const mallAmt = s.items.reduce((a, i) => a + i.commission + i.cardFee, 0) + s.tax - s.stripeFee + mallExtra;
   if (mallAmt <= 0) s.mallPayout = { amount: mallAmt, status: 'none' };
@@ -538,7 +571,7 @@ async function relist(env, s) {
 export async function mallAfterRefund(env, saleId, charge, full, out) {
   const key = saleId && await env.TABELLA.get('msaleix:' + saleId);
   const s = key ? JSON.parse(await env.TABELLA.get(key) || 'null') : null;
-  if (s && full && s.status !== 'refunded') { await relist(env, s); await dropWaiting(env, s); s.status = 'refunded'; s.refundedAt = Date.now(); s.reversed = out.reversed; await env.TABELLA.put(key, JSON.stringify(s)); }
+  if (s && full && s.status !== 'refunded') { await relist(env, s); await dropWaiting(env, s); await giveBackRent(env, s); s.status = 'refunded'; s.refundedAt = Date.now(); s.reversed = out.reversed; await env.TABELLA.put(key, JSON.stringify(s)); }
   const amt = '$' + ((charge.amount_refunded || 0) / 100).toFixed(2);
   const text = (full ? 'Full refund of ' + amt + ' on in-store sale ' + saleId + (s ? ' at ' + s.mallName : '') + '. Items back on sale; ' + out.reversed.length + ' payout(s) taken back.'
     : 'Partial refund of ' + amt + ' on in-store sale ' + saleId + '. Settle the dealer and mall shares by hand.') + (out.problems.length ? ' Needs a look: ' + out.problems.join('; ') : '');
@@ -569,14 +602,19 @@ async function report(env, m, day) {
       d.items++; d.sales += it.price; d.commission += it.commission; d.cardFees += it.cardFee; d.owed += it.owed;
       t.commission += it.commission; t.cardFees += it.cardFee;
       if (s.method === 'cash') { d.mallOwes += it.owed; t.mallOwesDealers += it.owed; }
-      else {
-        const po = s.payouts && s.payouts[it.dealer];
-        if (po && po.status === 'mall') { d.mallOwes += it.owed; t.mallOwesDealers += it.owed; }
-        else if (po && po.status === 'sent') { d.paid += it.owed; t.paidToDealers += it.owed; } else { d.waiting += it.owed; t.waitingForDealers += it.owed; }
-      }
+      else if (!(s.payouts || {})[it.dealer]) { d.waiting += it.owed; t.waitingForDealers += it.owed; }
+    }
+    if (s.method === 'card') for (const did of Object.keys(s.payouts || {})) {
+      const po = s.payouts[did], d = dealers[did]; if (!d) continue;
+      const r = po.rent || 0, a = po.amount;
+      d.rent = (d.rent || 0) + r; t.rentTaken = (t.rentTaken || 0) + r;
+      if (po.status === 'mall') { d.mallOwes += a; t.mallOwesDealers += a; }
+      else if (po.status === 'sent') { d.paid += a; t.paidToDealers += a; }
+      else if (po.status === 'waiting') { d.waiting += a; t.waitingForDealers += a; }
     }
   }
-  t.mallKeeps = t.commission + t.cardFees;
+  t.rentTaken = t.rentTaken || 0;
+  t.mallKeeps = t.commission + t.cardFees + t.rentTaken;
   return { day, mall: m.name, totals: t, dealers: Object.values(dealers).sort((a, b) => String(a.booth).localeCompare(String(b.booth), 'en', { numeric: true })),
     sales: all.map(publicSale) };
 }
@@ -654,24 +692,34 @@ async function statements(env, m, month) {
   for (const b of booths) {
     const d = JSON.parse(await env.TABELLA.get('dealer:' + b.dealer) || 'null');
     byId[b.dealer] = { id: b.dealer, name: d ? d.name : 'Booth ' + b.booth, email: d ? d.email || '' : '', managed: !!(d && d.managed), booth: b.booth, lines: [],
-      sales: 0, commission: 0, cardFees: 0, share: 0, mallOwes: 0, paidByTabella: 0, waiting: 0 };
+      sales: 0, commission: 0, cardFees: 0, share: 0, mallOwes: 0, paidByTabella: 0, waiting: 0, rent: b.rent || 0, rentTaken: 0 };
   }
   for (const s of all.filter(x => x.status === 'paid').sort((a, b) => a.at - b.at)) {
     for (const it of s.items) {
-      const st = byId[it.dealer] || (byId[it.dealer] = { id: it.dealer, name: it.dealerName, email: '', managed: false, booth: it.booth, gone: true, lines: [], sales: 0, commission: 0, cardFees: 0, share: 0, mallOwes: 0, paidByTabella: 0, waiting: 0 });
+      const st = byId[it.dealer] || (byId[it.dealer] = { id: it.dealer, name: it.dealerName, email: '', managed: false, booth: it.booth, gone: true, lines: [], sales: 0, commission: 0, cardFees: 0, share: 0, mallOwes: 0, paidByTabella: 0, waiting: 0, rent: 0, rentTaken: 0 });
       const po = s.method === 'card' ? (s.payouts || {})[it.dealer] : null;
       const who = s.method === 'cash' || (po && po.status === 'mall') ? 'mall' : po && po.status === 'sent' ? 'tabella' : 'waiting';
       st.lines.push({ day: s.day, sale: s.id, item: it.manual ? '' : it.id, title: it.title, method: s.method, price: it.price, commission: it.commission, cardFee: it.cardFee, share: it.owed, who });
       st.sales += it.price; st.commission += it.commission; st.cardFees += it.cardFee; st.share += it.owed;
-      if (who === 'mall') st.mallOwes += it.owed; else if (who === 'tabella') st.paidByTabella += it.owed; else st.waiting += it.owed;
+      if (s.method === 'cash') st.mallOwes += it.owed;
+      else if (!po) st.waiting += it.owed;
+    }
+    // Card money is settled per sale and dealer: what went to the dealer's bank, what waits, and what went to rent.
+    if (s.method === 'card') for (const did of Object.keys(s.payouts || {})) {
+      const po = s.payouts[did], st = byId[did]; if (!st) continue;
+      st.rentTaken += po.rent || 0;
+      if (po.status === 'mall') st.mallOwes += po.amount; else if (po.status === 'sent') st.paidByTabella += po.amount; else if (po.status === 'waiting') st.waiting += po.amount;
     }
   }
   const list = Object.values(byId);
+  // Rent still unpaid after card payouts comes off what the mall owes; if that isn't enough, the dealer owes the rest.
+  for (const st of list) { const left = Math.max(0, st.rent - st.rentTaken); st.rentLeft = left; st.net = st.mallOwes - left; }
   await Promise.all(list.map(async st => { st.paid = JSON.parse(await env.TABELLA.get('mpaid:' + m.id + ':' + month.replace('-', '') + ':' + st.id) || 'null');
     st.sent = Number(await env.TABELLA.get('msent:' + m.id + ':' + month.replace('-', '') + ':' + st.id)) || null; }));
   list.sort((a, b) => String(a.booth).localeCompare(String(b.booth), 'en', { numeric: true }));
-  const tot = list.reduce((t, st) => { for (const k of ['sales', 'commission', 'cardFees', 'share', 'mallOwes', 'paidByTabella', 'waiting']) t[k] += st[k]; return t; },
-    { sales: 0, commission: 0, cardFees: 0, share: 0, mallOwes: 0, paidByTabella: 0, waiting: 0 });
+  const tot = list.reduce((t, st) => { for (const k of ['sales', 'commission', 'cardFees', 'share', 'mallOwes', 'paidByTabella', 'waiting', 'rent', 'rentTaken']) t[k] += st[k];
+    if (st.net > 0) t.netOwed += st.net; else t.rentDue += -st.net; return t; },
+    { sales: 0, commission: 0, cardFees: 0, share: 0, mallOwes: 0, paidByTabella: 0, waiting: 0, rent: 0, rentTaken: 0, netOwed: 0, rentDue: 0 });
   return { month, mall: m.name, totals: tot, dealers: list };
 }
 async function markPaid(env, m, b) {
@@ -699,11 +747,15 @@ async function emailStatement(env, m, r, st) {
     (st.lines.length ? '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-size:14px;border-collapse:collapse"><tr style="color:#6A6259;font-size:12px"><td>Date</td><td style="padding:0 6px">Item</td><td style="text-align:right">Sold for</td><td style="text-align:right;padding-left:8px">Your share</td></tr>' + rows + '</table>' : '<p>No sales this month.</p>') +
     '<p style="margin:14px 0 4px">Sales ' + c(st.sales) + ' &middot; mall commission ' + c(st.commission) + (st.cardFees ? ' &middot; card fees ' + c(st.cardFees) : '') + '</p>' +
     '<p style="margin:0 0 4px"><b>Your share: ' + c(st.share) + '</b></p>' +
-    (st.mallOwes ? '<p style="margin:0 0 4px">Paid by ' + e(m.name) + ': ' + c(st.mallOwes) + (st.paid ? ' (paid ' + e(new Date(st.paid.at).toLocaleDateString('en-US')) + (st.paid.note ? ', ' + e(st.paid.note) : '') + ')' : '') + '</p>' : '') +
     (st.paidByTabella ? '<p style="margin:0 0 4px">Already sent to your bank by Tabella (card sales): ' + c(st.paidByTabella) + '</p>' : '') +
+    (st.rent ? '<p style="margin:0 0 4px">Booth rent: ' + c(st.rent) + (st.rentTaken ? ' (' + c(st.rentTaken) + ' taken from card sales)' : '') + '</p>' : '') +
+    (st.net > 0 ? '<p style="margin:0 0 4px"><b>Paid by ' + e(m.name) + ': ' + c(st.net) + '</b>' + (st.paid ? ' (paid ' + e(new Date(st.paid.at).toLocaleDateString('en-US')) + (st.paid.note ? ', ' + e(st.paid.note) : '') + ')' : '') + '</p>' : '') +
+    (st.net < 0 ? '<p style="margin:0 0 4px"><b>Rent still due to ' + e(m.name) + ': ' + c(-st.net) + '</b></p>' : '') +
     (st.waiting ? '<p style="margin:0 0 4px">Waiting for you to connect a bank in the Tabella dealer app: ' + c(st.waiting) + '</p>' : '');
   const text = m.name + ', booth ' + st.booth + ', ' + label + '\n' + st.lines.map(l => l.day + '  ' + l.title + '  ' + c(l.price) + '  share ' + c(l.share)).join('\n') +
-    '\nSales ' + c(st.sales) + ', commission ' + c(st.commission) + ', card fees ' + c(st.cardFees) + '\nYour share ' + c(st.share);
+    '\nSales ' + c(st.sales) + ', commission ' + c(st.commission) + ', card fees ' + c(st.cardFees) + '\nYour share ' + c(st.share) +
+    (st.rent ? '\nBooth rent ' + c(st.rent) + (st.rentTaken ? ' (' + c(st.rentTaken) + ' taken from card sales)' : '') : '') +
+    (st.net > 0 ? '\nPaid by ' + m.name + ' ' + c(st.net) : st.net < 0 ? '\nRent still due ' + c(-st.net) : '');
   const r2 = await sendEmail(env, { to: st.email, replyTo: m.email, subject: m.name + ' statement, ' + label + ', booth ' + st.booth, html: emailFrame('Your ' + label + ' statement', inner), text });
   if (r2.skipped) throw err(503, 'Email isn\u2019t switched on yet. Print the statement instead.');
   if (r2.error) throw err(502, 'The email didn\u2019t send: ' + r2.error);
@@ -717,8 +769,8 @@ async function statementsCsv(env, m, month, cors) {
   const rows = [['Booth', 'Dealer', 'Date', 'Sale', 'Item number', 'Item', 'Paid by', 'Sold for', 'Mall commission', 'Card fee', 'Dealer share', 'Who pays the dealer']];
   for (const st of r.dealers) for (const l of st.lines) rows.push([st.booth, st.name, l.day, l.sale, l.item, l.title, l.method === 'cash' ? 'Cash' : 'Card', c(l.price), c(l.commission), c(l.cardFee), c(l.share), who[l.who]]);
   rows.push([]);
-  rows.push(['Booth', 'Dealer', 'Sales', 'Commission', 'Card fees', 'Dealer share', 'Mall owes', 'Sent by Tabella', 'Waiting', 'Marked paid']);
-  for (const st of r.dealers) rows.push([st.booth, st.name, c(st.sales), c(st.commission), c(st.cardFees), c(st.share), c(st.mallOwes), c(st.paidByTabella), c(st.waiting), st.paid ? new Date(st.paid.at).toISOString().slice(0, 10) + (st.paid.note ? ' ' + st.paid.note : '') : '']);
+  rows.push(['Booth', 'Dealer', 'Sales', 'Commission', 'Card fees', 'Dealer share', 'Sent by Tabella', 'Waiting', 'Booth rent', 'Rent taken from card sales', 'Mall pays dealer', 'Rent still due from dealer', 'Marked paid']);
+  for (const st of r.dealers) rows.push([st.booth, st.name, c(st.sales), c(st.commission), c(st.cardFees), c(st.share), c(st.paidByTabella), c(st.waiting), c(st.rent), c(st.rentTaken), c(Math.max(0, st.net)), c(Math.max(0, -st.net)), st.paid ? new Date(st.paid.at).toISOString().slice(0, 10) + (st.paid.note ? ' ' + st.paid.note : '') : '']);
   const csv = rows.map(row => row.map(v => { v = String(v); return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }).join(',')).join('\r\n');
   return new Response(csv, { headers: Object.assign({ 'content-type': 'text/csv; charset=utf-8', 'content-disposition': 'attachment; filename="' + m.name.replace(/[^A-Za-z0-9]+/g, '-') + '-statements-' + r.month + '.csv"' }, cors) });
 }
@@ -731,8 +783,9 @@ async function sendAll(env, m, b) {
   const r = await statements(env, m, b.month);
   // resend: "send them all again". since = when the mall tapped the button, so each booth gets exactly one new copy.
   const since = b.resend ? Number(b.since) || Date.now() : 0;
-  const todo = r.dealers.filter(st => st.lines.length && st.email && (!st.sent || (since && st.sent < since)));
-  const out = { month: r.month, sent: 0, failed: [], noEmail: r.dealers.filter(st => st.lines.length && !st.email).map(st => 'Booth ' + st.booth + ' ' + st.name) };
+  const has = st => st.lines.length || st.rent;
+  const todo = r.dealers.filter(st => has(st) && st.email && (!st.sent || (since && st.sent < since)));
+  const out = { month: r.month, sent: 0, failed: [], noEmail: r.dealers.filter(st => has(st) && !st.email).map(st => 'Booth ' + st.booth + ' ' + st.name) };
   for (const st of todo.slice(0, SEND_BATCH)) {
     try { await emailStatement(env, m, r, st); out.sent++; } catch (e) { out.failed.push('Booth ' + st.booth + ' ' + st.name + ': ' + e.message); if (e.status === 503) break; }
     await new Promise(ok => setTimeout(ok, 600)); // stay under the email service's rate limit
