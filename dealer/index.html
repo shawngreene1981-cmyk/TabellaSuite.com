@@ -104,6 +104,7 @@ dialog{max-height:calc(100dvh - 24px);max-height:calc(100vh - 24px)}
 .stats div{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:2px}
 .stats b{font-size:1.25rem}
 #salesBar[hidden],#invBar[hidden]{display:none}
+.tglist{list-style:none;padding:0;margin:0;max-height:46vh;overflow:auto;border:1px solid var(--line);border-radius:10px}.tglist li{border-bottom:1px solid var(--line)}.tglist label{display:flex;gap:10px;align-items:center;margin:0;padding:8px 10px;cursor:pointer}.tglist input{width:20px;height:20px;flex:none}.tglist .meta{margin-left:auto;white-space:nowrap}
 </style>
 </head>
 <body>
@@ -172,7 +173,7 @@ dialog{max-height:calc(100dvh - 24px);max-height:calc(100vh - 24px)}
  </details>
 
  <div class="tabs" role="tablist" id="viewTabs" style="margin-top:22px"><button type="button" role="tab" id="tabInv" aria-selected="true">Inventory <span id="count"></span></button><button type="button" role="tab" id="tabSales" aria-selected="false">Sales <span id="salesCount"></span></button></div>
-<div class="bar" id="invBar"><h2 style="font-size:1.7rem">Inventory</h2><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn sec" type="button" id="csvBtn">Download spreadsheet</button><button class="btn" type="button" id="addBtn">Add an item</button></div></div>
+<div class="bar" id="invBar"><h2 style="font-size:1.7rem">Inventory</h2><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn sec" type="button" id="tagsBtn">Print tags</button><button class="btn sec" type="button" id="csvBtn">Download spreadsheet</button><button class="btn" type="button" id="addBtn">Add an item</button></div></div>
 <div id="salesBar" hidden><h2 style="font-size:1.7rem;margin:0 0 8px">Sales</h2><div class="stats" id="salesStats"></div></div>
 <ul class="items" id="items"><li class="empty">Loading...</li></ul>
 </section>
@@ -201,6 +202,18 @@ dialog{max-height:calc(100dvh - 24px);max-height:calc(100vh - 24px)}
  <div id="itMsg" aria-live="polite"></div>
  <div class="dlgfoot"><button class="btn" type="submit" id="saveBtn">Save item</button><button class="btn sec" type="button" id="soldBtn" hidden>Mark as sold</button></div>
 </form></dialog>
+<dialog id="tagDlg" aria-labelledby="tgH"><div class="dlg">
+ <button class="x" type="button" data-close aria-label="Close">&times;</button>
+ <h2 id="tgH" style="font-size:1.6rem;margin:0 0 6px">Print tags</h2>
+ <p class="meta" style="margin:0 0 10px">Each tag has a QR code the mall's register scans, plus the price, item number and your booth in print.</p>
+ <label for="tgBooth">Booth number on the tags</label><input id="tgBooth" maxlength="20" placeholder="B14">
+ <div class="lbl" style="margin-top:10px">Print on</div>
+ <div class="chips" id="tgSize"><button type="button" data-s="roll" aria-pressed="true">Label roll, 2.25 x 1.25 in</button><button type="button" data-s="sheet" aria-pressed="false">Letter sheet, 24 tags</button></div>
+ <div class="bar" style="margin:10px 0 4px"><b id="tgCount"></b><span><button type="button" class="linkbtn" id="tgAll">Select all</button> &middot; <button type="button" class="linkbtn" id="tgNone">None</button></span></div>
+ <ul class="tglist" id="tgList"></ul>
+ <div id="tgMsg" aria-live="polite"></div>
+ <div class="dlgfoot"><button class="btn" type="button" id="tgPrint">Print tags</button><button class="btn sec" type="button" data-close>Cancel</button></div>
+</div></dialog>
 <footer><span>&copy; <span id="y"></span> Tabella Suite &middot; <a href="mailto:contact@tabellasuite.com">contact@tabellasuite.com</a></span><span><a href="../pricing.html">Pricing</a> &middot; <a href="../privacy.html">Privacy</a></span></footer>
 </div>
 <script>
@@ -335,6 +348,37 @@ $('importBtn').onclick=async function(){var b=this,total=0;b.disabled=true;
   try{for(var i=0;i<20;i++){b.textContent='Bringing items in... '+total+' so far';var r=await api('/app/import',{method:'POST',json:{}});total+=r.added;if(r.done)break}
     msg('importMsg',total+' items are in your shop. The Tabella shop now shows them from here.');b.hidden=true;await loadItems();setTimeout(function(){$('importCard').hidden=true},6000)}
   catch(err){msg('importMsg',err.message+' Tap again to continue; items already copied are kept.',1);b.disabled=false;b.textContent='Continue'}};
+// ----- tags: QR in the register's format SQ1|BOOTH|ITEM|PRICE|CATEGORY|RARITY
+var tagSize='roll';
+document.querySelectorAll('#tgSize button').forEach(function(b){b.onclick=function(){tagSize=b.dataset.s;document.querySelectorAll('#tgSize button').forEach(function(x){x.setAttribute('aria-pressed',x===b)})}});
+function tagCount(){var n=document.querySelectorAll('#tgList input:checked').length;$('tgCount').textContent=n+' tag'+(n===1?'':'s');return n}
+$('tagsBtn').onclick=function(){var av=items.filter(function(i){return i.status!=='sold'&&i.price>0});
+  $('tgBooth').value=(me.mall&&me.mall.booth)||$('tgBooth').value||'';msg('tgMsg','');
+  $('tgList').innerHTML=av.length?av.map(function(i){return '<li><label><input type="checkbox" value="'+i.id+'"><span>'+esc(i.title)+'</span><span class="meta">'+i.id+' &middot; '+fm(i.price)+'</span></label></li>'}).join(''):'<li style="padding:12px" class="meta">No unsold items with a price yet.</li>';
+  $('tgList').querySelectorAll('input').forEach(function(c){c.onchange=tagCount});tagCount();$('tagDlg').showModal()};
+$('tgAll').onclick=function(){$('tgList').querySelectorAll('input').forEach(function(c){c.checked=true});tagCount()};
+$('tgNone').onclick=function(){$('tgList').querySelectorAll('input').forEach(function(c){c.checked=false});tagCount()};
+function loadQr(){return window.qrcode?Promise.resolve():new Promise(function(ok,no){var s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js';s.onload=ok;s.onerror=function(){no(new Error('The QR code maker could not load. Check the connection and try again.'))};document.head.appendChild(s)})}
+function qrSvg(q){var n=q.getModuleCount(),p='';for(var r=0;r<n;r++)for(var c=0;c<n;c++)if(q.isDark(r,c))p+='M'+c+' '+r+'h1v1h-1z';
+  return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="-1 -1 '+(n+2)+' '+(n+2)+'" shape-rendering="crispEdges"><rect x="-1" y="-1" width="'+(n+2)+'" height="'+(n+2)+'" fill="#fff"/><path d="'+p+'" fill="#000"/></svg>'}
+function tagTxt(s,n){return String(s==null?'':s).replace(/[|\r\n]/g,' ').trim().slice(0,n)}
+$('tgPrint').onclick=async function(){var ids=[].map.call(document.querySelectorAll('#tgList input:checked'),function(c){return c.value});
+  if(!ids.length){msg('tgMsg','Pick at least one item.',1);return}
+  try{await loadQr()}catch(e){msg('tgMsg',e.message,1);return}
+  var booth=tagTxt($('tgBooth').value,10),shop=esc(me.name);
+  var tags=ids.map(function(id){var it=items.find(function(x){return x.id===id});
+    var q=qrcode(0,'M');q.addData(['SQ1',booth,it.id,Number(it.price).toFixed(2),tagTxt(it.category,12),''].join('|'));q.make();
+    return '<div class="tag"><div class="qr">'+qrSvg(q)+'</div><div class="tx"><div class="shop">'+shop+'</div><div class="ti">'+esc(it.title)+'</div><div class="pr">'+fm(it.price)+'</div><div class="id">'+it.id+(booth?' &middot; Booth '+esc(booth):'')+'</div></div></div>'}).join('');
+  var roll=tagSize==='roll';
+  var css='*{box-sizing:border-box}body{margin:0;font-family:Arial,Helvetica,sans-serif;color:#000}'+
+    '.tag{display:flex;gap:.08in;align-items:center;overflow:hidden;border:1px solid #000;border-radius:.06in;padding:.07in}'+
+    '.qr{flex:none;width:.95in;height:.95in}.qr svg{width:100%;height:100%;display:block}.tx{min-width:0;display:flex;flex-direction:column;gap:1px}'+
+    '.shop{font:600 6.5pt Georgia,serif;letter-spacing:.12em;text-transform:uppercase}.ti{font-size:7.5pt;line-height:1.15;max-height:2.3em;overflow:hidden}.pr{font-size:15pt;font-weight:700;line-height:1.1}.id{font-size:7pt}'+
+    (roll?'@page{size:2.25in 1.25in;margin:0}.tag{width:2.25in;height:1.25in;border:0;border-radius:0;page-break-after:always;padding:.08in .1in}'
+         :'@page{size:letter;margin:.5in}.sheet{display:grid;grid-template-columns:repeat(3,2.5in);grid-auto-rows:1.25in}.tag{width:2.5in;height:1.25in;border-color:#999;border-radius:0}.sheet .tag:nth-child(24n){page-break-after:always}');
+  var html='<!doctype html><html><head><meta charset="utf-8"><title>Tags</title><style>'+css+'</style></head><body>'+(roll?tags:'<div class="sheet">'+tags+'</div>')+'</body></html>';
+  var f=document.createElement('iframe');f.style.cssText='position:fixed;width:0;height:0;border:0;right:0;bottom:0';document.body.appendChild(f);var d=f.contentDocument;d.open();d.write(html);d.close();
+  setTimeout(function(){f.contentWindow.focus();f.contentWindow.print();setTimeout(function(){f.remove()},1500)},250)};
 $('csvBtn').onclick=async function(){var b=this;b.disabled=true;
   try{var r=await fetch(API+'/app/export.csv',{headers:{Authorization:'Bearer '+tok}});if(!r.ok)throw new Error('The spreadsheet could not be made. Try again.');
     var blob=await r.blob(),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=(me.name||'items').replace(/[^A-Za-z0-9]+/g,'-')+'-items.csv';document.body.appendChild(a);a.click();a.remove()}
