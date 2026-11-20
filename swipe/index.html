@@ -21,6 +21,7 @@ body{overscroll-behavior:none}
 .topbar{display:flex;justify-content:space-between;align-items:center;padding:14px 0}
 .topbar .logo{font-family:Cinzel,serif;font-weight:600;letter-spacing:.22em;text-decoration:none;color:var(--ink)}
 .topbar a.s,.topbar button.s{font:500 .9rem Inter,sans-serif;color:var(--muted);background:none;border:0;text-decoration:none;cursor:pointer;padding:6px 0;margin-left:14px}
+.modes{display:inline-flex;border:1px solid var(--line);border-radius:999px;padding:3px;background:var(--card);gap:2px;margin:0 0 14px}.modes a{font:600 .92rem Inter,sans-serif;padding:8px 18px;border-radius:999px;text-decoration:none;color:var(--muted)}.modes a[aria-current]{background:var(--ink);color:var(--bg)}
 .tabs3{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:0 0 14px}
 .tabs3 button{font:600 .95rem Inter,sans-serif;padding:10px;border-radius:999px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer}
 .tabs3 button[aria-selected=true]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
@@ -74,7 +75,8 @@ dialog::backdrop{background:rgba(20,16,12,.55)}
 </head>
 <body>
 <div class="app">
- <div class="topbar"><a class="logo" href="../">TABELLA</a><span><a class="s" href="../shop/">Shop</a><button class="s" type="button" id="who">Sign in</button></span></div>
+ <div class="topbar"><a class="logo" href="../">TABELLA</a><span><button class="s" type="button" id="who">Sign in</button></span></div>
+ <div style="text-align:center"><nav class="modes" aria-label="How to shop"><a href="./" aria-current="page">Swipe</a><a href="../shop/">Browse</a></nav></div>
  <div class="tabs3" role="tablist"><button type="button" role="tab" data-v="disc" aria-selected="true">Discover</button><button type="button" role="tab" data-v="saved" aria-selected="false">Saved <span id="nSaved"></span></button><button type="button" role="tab" data-v="offers" aria-selected="false">Offers <span id="nOffers"></span></button></div>
 
  <section id="v-disc">

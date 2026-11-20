@@ -59,6 +59,7 @@ input{font:inherit;width:100%;padding:9px 10px;border:1px solid var(--line);bord
 .msg{border-radius:8px;padding:10px 12px;margin:10px 0;font-size:.92rem}.msg.err{background:#F6E2DC;color:#7A2A17}.msg.ok{background:#E3EEDF;color:#264B2B}
 .empty{color:var(--muted);padding:20px 0}
 footer{padding:36px 0 48px;border-top:1px solid var(--line);margin-top:48px;font-size:.88rem;color:var(--muted);display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px}
+.modes{display:inline-flex;border:1px solid var(--line);border-radius:999px;padding:3px;background:var(--card);gap:2px;margin:0 0 14px}.modes a{font:600 .92rem Inter,sans-serif;padding:8px 18px;border-radius:999px;text-decoration:none;color:var(--muted)}.modes a[aria-current]{background:var(--ink);color:var(--bg)}
 .dnote{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 14px;margin:0 0 12px}
 </style>
 </head>
@@ -69,7 +70,8 @@ footer{padding:36px 0 48px;border-top:1px solid var(--line);margin-top:48px;font
 <p class="test" role="note" hidden>Test shop. Payments run in Stripe's sandbox: no real money moves. Pay with test card 4242 4242 4242 4242, any future date, any security code.</p><script>fetch('https://tabella-shipping.shawn-greene1981.workers.dev/health').then(function(r){return r.json()}).then(function(h){if(h.stripe!=='live')document.querySelectorAll('.test').forEach(function(e){e.hidden=false})}).catch(function(){document.querySelectorAll('.test').forEach(function(e){e.hidden=false})})</script>
 <div class="cap">Shop</div>
 <h1>The Tabella shop</h1>
-<p class="lede">One-of-a-kind vintage and antique finds from independent dealers. Every piece is photographed by the dealer who has it, and shipped to your door. Or <a href="../swipe/">swipe through them and make an offer</a>.</p>
+<p class="lede">One-of-a-kind vintage and antique finds from independent dealers. Every piece is photographed by the dealer who has it, and shipped to your door.</p>
+<nav class="modes" aria-label="How to shop"><a href="../swipe/">Swipe</a><a href="./" aria-current="page">Browse</a></nav>
 <div id="dealerNote" hidden class="dnote"></div>
 <div class="bar"><div class="chips" id="chips" role="group" aria-label="Category"></div><button class="btn cartbtn" id="cartBtn" type="button">Cart (0)</button></div>
 <div id="canceled"></div>
