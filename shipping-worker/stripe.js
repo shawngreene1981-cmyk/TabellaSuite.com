@@ -161,6 +161,7 @@ export async function createCheckoutSession(env, order, extra) {
     // Payment methods are chosen in the Stripe Dashboard (Settings > Payment methods); Stripe no longer
     // accepts payment_method_types here. Keep only card-rate methods on there so the Card processing line is right.
     'payment_intent_data[transfer_group]': order.group,
+    'payment_intent_data[metadata][order]': (extra && extra['metadata[order]']) || '',
     'metadata[group]': order.group,
     'metadata[splits]': order.splitsMeta
   }, extra || {});
@@ -206,7 +207,12 @@ async function webhook(request, env, json) {
 // A partial refund is left for a person to settle; Tabella's ops inbox gets an email either way.
 async function refunded(env, charge) {
   const pi = charge.payment_intent ? await stripe(env, 'GET', '/payment_intents/' + charge.payment_intent) : null;
-  const ref = pi && pi.metadata && pi.metadata.order;
+  let ref = pi && pi.metadata && pi.metadata.order;
+  // Orders placed before the order number was saved on the payment: find it through the Checkout Session.
+  if (!ref && charge.payment_intent) {
+    const ss = await stripe(env, 'GET', '/checkout/sessions?limit=1&payment_intent=' + encodeURIComponent(charge.payment_intent)).catch(() => null);
+    ref = ss && ss.data && ss.data[0] && ss.data[0].metadata && ss.data[0].metadata.order;
+  }
   const full = charge.refunded === true || charge.amount_refunded >= charge.amount;
   const out = { ref, full, reversed: [], problems: [] };
   if (full && pi && pi.transfer_group) {
