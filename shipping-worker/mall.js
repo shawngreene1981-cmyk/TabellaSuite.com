@@ -71,8 +71,8 @@ export async function handleMall(request, env, url, json, cors) {
     if (p === '/mall/statements/send-all' && request.method === 'POST') return json(await sendAll(env, m.mall, await body(request)), 200, cors);
     if (p === '/mall/statements/auto' && request.method === 'PUT') return json({ mall: publicMall(env, await setAuto(env, m.mall, await body(request))) }, 200, cors);
     if (p === '/mall/statements/send' && request.method === 'POST') return json(await sendStatement(env, m.mall, await body(request)), 200, cors);
-    if (p === '/mall/report' && request.method === 'GET') return json(await report(env, m.mall, url.searchParams.get('day')), 200, cors);
-    if (p === '/mall/report.csv' && request.method === 'GET') return reportCsv(env, m.mall, url.searchParams.get('day'), cors);
+    if (p === '/mall/report' && request.method === 'GET') return json(await report(env, m.mall, url.searchParams.get('month') || url.searchParams.get('day')), 200, cors);
+    if (p === '/mall/report.csv' && request.method === 'GET') return reportCsv(env, m.mall, url.searchParams.get('month') || url.searchParams.get('day'), cors);
     if (p === '/mall/reader' && request.method === 'POST') return json({ mall: publicMall(env, await setupReader(env, m.mall, await body(request))) }, 200, cors);
     if (p === '/mall/payouts' && request.method === 'POST') return json(await payouts(env, m.mall, url), 200, cors);
     if (p === '/mall/payouts/waiting' && request.method === 'POST') return json(await sendAllWaiting(env, m.mall), 200, cors);
@@ -582,7 +582,8 @@ export async function mallAfterRefund(env, saleId, charge, full, out) {
 async function salesOn(env, m, day) {
   const out = []; let cursor;
   do {
-    const l = await env.TABELLA.list({ prefix: 'msale:' + m.id + ':' + day.replace(/-/g, '') + ':', cursor });
+    // A day (YYYY-MM-DD) or a whole month (YYYY-MM): sale keys start msale:<mall>:<yyyymmdd>:
+    const l = await env.TABELLA.list({ prefix: 'msale:' + m.id + ':' + day.replace(/-/g, '') + (day.length === 10 ? ':' : ''), cursor });
     const vals = await Promise.all(l.keys.map(k => env.TABELLA.get(k.name)));
     vals.forEach(v => { if (v) out.push(JSON.parse(v)); });
     cursor = l.list_complete ? null : l.cursor;
@@ -590,7 +591,7 @@ async function salesOn(env, m, day) {
   return out.sort((a, b) => a.at - b.at);
 }
 async function report(env, m, day) {
-  day = /^\d{4}-\d{2}-\d{2}$/.test(String(day || '')) ? day : dayOf(m, Date.now());
+  day = /^\d{4}-\d{2}(-\d{2})?$/.test(String(day || '')) ? day : dayOf(m, Date.now()); // a month works too
   const all = await salesOn(env, m, day), paid = all.filter(s => s.status === 'paid');
   const t = { sales: paid.length, items: 0, subtotal: 0, tax: 0, total: 0, cash: 0, card: 0, commission: 0, cardFees: 0, stripeFees: 0, mallOwesDealers: 0, paidToDealers: 0, waitingForDealers: 0, mallWaiting: 0 };
   const dealers = {};
