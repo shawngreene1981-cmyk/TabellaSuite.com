@@ -608,7 +608,7 @@ async function report(env, m, day) {
       const po = s.payouts[did], d = dealers[did]; if (!d) continue;
       const r = po.rent || 0, a = po.amount;
       d.rent = (d.rent || 0) + r; t.rentTaken = (t.rentTaken || 0) + r;
-      if (po.status === 'mall') { d.mallOwes += a; t.mallOwesDealers += a; }
+      if (po.status === 'mall') { d.mallOwes += a; d.mallCard = (d.mallCard || 0) + a; t.mallOwesDealers += a; }
       else if (po.status === 'sent') { d.paid += a; t.paidToDealers += a; }
       else if (po.status === 'waiting') { d.waiting += a; t.waitingForDealers += a; }
     }

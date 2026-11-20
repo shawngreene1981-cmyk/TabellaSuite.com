@@ -444,6 +444,11 @@ $('camStop').onclick=stopCam;
 // ----- today
 function today(){try{return new Intl.DateTimeFormat('en-CA',{timeZone:me.tz||'America/Chicago'}).format(new Date())}catch(e){return new Date().toISOString().slice(0,10)}}
 $('dayPick').onchange=loadDay;
+// Says in words why a booth's "You owe" is what it is.
+function whyOwe(d){var owe=[],other=[],cash=d.mallOwes-(d.mallCard||0);
+  if(cash>0)owe.push(fc(cash)+' from cash sales');if(d.mallCard)owe.push(fc(d.mallCard)+' from card sales, since you pay this booth yourself');
+  if(d.paid)other.push(fc(d.paid)+' from card sales already went to their bank');if(d.waiting)other.push(fc(d.waiting)+' from card sales is waiting for their bank');if(d.rent)other.push(fc(d.rent)+' from card sales went to their booth rent');
+  var t=owe.length?owe.join(', plus '):'';if(other.length)t+=(t?'. ':'Nothing from you: ')+other.join('. ');return t?'<br><span class="meta">'+t+'.</span>':''}
 async function loadDay(){if(!$('dayPick').value)$('dayPick').value=today();var day=$('dayPick').value;
   $('dayStats').innerHTML='<div><span class="meta">Loading...</span></div>';
   try{var r=await api('/mall/report?day='+day),t=r.totals;
@@ -451,8 +456,8 @@ async function loadDay(){if(!$('dayPick').value)$('dayPick').value=today();var d
       .map(function(x){return '<div><span class="meta">'+esc(x[0])+'</span><b>'+esc(x[1])+'</b></div>'}).join('');
     var w=t.waitingForDealers+t.mallWaiting;$('waitBox').hidden=!w;
     $('waitTxt').textContent=w?fc(w)+' from card sales is waiting'+(t.waitingForDealers&&t.mallWaiting?' for dealers\u2019 banks and yours':t.mallWaiting?' for your bank (Settings > Get paid)':' for dealers to connect a bank')+'. It is sent automatically when the bank is connected, or tap to send it now.':'';
-    $('dayTbl').innerHTML=r.dealers.length?'<thead><tr><th>Booth</th><th>Dealer</th><th>Items</th><th>Sales</th><th>Commission</th><th>Card fees</th><th>Dealer share</th><th>You owe</th><th>Paid by card</th></tr></thead><tbody>'+
-      r.dealers.map(function(d){return '<tr><td>'+esc(d.booth)+'</td><td>'+esc(d.name)+'</td><td>'+d.items+'</td><td>'+fc(d.sales)+'</td><td>'+fc(d.commission)+'</td><td>'+fc(d.cardFees)+'</td><td>'+fc(d.owed)+'</td><td><b>'+fc(d.mallOwes)+'</b></td><td>'+fc(d.paid)+(d.rent?'<br><span class="meta">'+fc(d.rent)+' went to booth rent</span>':'')+(d.waiting?'<br><span class="meta">'+fc(d.waiting)+' waiting for the dealer\'s bank</span>':'')+'</td></tr>'}).join('')+'</tbody>':'<tbody><tr><td class="meta">No sales on this day.</td></tr></tbody>';
+    $('dayTbl').innerHTML=r.dealers.length?'<thead><tr><th>Booth</th><th>Dealer</th><th>Items</th><th>Sales</th><th>Commission</th><th>Card fees</th><th>Dealer share</th><th>You owe them</th><th>Tabella sent to their bank</th></tr></thead><tbody>'+
+      r.dealers.map(function(d){return '<tr><td>'+esc(d.booth)+'</td><td>'+esc(d.name)+'</td><td>'+d.items+'</td><td>'+fc(d.sales)+'</td><td>'+fc(d.commission)+'</td><td>'+fc(d.cardFees)+'</td><td>'+fc(d.owed)+'</td><td><b>'+fc(d.mallOwes)+'</b>'+whyOwe(d)+'</td><td>'+fc(d.paid)+'</td></tr>'}).join('')+'</tbody>':'<tbody><tr><td class="meta">No sales on this day.</td></tr></tbody>';
     $('daySales').innerHTML=r.sales.slice().reverse().map(function(s){var st={paid:'',refunded:'Refunded',refunding:'Refund in progress',cancelled:'Cancelled',pending:'Not finished',failed:'Failed'}[s.status];
       return '<li><span><b>'+new Date(s.at).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'})+'</b> &middot; '+(s.method==='cash'?'Cash':'Card')+' &middot; '+s.items.length+' item'+(s.items.length===1?'':'s')+' &middot; '+fc(s.total)+(st?' <span class="pill">'+st+'</span>':'')+
       '<br><span class="meta">'+s.items.map(function(i){return esc(i.title)+' (Booth '+esc(i.booth)+')'}).join(', ')+'</span></span>'+
