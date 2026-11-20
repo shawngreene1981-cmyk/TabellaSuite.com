@@ -9,6 +9,7 @@
 //   CATALOG_URL       optional; defaults to https://tabellasuite.com/shop/items.json
 
 import { mallAccountFor } from './mall.js';
+import { offerForCheckout, offerOrderStarted, offerCheckoutEnded } from './offers.js';
 import { buildOrder, createCheckoutSession, stripeMode, stripeApi } from './stripe.js';
 import { dealerListings, dealerItem, markDealerItemSold, markDealerItemAvailable, payoutsOk, shantiquesMoved, ITEM_ID } from './app.js';
 import { sendEmail, buyerReceipt, dealerAlert, opsEmail } from './mail.js';
@@ -43,6 +44,9 @@ export async function handleShop(request, env, url, json, cors, shippoFetch) {
       const cat = await catalog(env);
       const pick = await pickItems(env, cat, b.items, null);
       if (pick.error) return json({ error: pick.error }, 400, cors);
+      // Buying at an accepted offer's price (offers.js): the signed-in shopper who made it, that one piece only.
+      let offer = null;
+      try { offer = await withOffer(env, request, b, pick); } catch (e) { return json({ error: e.message }, e.status || 400, cors); }
       const to = checkAddress(b.to);
       if (to.error) return json({ error: to.error }, 400, cors);
       const from = pick.items[0].shipFrom || shipFrom(env);
@@ -63,6 +67,9 @@ export async function handleShop(request, env, url, json, cors, shippoFetch) {
       const cat = await catalog(env);
       const pick = await pickItems(env, cat, b.items, null);
       if (pick.error) return json({ error: pick.error }, 400, cors);
+      // Buying at an accepted offer's price (offers.js): the signed-in shopper who made it, that one piece only.
+      let offer = null;
+      try { offer = await withOffer(env, request, b, pick); } catch (e) { return json({ error: e.message }, e.status || 400, cors); }
       const to = checkAddress(b.to);
       if (to.error) return json({ error: to.error }, 400, cors);
       if (!/^[a-f0-9]{32}$/.test(String(b.rateId || ''))) return json({ error: 'Pick a shipping option first.' }, 400, cors);
@@ -88,7 +95,8 @@ export async function handleShop(request, env, url, json, cors, shippoFetch) {
       // Hold each item so two people can't buy the same one-of-a-kind piece.
       const ref = 'o_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
       for (const it of pick.items) {
-        if (await env.ORDERS.get('sold:' + it.id) || await env.ORDERS.get('hold:' + it.id)) return json({ error: it.title + ' was just bought or is in someone’s checkout. Remove it and try again.' }, 409, cors);
+        const h = await env.ORDERS.get('hold:' + it.id);
+        if (await env.ORDERS.get('sold:' + it.id) || (h && !(offer && h === 'offer:' + offer.id))) return json({ error: it.title + ' was just bought or is in someone’s checkout. Remove it and try again.' }, 409, cors);
       }
       await Promise.all(pick.items.map(it => env.ORDERS.put('hold:' + it.id, ref, { expirationTtl: HOLD_SECONDS })));
 
@@ -106,9 +114,11 @@ export async function handleShop(request, env, url, json, cors, shippoFetch) {
         });
       } catch (e) {
         await Promise.all(pick.items.map(it => env.ORDERS.delete('hold:' + it.id)));
+        if (offer) await offerCheckoutEnded(env, offer.id, offer.item);
         throw e;
       }
-      await env.ORDERS.put('order:' + ref, JSON.stringify({ ref, status: 'checkout', created: Date.now(), session: session.id,
+      if (offer) await offerOrderStarted(env, offer, ref);
+      await env.ORDERS.put('order:' + ref, JSON.stringify({ ref, status: 'checkout', created: Date.now(), session: session.id, offer: offer ? offer.id : undefined,
         items: pick.items.map(i => ({ id: i.id, title: i.title, price: i.price, dealer: i.dealer })), shipTo: to.addr, email, tax: tax ? { cents: tax.cents, calc: tax.id } : null,
         shipping: { rateId: b.rateId, amount: ship, carrier: rate.provider, service: rate.servicelevel && rate.servicelevel.name, token: rate.servicelevel && rate.servicelevel.token }, breakdown: order.breakdown }), { expirationTtl: 60 * 60 * 24 * 400 });
       return json({ url: session.url, order: ref, breakdown: order.breakdown, testMode: stripeMode(env) === 'test' }, 200, cors);
@@ -159,6 +169,7 @@ export async function shopAfterPayment(env, session, paid) {
     if (o && o.status === 'checkout') { o.status = 'expired'; await env.ORDERS.put('order:' + ref, JSON.stringify(o), { expirationTtl: 60 * 60 * 24 * 30 }); }
   }
   await Promise.all(ids.map(async id => { if ((await env.ORDERS.get('hold:' + id)) === ref) await env.ORDERS.delete('hold:' + id); }));
+  if (o && o.offer && o.status !== 'paid') for (const id of ids) await offerCheckoutEnded(env, o.offer, id);
 }
 
 // After a refund in the Stripe Dashboard (see stripe.js). Full refund: items back on sale and the tax record reversed.
@@ -233,6 +244,12 @@ async function pickItems(env, cat, ids) {
   const dealers = new Set(out.map(i => i.dealer));
   if (dealers.size > 1) return { error: 'For now, each order can hold items from one shop.' };
   return { items: out };
+}
+async function withOffer(env, request, b, pick) {
+  if (!b.offer) return null;
+  const o = await offerForCheckout(env, request, b.offer, pick.items.map(i => i.id));
+  pick.items[0].price = o.agreed / 100;
+  return o;
 }
 function dealerAccount(cat, it) { const d = (cat.dealers || {})[it.dealer]; return d && d.account; }
 function publicItem(i) { return { id: i.id, title: i.title, price: i.price }; }

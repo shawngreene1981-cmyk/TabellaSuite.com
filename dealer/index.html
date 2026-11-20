@@ -103,7 +103,12 @@ dialog{max-height:calc(100dvh - 24px);max-height:calc(100vh - 24px)}
 .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-bottom:12px}
 .stats div{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:2px}
 .stats b{font-size:1.25rem}
-#salesBar[hidden],#invBar[hidden]{display:none}
+#salesBar[hidden],#invBar[hidden],#offersBar[hidden]{display:none}
+.of{list-style:none;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:10px}.of.due{border-color:var(--terra);box-shadow:0 0 0 1px var(--terra) inset}
+.ofh{display:flex;gap:12px;align-items:center}.ofh img{width:64px;height:64px;object-fit:cover;border-radius:8px;flex:none}.ofs{margin-top:2px;font-weight:500}
+.bub{display:flex;flex-direction:column;gap:6px;margin:10px 0 0}.bub span{max-width:80%;padding:7px 12px;border-radius:14px;font-size:.92rem}.bub .them{background:var(--bg2);align-self:flex-start}.bub .me{background:var(--terra);color:var(--terra-ink);align-self:flex-end}
+.ofa{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:12px}.ctr{display:flex;gap:6px;align-items:center}.ctr input{width:90px}
+.chips.sm{margin-top:10px}.chips.sm button{font-size:.85rem;padding:6px 10px}
 .tglist{list-style:none;padding:0;margin:0;max-height:46vh;overflow:auto;border:1px solid var(--line);border-radius:10px}.tglist li{border-bottom:1px solid var(--line)}.tglist label{display:flex;gap:10px;align-items:center;margin:0;padding:8px 10px;cursor:pointer}.tglist input{width:20px;height:20px;flex:none}.tglist .meta{margin-left:auto;white-space:nowrap}
 </style>
 </head>
@@ -172,8 +177,9 @@ dialog{max-height:calc(100dvh - 24px);max-height:calc(100vh - 24px)}
   </form>
  </details>
 
- <div class="tabs" role="tablist" id="viewTabs" style="margin-top:22px"><button type="button" role="tab" id="tabInv" aria-selected="true">Inventory <span id="count"></span></button><button type="button" role="tab" id="tabSales" aria-selected="false">Sales <span id="salesCount"></span></button></div>
+ <div class="tabs" role="tablist" id="viewTabs" style="margin-top:22px"><button type="button" role="tab" id="tabInv" aria-selected="true">Inventory <span id="count"></span></button><button type="button" role="tab" id="tabSales" aria-selected="false">Sales <span id="salesCount"></span></button><button type="button" role="tab" id="tabOffers" aria-selected="false">Offers <span id="offerCount"></span></button></div>
 <div class="bar" id="invBar"><h2 style="font-size:1.7rem">Inventory</h2><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn sec" type="button" id="tagsBtn">Print tags</button><button class="btn sec" type="button" id="csvBtn">Download spreadsheet</button><button class="btn" type="button" id="addBtn">Add an item</button></div></div>
+<div id="offersBar" hidden><h2 style="font-size:1.7rem;margin:0 0 4px">Offers</h2><p class="meta" style="margin:0 0 10px">Shoppers can offer on pieces you sell online. Accept, decline, or make one counter within 24 hours. Messages are tap-to-send, so nobody shares phone numbers or takes the sale elsewhere. An accepted offer holds the piece for the shopper for 24 hours while they pay.</p></div>
 <div id="salesBar" hidden><h2 style="font-size:1.7rem;margin:0 0 8px">Sales</h2><div class="stats" id="salesStats"></div></div>
 <ul class="items" id="items"><li class="empty">Loading...</li></ul>
 </section>
@@ -272,13 +278,30 @@ function card(it){var w=why(it);return '<li class="it"><button type="button" cla
 function drawItems(){var u=$('items'),inv=items.filter(function(i){return i.status!=='sold'}),sold=items.filter(function(i){return i.status==='sold'});
   var toShip=sold.filter(function(i){return i.order&&!i.shippedAt}).length;
   $('count').textContent=inv.length?'('+inv.length+')':'';$('salesCount').textContent=sold.length?'('+sold.length+')'+(toShip?' · '+toShip+' to ship':''):'';
-  $('tabInv').setAttribute('aria-selected',view==='inv');$('tabSales').setAttribute('aria-selected',view==='sales');$('invBar').hidden=view!=='inv';$('salesBar').hidden=view!=='sales';
+  $('tabInv').setAttribute('aria-selected',view==='inv');$('tabSales').setAttribute('aria-selected',view==='sales');$('tabOffers').setAttribute('aria-selected',view==='offers');$('invBar').hidden=view!=='inv';$('salesBar').hidden=view!=='sales';$('offersBar').hidden=view!=='offers';
+  if(view==='offers'){drawOffers();return}
   if(view==='sales'){sold.sort(function(x,y){var a=(x.order&&!x.shippedAt)?1:0,b=(y.order&&!y.shippedAt)?1:0;return b-a||(y.soldAt||0)-(x.soldAt||0)});
     var tot=0,prof=0,known=0;sold.forEach(function(i){var p=+i.price||0;tot+=p;if(i.paid!=null&&i.paid!==''){prof+=p*0.91-(+i.paid);known++}});
     $('salesStats').innerHTML='<div><span class="meta">Items sold</span><b>'+sold.length+'</b></div><div><span class="meta">Sales</span><b>'+fm(tot)+'</b></div><div><span class="meta">Your share after 9%</span><b>'+fm(tot*0.91)+'</b></div><div><span class="meta">To ship</span><b>'+toShip+'</b></div>'+(known?'<div><span class="meta">Profit'+(known<sold.length?' ('+known+' with cost)':'')+'</span><b>'+fm(prof)+'</b></div>':'');
     u.innerHTML=sold.length?sold.map(card).join(''):'<li class="empty">No sales yet. When something sells, it moves here with the ship-to address and a label button.</li>';return}
   u.innerHTML=inv.length?inv.map(card).join(''):(items.length?'<li class="empty">Everything has sold. Tap <b>Add an item</b> to list more.</li>':'<li class="empty">No items yet. Tap <b>Add an item</b> to list your first piece.</li>')}
-$('tabInv').onclick=function(){view='inv';drawItems()};$('tabSales').onclick=function(){view='sales';drawItems()};
+$('tabInv').onclick=function(){view='inv';drawItems()};$('tabSales').onclick=function(){view='sales';drawItems()};$('tabOffers').onclick=function(){view='offers';drawItems();loadOffers()};
+// ----- offers from shoppers (one counter, preset messages only)
+var offers=[],SAYS={avail_yes:'Yes, it\u2019s still available.',photo_yes:'I\u2019ve added more photos to the listing.',cond_none:'No chips, cracks or repairs that I can see.',cond_listing:'Any wear is described in the listing.',size_added:'I\u2019ve added the measurements to the listing.',firm:'The price is firm.',thanks:'Thank you!'};
+function left(t){var h=Math.max(0,Math.round((t-Date.now())/3600e3));return h>=48?Math.round(h/24)+' days left':h>=24?'1 day left':h>=1?h+'h left':'under an hour left'}
+async function loadOffers(){try{offers=(await api('/app/offers')).offers;var n=offers.filter(function(o){return o.turn==='dealer'}).length;$('offerCount').textContent=n?'('+n+')':'';if(view==='offers')drawOffers()}catch(e){}}
+function ostate(o){return {asked:'Question, waiting on you',offered:'Offer of '+fm(o.amount/100)+', waiting on you',countered:'You countered at '+fm(o.counter/100)+', waiting on the shopper',accepted:'Accepted at '+fm(o.agreed/100)+', waiting for the shopper to pay',bought:'Bought at '+fm(o.agreed/100)+'. It\u2019s in your Sales tab.',declined:'Declined',expired:'Expired',sold:'The piece sold'}[o.status]||o.status}
+function drawOffers(){var u=$('items');
+  u.innerHTML=offers.length?offers.map(function(o){var open=['asked','offered','countered','accepted'].indexOf(o.status)>=0;
+    return '<li class="of'+(o.turn==='dealer'?' due':'')+'" data-o="'+o.id+'"><div class="ofh">'+(o.photo?'<img src="'+API+esc(o.photo)+'" alt="" width="64" height="64">':'')+'<div><b>'+esc(o.title)+'</b><div class="meta">'+esc(o.item)+' &middot; listed '+fm(o.price/100)+' &middot; '+esc(o.shopper)+'</div><div class="ofs">'+esc(ostate(o))+(open&&o.expires?' <span class="meta">&middot; '+left(o.expires)+'</span>':'')+'</div></div></div>'+
+      (o.says.length?'<div class="bub">'+o.says.map(function(m){return '<span class="'+(m.from==='dealer'?'me':'them')+'">'+esc(m.text)+'</span>'}).join('')+'</div>':'')+
+      (o.status==='offered'?'<div class="ofa"><button class="btn" type="button" data-a="accept">Accept '+fm(o.amount/100)+'</button><span class="ctr"><span class="meta">Counter $</span><input type="number" inputmode="decimal" step="1" min="0" aria-label="Counter offer" placeholder="'+Math.round((o.amount+o.price)/200)+'"><button class="btn sec" type="button" data-a="counter">Counter</button></span><button class="linkbtn" type="button" data-a="decline">Decline</button></div>':'')+
+      (o.canSay&&o.canSay.length?'<div class="chips sm">'+o.canSay.map(function(k){return '<button type="button" data-say="'+k+'">'+esc(SAYS[k])+'</button>'}).join('')+'</div>':'')+'<div class="ofm"></div></li>'}).join(''):'<li class="empty">No offers yet. Shoppers can make offers on pieces you sell online.</li>';
+  u.querySelectorAll('[data-a],[data-say]').forEach(function(b){b.onclick=async function(){var li=b.closest('li'),id=li.dataset.o,a=b.dataset.a||'say',body={};
+    if(a==='counter'){body.amount=li.querySelector('.ctr input').value;if(!body.amount){li.querySelector('.ctr input').focus();return}}
+    if(a==='say')body.code=b.dataset.say;
+    if(a==='decline'&&!confirm('Decline this offer? The piece stays for sale.'))return;
+    b.disabled=true;try{await api('/app/offers/'+id+'/'+a,{json:body});await loadOffers();if(a==='accept')loadItems()}catch(err){li.querySelector('.ofm').innerHTML='<div class="msg err">'+esc(err.message)+'</div>';b.disabled=false}}})}
 async function loadItems(){try{var d=await api('/app/items');items=d.items;drawItems()}catch(e){$('items').innerHTML='<li class="empty">'+esc(e.message)+'</li>'}}
 $('items').addEventListener('click',function(e){var b=e.target.closest('[data-edit]');if(b)openItem(items.filter(function(i){return i.id===b.getAttribute('data-edit')})[0])});
 $('addBtn').onclick=function(){openItem(null)};
@@ -386,7 +409,7 @@ $('csvBtn').onclick=async function(){var b=this;b.disabled=true;
     var blob=await r.blob(),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=(me.name||'items').replace(/[^A-Za-z0-9]+/g,'-')+'-items.csv';document.body.appendChild(a);a.click();a.remove()}
   catch(err){alertMsg(err.message)}b.disabled=false};
 // ----- start
-async function enter(){show('app');drawSetup();loadItems();checkImport();
+async function enter(){show('app');drawSetup();loadItems();checkImport();loadOffers();if(location.hash==='#offers'){view='offers';drawItems()}
   if(/payouts=back/.test(location.search)){try{var s=await api('/app/payouts');me.payouts=s.ready;drawSetup();drawItems()}catch(e){}history.replaceState(null,'',location.pathname)}}
 (async function(){if(resetTok){show('auth');setMode('in');$('authForm').hidden=true;$('resetForm').hidden=false;document.querySelector('.tabs').hidden=true;return}
   if(!tok){show('auth');setMode('in');return}try{var d=await api('/app/me');me=d.dealer;await enter()}catch(e){show('auth');setMode('in')}})();

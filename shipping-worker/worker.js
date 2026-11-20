@@ -10,6 +10,7 @@ import { handleStripe, stripeMode } from './stripe.js';
 import { handleShop } from './shop.js';
 import { handleApp } from './app.js';
 import { handleMall, autoStatements } from './mall.js';
+import { handleOffers } from './offers.js';
 import { handleTrips } from './trips.js';
 import { handlePlaces } from './places.js';
 
@@ -33,6 +34,9 @@ export default {
 
     const paid = await handleStripe(request, env, url, json, cors);
     if (paid) return paid;
+
+    const offers = await handleOffers(request, env, url, json, cors);
+    if (offers) return offers;
 
     const mall = await handleMall(request, env, url, json, cors);
     if (mall) return mall;

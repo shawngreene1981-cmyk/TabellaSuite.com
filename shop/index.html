@@ -69,7 +69,7 @@ footer{padding:36px 0 48px;border-top:1px solid var(--line);margin-top:48px;font
 <p class="test" role="note" hidden>Test shop. Payments run in Stripe's sandbox: no real money moves. Pay with test card 4242 4242 4242 4242, any future date, any security code.</p><script>fetch('https://tabella-shipping.shawn-greene1981.workers.dev/health').then(function(r){return r.json()}).then(function(h){if(h.stripe!=='live')document.querySelectorAll('.test').forEach(function(e){e.hidden=false})}).catch(function(){document.querySelectorAll('.test').forEach(function(e){e.hidden=false})})</script>
 <div class="cap">Shop</div>
 <h1>The Tabella shop</h1>
-<p class="lede">One-of-a-kind vintage and antique finds from independent dealers. Every piece is photographed by the dealer who has it, and shipped to your door.</p>
+<p class="lede">One-of-a-kind vintage and antique finds from independent dealers. Every piece is photographed by the dealer who has it, and shipped to your door. Or <a href="../swipe/">swipe through them and make an offer</a>.</p>
 <div id="dealerNote" hidden class="dnote"></div>
 <div class="bar"><div class="chips" id="chips" role="group" aria-label="Category"></div><button class="btn cartbtn" id="cartBtn" type="button">Cart (0)</button></div>
 <div id="canceled"></div>
@@ -114,6 +114,9 @@ function mine(i){return !ONLY||slug(i.dealer)===ONLY||slug(i.dealerName)===ONLY}
 try{cart=JSON.parse(localStorage.getItem('tabCart')||'[]')}catch(e){cart=[]}
 function save(){try{localStorage.setItem('tabCart',JSON.stringify(cart))}catch(e){}$('cartBtn').textContent='Cart ('+cart.length+')'}
 function item(id){return CAT.items.filter(function(i){return i.id===id})[0]}
+// Paying for an accepted offer (from the Discover page): ?offer=<id>. That piece only, at the agreed price, as the signed-in shopper.
+var OFFER=null,OFFER_ID=(location.search.match(/offer=(O[0-9A-Z]{8,16})/)||[])[1],BTOK=null;try{BTOK=JSON.parse(localStorage.getItem('tabBuyer')||'null')}catch(e){}
+function priceOf(i){return OFFER&&i.id===OFFER.item?OFFER.agreed/100:i.price}
 function draw(){
   var cats=['All'];CAT.items.forEach(function(i){if(mine(i)&&cats.indexOf(i.category)<0)cats.push(i.category)});
   if(ONLY){var any=CAT.items.filter(mine)[0];$('dealerNote').hidden=false;$('dealerNote').innerHTML=any?'Showing pieces from <b>'+esc(any.dealerName||((CAT.dealers||{})[any.dealer]||{}).name||'this dealer')+'</b> only. <a href="./">See the whole shop</a>':'No pieces from that dealer right now. <a href="./">See the whole shop</a>'}
@@ -140,15 +143,15 @@ function resetShip(){rate=null;$('rates').innerHTML='';$('totals').innerHTML='';
 function drawCart(){
   cart=cart.filter(function(id){var i=item(id);return i&&i.shippable&&!GONE[id]});save();
   if(!cart.length){$('cartList').innerHTML='<p class="empty">Your cart is empty.</p>';$('addr').hidden=true;resetShip();return}
-  sub=0;$('cartList').innerHTML=cart.map(function(id){var i=item(id);sub+=i.price;
-    return '<div class="line"><span>'+esc(i.title)+' <span class="meta">'+i.id+'</span></span><span>'+fm(i.price)+' <button type="button" class="rm" data-rm="'+id+'" aria-label="Remove '+esc(i.title)+'">Remove</button></span></div>'}).join('')+
+  sub=0;$('cartList').innerHTML=(OFFER?'<div class="msg ok">Your accepted offer: '+fm(OFFER.agreed/100)+' (listed at '+fm(OFFER.price/100)+'). Pay within '+Math.max(1,Math.round((OFFER.expires-Date.now())/3600e3))+' hours.</div>':'')+cart.map(function(id){var i=item(id);sub+=priceOf(i);
+    return '<div class="line"><span>'+esc(i.title)+' <span class="meta">'+i.id+'</span></span><span>'+fm(priceOf(i))+' <button type="button" class="rm" data-rm="'+id+'" aria-label="Remove '+esc(i.title)+'">Remove</button></span></div>'}).join('')+
     '<div class="line"><b>Items</b><b>'+fm(sub)+'</b></div>';
   $('addr').hidden=false}
 function openCart(){$('cartMsg').innerHTML='';drawCart();$('cartDlg').showModal()}
 $('cartBtn').onclick=openCart;
 function addr(){return{name:$('aName').value,street1:$('aSt').value,street2:$('aSt2').value,city:$('aCity').value,state:$('aState').value,zip:$('aZip').value}}
 function say(t,bad){$('cartMsg').innerHTML='<div class="msg '+(bad?'err':'ok')+'">'+esc(t)+'</div>'}
-async function post(p,b){var r=await fetch(API+p,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)});var d=await r.json().catch(function(){return{}});if(!r.ok)throw new Error(d.error||'Something went wrong. Try again.');return d}
+async function post(p,b){var h={'Content-Type':'application/json'};if(OFFER){b.offer=OFFER.id;h.Authorization='Bearer '+BTOK}var r=await fetch(API+p,{method:'POST',headers:h,body:JSON.stringify(b)});var d=await r.json().catch(function(){return{}});if(!r.ok)throw new Error(d.error||'Something went wrong. Try again.');return d}
 $('addr').addEventListener('submit',async function(e){e.preventDefault();resetShip();$('cartMsg').innerHTML='';
   var b=$('getShip');b.disabled=true;b.textContent='Getting shipping...';
   try{var d=await post('/shop/quote',{items:cart,to:addr()});
@@ -164,7 +167,12 @@ $('payBtn').onclick=async function(){var b=this;if(!rate)return;b.disabled=true;
   catch(err){say(err.message,1);b.disabled=false;b.textContent='Go to secure checkout'}};
 if(/canceled=/.test(location.search))$('canceled').innerHTML='<div class="msg ok">Checkout canceled. Your cart is still here.</div>';
 Promise.all([fetch(API+'/shop/catalog').then(function(r){if(!r.ok)throw 0;return r.json()}).catch(function(){return fetch('items.json',{cache:'no-cache'}).then(function(r){return r.json()})}),fetch(API+'/shop/status').then(function(r){return r.json()}).catch(function(){return{sold:[],held:[]}})])
- .then(function(a){CAT=a[0];(a[1].sold||[]).concat(a[1].held||[]).forEach(function(id){GONE[id]=1});draw();var h=decodeURIComponent((location.hash||'').slice(1));if(h&&item(h)&&!GONE[h])openItem(h)})
+ .then(async function(a){CAT=a[0];(a[1].sold||[]).concat(a[1].held||[]).forEach(function(id){GONE[id]=1});
+   if(OFFER_ID&&BTOK){try{var r=await fetch(API+'/buyer/offers/'+OFFER_ID,{headers:{Authorization:'Bearer '+BTOK}}),d=await r.json();
+     if(r.ok&&d.offer.status==='accepted'&&item(d.offer.item)){OFFER=d.offer;delete GONE[OFFER.item];try{if(cart.length&&cart.join()!==OFFER.item)localStorage.setItem('tabCartBefore',JSON.stringify(cart))}catch(e){}cart=[OFFER.item];save();draw();openCart();return}
+     $('canceled').innerHTML='<div class="msg err">'+esc(r.ok?'That offer can\u2019t be paid for now ('+d.offer.status+').':(d.error||'Sign in again on the Discover page.'))+'</div>'}catch(e){}}
+   else if(OFFER_ID)$('canceled').innerHTML='<div class="msg err">Sign in on the Discover page first, then tap Pay now on your offer.</div>';
+   draw();var h=decodeURIComponent((location.hash||'').slice(1));if(h&&item(h)&&!GONE[h])openItem(h)})
  .catch(function(){$('grid').innerHTML='<li class="empty">The shop could not load. Refresh to try again.</li>'});
 })();
 </script>

@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Discover | Tabella</title>
+<meta name="description" content="Swipe through one-of-a-kind antique and vintage finds from independent dealers. Save what you love and make an offer.">
+<link rel="canonical" href="https://tabellasuite.com/swipe/">
+<meta property="og:type" content="website"><meta property="og:site_name" content="Tabella">
+<meta property="og:title" content="Discover antiques on Tabella">
+<meta property="og:description" content="Swipe, save and make an offer on one-of-a-kind finds.">
+<meta property="og:url" content="https://tabellasuite.com/swipe/"><meta property="og:image" content="https://tabellasuite.com/og.png">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Inter:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="../styles.css?v=4">
+<style>
+[hidden]{display:none!important}
+body{overscroll-behavior:none}
+.app{max-width:520px;margin:0 auto;padding-bottom:30px}
+.topbar{display:flex;justify-content:space-between;align-items:center;padding:14px 0}
+.topbar .logo{font-family:Cinzel,serif;font-weight:600;letter-spacing:.22em;text-decoration:none;color:var(--ink)}
+.topbar a.s,.topbar button.s{font:500 .9rem Inter,sans-serif;color:var(--muted);background:none;border:0;text-decoration:none;cursor:pointer;padding:6px 0;margin-left:14px}
+.tabs3{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:0 0 14px}
+.tabs3 button{font:600 .95rem Inter,sans-serif;padding:10px;border-radius:999px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer}
+.tabs3 button[aria-selected=true]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.badge{display:inline-block;min-width:20px;padding:0 6px;border-radius:99px;background:var(--terra);color:var(--terra-ink);font-size:.75rem;margin-left:4px}
+.stack{position:relative;height:min(68vh,600px);touch-action:pan-y}
+.card{position:absolute;inset:0;background:var(--card);border:1px solid var(--line);border-radius:18px;overflow:hidden;box-shadow:0 10px 30px rgba(35,31,26,.14);display:flex;flex-direction:column;user-select:none;-webkit-user-select:none;touch-action:none;will-change:transform}
+.card.back{transform:scale(.96) translateY(10px);filter:brightness(.97)}
+.card .ph{flex:1;min-height:0;background:#fff;display:flex;align-items:center;justify-content:center}
+.card .ph img{max-width:100%;max-height:100%;object-fit:contain;pointer-events:none}
+.card .tx{padding:14px 16px}
+.card h2{font-size:1.6rem;margin:0}
+.card .pr{font:600 1.5rem 'Cormorant Garamond',serif;color:var(--terra)}
+.card .meta{color:var(--muted);font-size:.9rem}
+.card .stamp{position:absolute;top:22px;padding:6px 14px;border:3px solid;border-radius:10px;font:700 1.4rem Inter,sans-serif;letter-spacing:.06em;opacity:0;transform:rotate(-12deg)}
+.card .stamp.yes{left:20px;color:var(--green);border-color:var(--green)}.card .stamp.no{right:20px;color:#9b2c2c;border-color:#9b2c2c;transform:rotate(12deg)}
+.acts{display:flex;justify-content:center;gap:18px;margin:16px 0 0}
+.round{width:62px;height:62px;border-radius:50%;border:1px solid var(--line);background:var(--card);font-size:1.6rem;cursor:pointer;box-shadow:0 4px 12px rgba(35,31,26,.1);color:var(--ink)}
+.round.save{color:var(--terra)}.round.pass{color:var(--muted)}
+.offerbtn{height:62px;padding:0 26px;border-radius:999px;border:0;background:var(--terra);color:var(--terra-ink);font:600 1.05rem Inter,sans-serif;cursor:pointer;box-shadow:0 4px 12px rgba(154,74,46,.3)}
+.offerbtn:disabled{opacity:.4;cursor:default}
+.empty{text-align:center;color:var(--muted);padding:40px 10px}
+.grid{list-style:none;padding:0;margin:0;display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.grid li{background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.grid button{all:unset;cursor:pointer;display:block;width:100%}
+.grid .gi{aspect-ratio:1;background:#fff;display:flex;align-items:center;justify-content:center}.grid img{max-width:100%;max-height:100%;object-fit:contain}
+.grid .gt{padding:8px 10px;font-size:.9rem}.grid .gt b{display:block;font-weight:600;line-height:1.25}
+.ol{list-style:none;padding:0;margin:0}
+.ol li{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:10px}
+.ol li.due{border-color:var(--terra);box-shadow:0 0 0 1px var(--terra) inset}
+.ofh{display:flex;gap:12px;align-items:center}.ofh img{width:60px;height:60px;object-fit:contain;background:#fff;border-radius:8px;flex:none}
+.ofs{font-weight:500;margin-top:2px}
+.bub{display:flex;flex-direction:column;gap:6px;margin:10px 0 0}.bub span{max-width:82%;padding:7px 12px;border-radius:14px;font-size:.92rem}.bub .them{background:var(--bg2);align-self:flex-start}.bub .me{background:var(--terra);color:var(--terra-ink);align-self:flex-end}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chips button{font:500 .85rem Inter,sans-serif;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:99px;padding:7px 12px;cursor:pointer}
+.chips button[aria-pressed=true]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+dialog{border:0;border-radius:16px;padding:0;max-width:440px;width:calc(100% - 24px);background:var(--bg);color:var(--ink)}
+dialog::backdrop{background:rgba(20,16,12,.55)}
+.dlg{padding:20px}
+.dlg h3{font-size:1.6rem;margin:0 0 4px}
+.money{display:flex;align-items:center;gap:6px;font-size:1.6rem}.money input{font:600 1.6rem Inter,sans-serif;width:150px;padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink)}
+.dlg input[type=email]{width:100%;font:inherit;padding:12px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink)}
+.dlg .btns{display:flex;gap:8px;margin-top:16px;flex-wrap:wrap}
+.btn{display:inline-flex;align-items:center;justify-content:center;font:600 .95rem Inter,sans-serif;padding:11px 18px;border-radius:999px;border:1px solid var(--terra);background:var(--terra);color:var(--terra-ink);cursor:pointer;text-decoration:none}
+.btn.sec{background:var(--card);color:var(--ink);border-color:var(--line)}
+.linkbtn{background:none;border:0;color:var(--terra);text-decoration:underline;cursor:pointer;font:inherit;padding:0}
+.msg{border-radius:10px;padding:10px 12px;margin-top:10px;font-size:.92rem}.msg.err{background:#FBEBEB;color:#7A1F1F}.msg.ok{background:#E5F4E4;color:#21451F}
+.note{font-size:.85rem;color:var(--muted);margin-top:10px}
+.big{max-height:46vh;width:100%;object-fit:contain;background:#fff;border-radius:10px}
+</style>
+</head>
+<body>
+<div class="app">
+ <div class="topbar"><a class="logo" href="../">TABELLA</a><span><a class="s" href="../shop/">Shop</a><button class="s" type="button" id="who">Sign in</button></span></div>
+ <div class="tabs3" role="tablist"><button type="button" role="tab" data-v="disc" aria-selected="true">Discover</button><button type="button" role="tab" data-v="saved" aria-selected="false">Saved <span id="nSaved"></span></button><button type="button" role="tab" data-v="offers" aria-selected="false">Offers <span id="nOffers"></span></button></div>
+
+ <section id="v-disc">
+  <div class="stack" id="stack"><div class="empty">Loading finds...</div></div>
+  <div class="acts" id="acts"><button class="round pass" type="button" id="bPass" aria-label="Pass">&#10005;</button><button class="offerbtn" type="button" id="bOffer">Make an offer</button><button class="round save" type="button" id="bSave" aria-label="Save">&#9829;</button></div>
+  <p class="note" style="text-align:center">Swipe right to save, left to pass. Tap a piece for more.</p>
+ </section>
+ <section id="v-saved" hidden><ul class="grid" id="savedList"></ul></section>
+ <section id="v-offers" hidden><div id="offersBox"></div></section>
+</div>
+
+<dialog id="dItem"><div class="dlg"><img class="big" id="diImg" alt=""><h3 id="diTitle" style="margin-top:10px"></h3><div class="meta" id="diMeta"></div><div class="pr" id="diPrice" style="font:600 1.6rem 'Cormorant Garamond',serif;color:var(--terra)"></div>
+ <div class="btns" id="diActs"></div></div></dialog>
+
+<dialog id="dOffer"><div class="dlg">
+ <h3>Make an offer</h3><div class="meta" id="doWhat"></div>
+ <div class="money" style="margin-top:12px"><span>$</span><input id="doAmt" type="number" inputmode="decimal" step="1" min="0" aria-label="Your offer"></div>
+ <div class="chips" id="doQuick"></div>
+ <div style="margin-top:14px;font-weight:600">Or ask first</div>
+ <div class="chips" id="doAsk"></div>
+ <p class="note">The dealer can accept, decline, or make one counter offer, within 24 hours. If they accept, the piece is held for you for 24 hours while you pay.</p>
+ <div id="doMsg"></div>
+ <div class="btns"><button class="btn" type="button" id="doSend">Send</button><button class="btn sec" type="button" data-close>Cancel</button></div>
+</div></dialog>
+
+<dialog id="dIn"><div class="dlg">
+ <h3>Sign in to Tabella</h3><p class="meta" style="margin:0 0 10px">We'll email you a link. No password. Your saved pieces come with you.</p>
+ <input type="email" id="inEmail" autocomplete="email" placeholder="you@example.com" aria-label="Email">
+ <div id="inMsg"></div>
+ <div class="btns"><button class="btn" type="button" id="inSend">Email me a link</button><button class="btn sec" type="button" data-close>Not now</button></div>
+</div></dialog>
+
+<script>
+(function(){
+var API='https://tabella-shipping.shawn-greene1981.workers.dev',$=function(i){return document.getElementById(i)};
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
+function fm(n){return '$'+Number(n).toFixed(2)}
+function ls(k,v){try{if(v===undefined)return JSON.parse(localStorage.getItem(k)||'null');localStorage.setItem(k,JSON.stringify(v))}catch(e){return null}}
+var tok=ls('tabBuyer'),me=null,ITEMS=[],GONE={},saved=ls('tabSaved')||[],passed=ls('tabPass')||[],deck=[],offers=[],pending=null;
+var ASK={avail:'Is this still available?',photo:'Could you add another photo?',cond:'Any chips, cracks or repairs?',size:'What are the measurements?',thanks:'Thank you!'};
+document.querySelectorAll('[data-close]').forEach(function(b){b.onclick=function(){b.closest('dialog').close()}});
+function msg(id,t,bad){$(id).innerHTML=t?'<div class="msg '+(bad?'err':'ok')+'">'+t+'</div>':''}
+async function api(p,o){o=o||{};var h={};if(tok)h.Authorization='Bearer '+tok;if(o.json!==undefined){h['Content-Type']='application/json';o.body=JSON.stringify(o.json)}
+  var r=await fetch(API+p,{method:o.method||(o.body?'POST':'GET'),headers:h,body:o.body});var d=await r.json().catch(function(){return{}});
+  if(r.status===401&&d.signin){tok=null;ls('tabBuyer',null);me=null;drawWho()}if(!r.ok)throw new Error(d.error||'Something went wrong. Try again.');return d}
+function offerable(i){return /^d[a-z0-9]{10}$/.test(String(i.dealer||''))&&i.shippable!==false}
+function item(id){return ITEMS.filter(function(i){return i.id===id})[0]}
+
+// ----- views
+var view='disc';
+document.querySelectorAll('.tabs3 button').forEach(function(b){b.onclick=function(){go(b.dataset.v)}});
+function go(v){view=v;document.querySelectorAll('.tabs3 button').forEach(function(b){b.setAttribute('aria-selected',b.dataset.v===v)});
+  ['disc','saved','offers'].forEach(function(x){$('v-'+x).hidden=x!==v});if(v==='saved')drawSaved();if(v==='offers')loadOffers();history.replaceState(null,'',v==='disc'?location.pathname:'#'+v)}
+
+// ----- sign-in by email link
+function drawWho(){$('who').textContent=me?'Sign out':'Sign in';$('nSaved').textContent=saved.length?'('+saved.length+')':''}
+$('who').onclick=async function(){if(me){try{await api('/buyer/logout',{method:'POST'})}catch(e){}tok=null;me=null;ls('tabBuyer',null);offers=[];drawWho();drawBadge();if(view==='offers')loadOffers();return}signIn(null)};
+function signIn(then){pending=then;msg('inMsg','');$('dIn').showModal();setTimeout(function(){$('inEmail').focus()},50)}
+$('inSend').onclick=async function(){var b=this;b.disabled=true;
+  try{var d=await api('/buyer/start',{json:{email:$('inEmail').value}});ls('tabPending',pending);
+    msg('inMsg',d.devLink?'Test mode: <a href="'+esc(d.devLink)+'">open your sign-in link</a>.':'Check your email for the sign-in link. It works for an hour.')}
+  catch(err){msg('inMsg',esc(err.message),1)}b.disabled=false};
+async function finishLogin(t){try{var d=await api('/buyer/login',{json:{token:t,saved:saved}});tok=d.token;ls('tabBuyer',tok);me=d.buyer;saved=me.saved;ls('tabSaved',saved)}
+  catch(err){alert(err.message)}history.replaceState(null,'',location.pathname+location.hash);drawWho();
+  var p=ls('tabPending');ls('tabPending',null);if(p&&p.offer&&item(p.offer))openOffer(p.offer)}
+
+// ----- the deck
+function build(){deck=ITEMS.filter(function(i){return !GONE[i.id]&&saved.indexOf(i.id)<0&&passed.indexOf(i.id)<0});draw()}
+function cardHtml(i,back){return '<div class="card'+(back?' back':'')+'" data-id="'+i.id+'"><span class="stamp yes">SAVE</span><span class="stamp no">PASS</span><div class="ph"><img src="'+esc(i.photo)+'" alt="'+esc(i.title)+'" draggable="false"></div><div class="tx"><h2>'+esc(i.title)+'</h2><div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px"><span class="meta">'+esc(i.dealerName||'')+(i.category?' &middot; '+esc(i.category):'')+'</span><span class="pr">'+fm(i.price)+'</span></div></div></div>'}
+function draw(){var st=$('stack');
+  if(!deck.length){st.innerHTML='<div class="empty">You’ve seen every piece for now.<br><br><button class="btn sec" type="button" id="again">Start over</button></div>';$('acts').style.visibility='hidden';
+    $('again').onclick=function(){passed=[];ls('tabPass',passed);build()};return}
+  $('acts').style.visibility='visible';st.innerHTML=(deck[1]?cardHtml(deck[1],true):'')+cardHtml(deck[0]);
+  $('bOffer').disabled=!offerable(deck[0]);$('bOffer').textContent=offerable(deck[0])?'Make an offer':'Buy in the shop';$('bOffer').disabled=false;
+  drag(st.querySelector('.card:not(.back)'))}
+function drag(el){var x0=0,y0=0,dx=0,dy=0,down=false,moved=false;
+  el.addEventListener('pointerdown',function(e){down=true;moved=false;x0=e.clientX;y0=e.clientY;el.setPointerCapture(e.pointerId);el.style.transition='none'});
+  el.addEventListener('pointermove',function(e){if(!down)return;dx=e.clientX-x0;dy=e.clientY-y0;if(Math.abs(dx)>6)moved=true;
+    el.style.transform='translate('+dx+'px,'+dy*0.3+'px) rotate('+dx/18+'deg)';el.querySelector('.yes').style.opacity=Math.max(0,Math.min(1,dx/100));el.querySelector('.no').style.opacity=Math.max(0,Math.min(1,-dx/100))});
+  el.addEventListener('pointerup',function(){if(!down)return;down=false;el.style.transition='transform .25s ease';
+    if(dx>110)fling(1);else if(dx<-110)fling(-1);else{el.style.transform='';el.querySelector('.yes').style.opacity=0;el.querySelector('.no').style.opacity=0;if(!moved)openItem(el.dataset.id)}dx=0});
+  el.addEventListener('pointercancel',function(){down=false;el.style.transform=''})}
+function fling(dir){var el=$('stack').querySelector('.card:not(.back)');if(!el)return;var id=el.dataset.id;el.style.transition='transform .3s ease';el.style.transform='translate('+dir*600+'px,40px) rotate('+dir*30+'deg)';
+  setTimeout(function(){deck.shift();if(dir>0)setSave(id,true);else{passed.push(id);passed=passed.slice(-500);ls('tabPass',passed)}draw()},220)}
+$('bPass').onclick=function(){fling(-1)};$('bSave').onclick=function(){fling(1)};
+$('bOffer').onclick=function(){var i=deck[0];if(!i)return;if(offerable(i))openOffer(i.id);else location.href='../shop/#'+encodeURIComponent(i.id)};
+document.addEventListener('keydown',function(e){if(view!=='disc'||document.querySelector('dialog[open]'))return;if(e.key==='ArrowRight')fling(1);if(e.key==='ArrowLeft')fling(-1)});
+
+// ----- saved
+async function setSave(id,on){saved=saved.filter(function(x){return x!==id});if(on)saved.push(id);ls('tabSaved',saved);drawWho();
+  if(me){try{me=(await api('/buyer/saved',{json:{id:id,on:on}})).buyer}catch(e){}}}
+function drawSaved(){var list=saved.map(item).filter(Boolean).reverse();
+  $('savedList').innerHTML=list.length?list.map(function(i){return '<li><button type="button" data-id="'+i.id+'"><div class="gi"><img src="'+esc(i.photo)+'" alt=""></div><div class="gt"><b>'+esc(i.title)+'</b>'+(GONE[i.id]?'<span class="meta">Sold or on hold</span>':fm(i.price))+'</div></button></li>'}).join(''):'<li class="empty" style="grid-column:1/-1;border:0;background:none">Swipe right on a piece to save it here.</li>';
+  $('savedList').querySelectorAll('button').forEach(function(b){b.onclick=function(){openItem(b.dataset.id)}})}
+function openItem(id){var i=item(id);if(!i)return;$('diImg').src=i.photo;$('diTitle').textContent=i.title;$('diMeta').textContent=(i.dealerName||'')+(i.category?' · '+i.category:'')+' · '+i.id;$('diPrice').textContent=fm(i.price);
+  var s=saved.indexOf(id)>=0,acts='';if(!GONE[id]){acts+='<a class="btn" href="../shop/#'+encodeURIComponent(id)+'">Buy now</a>';if(offerable(i))acts+='<button class="btn sec" type="button" id="diOffer">Make an offer</button>'}
+  acts+='<button class="btn sec" type="button" id="diSave">'+(s?'Remove from saved':'Save')+'</button>';$('diActs').innerHTML=acts;
+  if($('diOffer'))$('diOffer').onclick=function(){$('dItem').close();openOffer(id)};
+  $('diSave').onclick=function(){setSave(id,!s);$('dItem').close();if(view==='saved')drawSaved();else build()};$('dItem').showModal()}
+
+// ----- offers
+var askPick=null;
+function openOffer(id){var i=item(id);if(!i)return;if(!me){signIn({offer:id});return}
+  askPick=null;$('dOffer').dataset.id=id;$('doWhat').textContent=i.title+' · listed at '+fm(i.price);$('doAmt').value='';msg('doMsg','');
+  $('doQuick').innerHTML=[10,15,20].map(function(p){var v=Math.round(i.price*(1-p/100));return '<button type="button" data-v="'+v+'">'+p+'% off: '+fm(v)+'</button>'}).join('');
+  $('doQuick').querySelectorAll('button').forEach(function(b){b.onclick=function(){$('doAmt').value=b.dataset.v}});
+  $('doAsk').innerHTML=['avail','photo','cond','size'].map(function(k){return '<button type="button" data-k="'+k+'" aria-pressed="false">'+esc(ASK[k])+'</button>'}).join('');
+  $('doAsk').querySelectorAll('button').forEach(function(b){b.onclick=function(){askPick=askPick===b.dataset.k?null:b.dataset.k;$('doAsk').querySelectorAll('button').forEach(function(x){x.setAttribute('aria-pressed',x.dataset.k===askPick)})}});
+  $('dOffer').showModal();setTimeout(function(){$('doAmt').focus()},50)}
+$('doSend').onclick=async function(){var b=this,id=$('dOffer').dataset.id,amt=$('doAmt').value.trim();if(!amt&&!askPick){msg('doMsg','Enter an offer, or pick a question to ask.',1);return}
+  b.disabled=true;try{await api('/buyer/offers',{json:{item:id,amount:amt||undefined,say:askPick||undefined}});$('dOffer').close();
+    if(deck[0]&&deck[0].id===id){deck.shift();draw()}if(saved.indexOf(id)<0)setSave(id,true);loadOffers(true);toast(amt?'Offer sent. You’ll get an email when the dealer answers.':'Question sent.')}
+  catch(err){msg('doMsg',esc(err.message),1)}b.disabled=false};
+function toast(t){var d=document.createElement('div');d.className='msg ok';d.style.cssText='position:fixed;left:50%;bottom:20px;transform:translateX(-50%);z-index:9;max-width:90%';d.textContent=t;document.body.appendChild(d);setTimeout(function(){d.remove()},3500)}
+function left(t){var h=Math.max(0,Math.round((t-Date.now())/3600e3));return h>=48?Math.round(h/24)+' days left':h>=24?'1 day left':h>=1?h+'h left':'under an hour left'}
+function ostate(o){return {asked:'Question sent. Waiting on the dealer.',offered:'You offered '+fm(o.amount/100)+'. Waiting on the dealer.',countered:'The dealer countered at '+fm(o.counter/100)+'.',accepted:'Accepted at '+fm(o.agreed/100)+'! It’s held for you.',bought:'You bought it for '+fm(o.agreed/100)+'.',declined:'Declined. It’s still for sale at '+fm(o.price/100)+'.',expired:'This offer expired.',sold:'This piece sold.'}[o.status]||o.status}
+function drawBadge(){var n=offers.filter(function(o){return o.turn==='buyer'}).length;$('nOffers').innerHTML=n?'<span class="badge">'+n+'</span>':''}
+async function loadOffers(quiet){if(!me){offers=[];drawBadge();if(view==='offers')$('offersBox').innerHTML='<div class="empty">Sign in to see your offers.<br><br><button class="btn" type="button" id="offIn">Sign in</button></div>',$('offIn').onclick=function(){signIn(null)};return}
+  try{offers=(await api('/buyer/offers')).offers}catch(e){}drawBadge();if(view==='offers')drawOffers()}
+function drawOffers(){var box=$('offersBox');
+  box.innerHTML=offers.length?'<ul class="ol">'+offers.map(function(o){var open=['asked','offered','countered','accepted'].indexOf(o.status)>=0;
+    return '<li class="'+(o.turn==='buyer'?'due':'')+'" data-o="'+o.id+'"><div class="ofh">'+(o.photo?'<img src="'+API+esc(o.photo)+'" alt="">':'')+'<div><b>'+esc(o.title)+'</b><div class="meta">'+esc(o.dealerName||'')+' &middot; listed '+fm(o.price/100)+'</div><div class="ofs">'+esc(ostate(o))+(open&&o.expires?' <span class="meta">'+left(o.expires)+'</span>':'')+'</div></div></div>'+
+      (o.says.length?'<div class="bub">'+o.says.map(function(m){return '<span class="'+(m.from==='buyer'?'me':'them')+'">'+esc(m.text)+'</span>'}).join('')+'</div>':'')+
+      (o.status==='countered'?'<div class="row"><button class="btn" type="button" data-a="accept">Accept '+fm(o.counter/100)+'</button><button class="btn sec" type="button" data-a="decline">No thanks</button></div>':'')+
+      (o.status==='accepted'?'<div class="row"><a class="btn" href="../shop/?offer='+o.id+'#'+encodeURIComponent(o.item)+'">Pay '+fm(o.agreed/100)+' now</a></div>':'')+
+      (o.status==='asked'?'<div class="row"><span class="money" style="font-size:1.1rem"><span>$</span><input type="number" inputmode="decimal" step="1" min="0" style="font-size:1.1rem;width:110px" aria-label="Your offer"></span><button class="btn sec" type="button" data-a="offer">Make an offer</button></div>':'')+
+      (o.canSay&&o.canSay.length?'<div class="chips">'+o.canSay.map(function(k){return '<button type="button" data-say="'+k+'">'+esc(ASK[k])+'</button>'}).join('')+'</div>':'')+
+      (open&&o.status!=='countered'?'<div class="row"><button class="linkbtn" type="button" data-a="decline">Withdraw</button></div>':'')+'<div class="om"></div></li>'}).join('')+'</ul>':'<div class="empty">No offers yet. Find a piece you love on Discover and tap <b>Make an offer</b>.</div>';
+  box.querySelectorAll('[data-a],[data-say]').forEach(function(b){b.onclick=async function(){var li=b.closest('li'),a=b.dataset.a||'say',body={};
+    if(a==='say')body.code=b.dataset.say;if(a==='offer'){body.amount=li.querySelector('input').value;if(!body.amount){li.querySelector('input').focus();return}}
+    if(a==='accept'&&!confirm('Accept the counter? The piece will be held for you for 24 hours while you pay.'))return;
+    b.disabled=true;try{await api('/buyer/offers/'+li.dataset.o+'/'+a,{json:body});await loadOffers()}catch(err){li.querySelector('.om').innerHTML='<div class="msg err">'+esc(err.message)+'</div>';b.disabled=false}}})}
+
+// ----- start
+Promise.all([fetch(API+'/shop/catalog').then(function(r){return r.json()}),fetch(API+'/shop/status').then(function(r){return r.json()}).catch(function(){return{sold:[],held:[]}})])
+ .then(async function(a){ITEMS=(a[0].items||[]).filter(function(i){return i.photo&&i.price>0});(a[1].sold||[]).concat(a[1].held||[]).forEach(function(id){GONE[id]=1});
+   // newest dealer pieces first, then the rest in a fresh order each visit
+   ITEMS.sort(function(x,y){return (offerable(y)-offerable(x))||(Math.random()-.5)});
+   var t=(location.search.match(/login=([a-z0-9]{40})/)||[])[1];
+   if(t)await finishLogin(t);else if(tok){try{me=(await api('/buyer/me')).buyer;saved=Array.from(new Set(saved.concat(me.saved)));ls('tabSaved',saved)}catch(e){}}
+   drawWho();build();loadOffers(true);if(location.hash==='#offers')go('offers');else if(location.hash==='#saved')go('saved')})
+ .catch(function(){$('stack').innerHTML='<div class="empty">The finds could not load. Refresh to try again.</div>'});
+})();
+</script>
+</body>
+</html>
