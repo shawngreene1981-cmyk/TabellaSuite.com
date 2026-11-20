@@ -26,6 +26,7 @@ const SESSION_TTL = 60 * 60 * 24 * 30;
 const CODE_ABC = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const STRIPE_IN_PERSON_PCT = 0.027, STRIPE_IN_PERSON_FIXED = 5; // US card-present rate, cents
 const HOLD_SECONDS = 600;
+const TERMINAL_API_VERSION = '2024-06-20';
 const ZONES = ['America/New_York', 'America/Chicago', 'America/Denver', 'America/Phoenix', 'America/Los_Angeles', 'America/Anchorage', 'Pacific/Honolulu'];
 
 export async function handleMall(request, env, url, json, cors) {
@@ -302,7 +303,9 @@ async function startSale(env, m, b) {
   }
   try {
     const pi = await stripeApi(env, 'POST', '/payment_intents', {
-      amount: String(s.total), currency: 'usd', 'payment_method_types[]': 'card_present', capture_method: 'automatic',
+      // Card-reader payments name card_present directly. Stripe's newest API versions dropped that field, so this call
+      // pins the last version that has it. Manual capture is Stripe's standard for readers: checkSale captures once approved.
+      _version: TERMINAL_API_VERSION, amount: String(s.total), currency: 'usd', 'payment_method_types[]': 'card_present', capture_method: 'manual',
       transfer_group: 'mall_' + id, description: 'In-store sale at ' + m.name,
       'metadata[sale]': id, 'metadata[mall]': m.id
     }, 'pi-' + id);
@@ -327,7 +330,8 @@ function readerProblem(msg) {
 async function checkSale(env, m, id) {
   const s = await getSale(env, m, id);
   if (s.method !== 'card' || s.status !== 'pending') return publicSale(s);
-  const pi = await stripeApi(env, 'GET', '/payment_intents/' + s.pi);
+  let pi = await stripeApi(env, 'GET', '/payment_intents/' + s.pi);
+  if (pi.status === 'requires_capture') pi = await stripeApi(env, 'POST', '/payment_intents/' + s.pi + '/capture', {}, 'cap-' + s.id);
   if (pi.status === 'succeeded') { s.charge = typeof pi.latest_charge === 'string' ? pi.latest_charge : pi.latest_charge && pi.latest_charge.id; await finish(env, m, s); return publicSale(s); }
   if (pi.status === 'canceled') { s.status = 'cancelled'; await releaseHolds(env, s); await saveSale(env, s); return publicSale(s); }
   const r = readerFor(env, m);
@@ -364,7 +368,8 @@ async function cancelSale(env, m, id) {
   const r = readerFor(env, m);
   if (r) await stripeApi(env, 'POST', '/terminal/readers/' + r.reader + '/cancel_action', {}).catch(() => null);
   if (s.pi) {
-    const pi = await stripeApi(env, 'GET', '/payment_intents/' + s.pi);
+    let pi = await stripeApi(env, 'GET', '/payment_intents/' + s.pi);
+    if (pi.status === 'requires_capture') pi = await stripeApi(env, 'POST', '/payment_intents/' + s.pi + '/capture', {}, 'cap-' + s.id);
     if (pi.status === 'succeeded') { s.charge = typeof pi.latest_charge === 'string' ? pi.latest_charge : pi.latest_charge && pi.latest_charge.id; await finish(env, m, s); return publicSale(s); }
     if (pi.status !== 'canceled') await stripeApi(env, 'POST', '/payment_intents/' + s.pi + '/cancel', {}).catch(() => null);
   }

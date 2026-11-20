@@ -254,6 +254,8 @@ async function onboardingLink(env, account, returnUrl, self) {
 export async function stripeApi(env, method, path, fields, idem) { return stripe(env, method, path, fields, idem); }
 async function stripe(env, method, path, fields, idem) {
   const headers = { Authorization: 'Bearer ' + env.STRIPE_SECRET_KEY };
+  // A call can pin an API version with a "_version" field (used for card-reader payments).
+  if (fields && fields._version) { headers['Stripe-Version'] = fields._version; fields = Object.assign({}, fields); delete fields._version; }
   let bodyStr;
   if (fields && method !== 'GET') {
     headers['Content-Type'] = 'application/x-www-form-urlencoded';
