@@ -8,6 +8,7 @@
 //   SHIPPO_API_KEY, STRIPE_SECRET_KEY (already set)
 //   CATALOG_URL       optional; defaults to https://tabellasuite.com/shop/items.json
 
+import { mallAccountFor } from './mall.js';
 import { buildOrder, createCheckoutSession, stripeMode, stripeApi } from './stripe.js';
 import { dealerListings, dealerItem, markDealerItemSold, markDealerItemAvailable, payoutsOk, shantiquesMoved, ITEM_ID } from './app.js';
 import { sendEmail, buyerReceipt, dealerAlert, opsEmail } from './mail.js';
@@ -79,7 +80,9 @@ export async function handleShop(request, env, url, json, cors, shippoFetch) {
         try { tax = await taxCalc(env, pick.items, ship, to.addr, from); }
         catch (e) { return json({ error: 'We could not work out sales tax for that address. Check the address and try again.' }, 400, cors); }
       }
-      const order = buildOrder({ items: pick.items.map(it => ({ name: it.title + ' (' + it.id + ')', price: it.price, dealerAccount: it.account || dealerAccount(cat, it), mallAccount: undefined })), shipping: ship, taxCents: tax ? tax.cents : 0 });
+      // A dealer in a Tabella mall: the mall gets 4% of the item price (out of the 9% commission).
+      const malls = await Promise.all(pick.items.map(it => mallAccountFor(env, it.dealer).catch(() => undefined)));
+      const order = buildOrder({ items: pick.items.map((it, i) => ({ name: it.title + ' (' + it.id + ')', price: it.price, dealerAccount: it.account || dealerAccount(cat, it), mallAccount: malls[i] })), shipping: ship, taxCents: tax ? tax.cents : 0 });
       if (order.error) return json({ error: order.error }, 400, cors);
 
       // Hold each item so two people can't buy the same one-of-a-kind piece.

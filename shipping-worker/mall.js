@@ -855,3 +855,12 @@ export async function autoStatements(env) {
   } while (cursor);
   return done;
 }
+
+// Online sales: the mall's 4% of an online sale goes to the mall the item's dealer has joined, once that mall has a payout bank.
+export async function mallAccountFor(env, dealerId) {
+  if (!/^d[a-z0-9]{10}$/.test(String(dealerId || ''))) return undefined;
+  const d = JSON.parse(await env.TABELLA.get('dealer:' + dealerId) || 'null');
+  if (!d || !d.mall || !d.mall.id) return undefined;
+  const m = JSON.parse(await env.TABELLA.get('mall:' + d.mall.id) || 'null');
+  return m && mallPayoutsOk(env, m) ? m.stripeAccount : undefined;
+}
