@@ -126,7 +126,6 @@ dialog{max-height:calc(100dvh - 24px);max-height:calc(100vh - 24px)}
 .sales{list-style:none;padding:0;margin:0}.sales li{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;padding:10px 0;border-bottom:1px solid var(--line)}.sales li.empty{color:var(--muted)}
 .row3b{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}@media(max-width:600px){.row3b{grid-template-columns:1fr}}
 .receipt .rch{text-align:center;margin-bottom:10px}
-@media print{body.printing *{visibility:hidden}body.printing #receipt,body.printing #receipt *{visibility:visible}body.printing #receipt{position:fixed;left:0;top:0;width:100%;color:#000}}
 </style>
 </head>
 <body>
@@ -264,7 +263,7 @@ dialog{max-height:calc(100dvh - 24px);max-height:calc(100vh - 24px)}
 
 <!-- Receipt -->
 <dialog id="rcDlg" aria-labelledby="rcH"><div class="dlg">
- <div id="receipt" class="receipt"></div>
+ <div id="rcNote"></div><div id="receipt" class="receipt"></div>
  <div class="dlgfoot noprint"><button class="btn" type="button" id="newSale">New sale</button><button class="btn sec" type="button" id="printRc">Print receipt</button></div>
 </div></dialog>
 </main>
@@ -374,9 +373,13 @@ function receiptHtml(s){var when=new Date(s.at);
   '<div class="line big"><span>Total</span><span>'+fc(s.total)+'</span></div>'+
   (s.method==='cash'?'<div class="line"><span>Cash</span><span>'+fc(s.cashGiven)+'</span></div><div class="line"><span>Change</span><span>'+fc(s.change)+'</span></div>':'<div class="line"><span>Paid by card</span><span>'+fc(s.total)+'</span></div>')+
   '<p class="meta" style="text-align:center;margin:12px 0 0">Thank you for shopping local.<br>tabellasuite.com</p>'}
-function done(s){cart=[];sale=null;drawCart();$('receipt').innerHTML=(s.method==='cash'&&s.change>0?'<div class="msg ok" style="font-size:1.2rem">Change due: <b>'+fc(s.change)+'</b></div>':'<div class="msg ok">Paid. The '+(s.items.length===1?'piece is':s.items.length+' pieces are')+' marked sold everywhere.</div>')+receiptHtml(s);$('rcDlg').showModal()}
+function done(s){cart=[];sale=null;drawCart();$('rcNote').innerHTML=(s.method==='cash'&&s.change>0?'<div class="msg ok" style="font-size:1.2rem">Change due: <b>'+fc(s.change)+'</b></div>':'<div class="msg ok">Paid. The '+(s.items.length===1?'piece is':s.items.length+' pieces are')+' marked sold everywhere.</div>');$('receipt').innerHTML=receiptHtml(s);$('rcDlg').showModal()}
 $('newSale').onclick=function(){$('rcDlg').close()};
-$('printRc').onclick=function(){document.body.classList.add('printing');window.print();setTimeout(function(){document.body.classList.remove('printing')},500)};
+// Prints only the receipt, in its own frame: no browser date, title or web address, and it fits a 4x6 label or a receipt roll.
+$('printRc').onclick=function(){var f=document.createElement('iframe');f.style.cssText='position:fixed;width:0;height:0;border:0;right:0;bottom:0';document.body.appendChild(f);
+  var d=f.contentDocument;d.open();d.write('<!doctype html><html><head><meta charset="utf-8"><title>Receipt</title><style>@page{margin:0}html,body{margin:0;background:#fff;color:#000}body{font:12px/1.35 Arial,Helvetica,sans-serif;padding:.18in .2in;max-width:3.6in;margin:0 auto}'+
+    '.rch{text-align:center;margin-bottom:8px}.rch b{font-size:15px}.line{display:flex;justify-content:space-between;gap:10px;padding:3px 0;border-bottom:1px solid #999}.line.big{font-size:15px;font-weight:700;border-bottom:0}.meta{color:#333;font-size:10.5px}p{margin:8px 0 0;text-align:center}</style></head><body>'+$('receipt').innerHTML+'</body></html>');d.close();
+  setTimeout(function(){f.contentWindow.focus();f.contentWindow.print();setTimeout(function(){f.remove()},1000)},150)};
 $('rcDlg').addEventListener('close',function(){$('scanIn').focus()});
 
 // camera scanning (QR on Tabella tags)
@@ -407,7 +410,7 @@ async function loadDay(){if(!$('dayPick').value)$('dayPick').value=today();var d
       '<br><span class="meta">'+s.items.map(function(i){return esc(i.title)+' (Booth '+esc(i.booth)+')'}).join(', ')+'</span></span>'+
       (s.status==='paid'?'<span style="display:flex;gap:6px"><button type="button" class="rm" data-rc="'+s.id+'">Receipt</button><button type="button" class="rm" data-rf="'+s.id+'">Refund</button></span>':'')+'</li>'}).join('')||'<li class="empty">No sales yet.</li>';
     var byId={};r.sales.forEach(function(s){byId[s.id]=s});
-    $('daySales').querySelectorAll('[data-rc]').forEach(function(b){b.onclick=function(){$('receipt').innerHTML=receiptHtml(byId[b.dataset.rc]);$('rcDlg').showModal()}});
+    $('daySales').querySelectorAll('[data-rc]').forEach(function(b){b.onclick=function(){$('rcNote').innerHTML='';$('receipt').innerHTML=receiptHtml(byId[b.dataset.rc]);$('rcDlg').showModal()}});
     $('daySales').querySelectorAll('[data-rf]').forEach(function(b){b.onclick=async function(){var s=byId[b.dataset.rf];
       if(!confirm('Refund '+fc(s.total)+'? '+(s.method==='cash'?'Hand the customer the cash back.':'The money goes back to their card.')+' The pieces go back on sale.'))return;
       try{await api('/mall/sale/'+s.id+'/refund',{json:{}});loadDay()}catch(err){alert(err.message)}}});
