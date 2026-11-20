@@ -9,6 +9,7 @@
 import { handleStripe, stripeMode } from './stripe.js';
 import { handleShop } from './shop.js';
 import { handleApp } from './app.js';
+import { handleMall } from './mall.js';
 import { handleTrips } from './trips.js';
 import { handlePlaces, buildNextState } from './places.js';
 
@@ -31,6 +32,9 @@ export default {
 
     const paid = await handleStripe(request, env, url, json, cors);
     if (paid) return paid;
+
+    const mall = await handleMall(request, env, url, json, cors);
+    if (mall) return mall;
 
     const app = await handleApp(request, env, url, json, cors, (path, method, body) => shippo(env, path, method, body));
     if (app) return app;
@@ -80,7 +84,7 @@ function isTestKey(env) { return String(env.SHIPPO_API_KEY || '').startsWith('sh
 function corsHeaders(request, env) {
   const origin = request.headers.get('Origin') || '';
   const allowed = String(env.ALLOWED_ORIGINS || DEFAULT_ORIGINS).split(',').map(s => s.trim()).filter(Boolean);
-  const h = { 'Access-Control-Allow-Methods': 'POST, GET, PUT, OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type, Authorization, Stripe-Signature', 'Vary': 'Origin' };
+  const h = { 'Access-Control-Allow-Methods': 'POST, GET, PUT, DELETE, OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type, Authorization, Stripe-Signature', 'Vary': 'Origin' };
   if (allowed.includes(origin)) h['Access-Control-Allow-Origin'] = origin;
   return h;
 }

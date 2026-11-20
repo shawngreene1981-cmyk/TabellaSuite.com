@@ -12,6 +12,7 @@
 //   mall 4%, Tabella 5%, dealer gets the rest. Card processing is a separate line on the buyer's receipt.
 
 import { shopAfterPayment, shopAfterRefund } from './shop.js';
+import { mallAfterRefund } from './mall.js';
 
 const API = 'https://api.stripe.com/v1';
 const COMMISSION = 0.09, MALL_SHARE = 0.04;
@@ -224,7 +225,8 @@ async function refunded(env, charge) {
       catch (e) { out.problems.push(t.id + ': ' + e.message); }
     }
   }
-  await shopAfterRefund(env, ref, charge, full, out);
+  if (pi && pi.metadata && pi.metadata.sale) await mallAfterRefund(env, pi.metadata.sale, charge, full, out);
+  else await shopAfterRefund(env, ref, charge, full, out);
   return out;
 }
 

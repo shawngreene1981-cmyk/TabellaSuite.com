@@ -81,6 +81,7 @@ async function login(env, b) {
     throw err(401, 'That email and password don’t match.');
   }
   await env.TABELLA.delete('rl:' + email);
+  if (u.kind === 'mall') throw err(400, 'That is a mall account. Sign in at tabellasuite.com/mall/');
   const dealer = JSON.parse(await env.TABELLA.get('dealer:' + u.id) || 'null');
   return { token: await newSession(env, u.id), dealer: publicDealer(dealer) };
 }
@@ -89,11 +90,12 @@ async function forgot(env, b) {
   const email = cleanEmail(b.email);
   if (!email) throw err(400, 'Enter the email you sign in with.');
   const n = Number(await env.TABELLA.get('rlf:' + email) || 0);
-  if (n < 3 && await env.TABELLA.get('user:' + email)) {
+  const known = n < 3 ? JSON.parse(await env.TABELLA.get('user:' + email) || 'null') : null;
+  if (known) {
     await env.TABELLA.put('rlf:' + email, String(n + 1), { expirationTtl: 3600 });
     const t = rand(40);
     await env.TABELLA.put('rst:' + t, email, { expirationTtl: 3600 });
-    const link = String(env.SITE_URL || 'https://tabellasuite.com').replace(/\/$/, '') + '/dealer/?reset=' + t;
+    const link = String(env.SITE_URL || 'https://tabellasuite.com').replace(/\/$/, '') + (known.kind === 'mall' ? '/mall/' : '/dealer/') + '?reset=' + t;
     const r = await sendEmail(env, Object.assign({ to: email }, resetEmail(link)));
     if (r.skipped) throw err(503, 'Password reset emails aren\u2019t switched on yet. Write to contact@tabellasuite.com.');
   }
@@ -110,6 +112,7 @@ async function resetPw(env, b) {
   u.salt = rand(16); u.hash = await hashPw(pw, u.salt);
   await env.TABELLA.put('user:' + email, JSON.stringify(u));
   await env.TABELLA.delete('rst:' + t); await env.TABELLA.delete('rl:' + email);
+  if (u.kind === 'mall') return { token: await newSession(env, u.id), kind: 'mall' };
   const dealer = JSON.parse(await env.TABELLA.get('dealer:' + u.id) || 'null');
   return { token: await newSession(env, u.id), dealer: publicDealer(dealer) };
 }
@@ -198,8 +201,8 @@ async function updateAccount(env, d, b) {
   if (email !== d.email) { await env.TABELLA.delete('user:' + d.email); d.email = email; await env.TABELLA.put('dealer:' + d.id, JSON.stringify(d)); }
   return d;
 }
-async function newSession(env, id) { const t = rand(40); await env.TABELLA.put('sess:' + t, id, { expirationTtl: SESSION_TTL }); return t; }
-async function session(env, request) {
+export async function newSession(env, id) { const t = rand(40); await env.TABELLA.put('sess:' + t, id, { expirationTtl: SESSION_TTL }); return t; }
+export async function session(env, request) {
   const t = (request.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '').trim();
   if (!/^[a-z0-9]{40}$/.test(t)) return null;
   const id = await env.TABELLA.get('sess:' + t);
@@ -229,6 +232,7 @@ async function updateDealer(env, d, b) {
 function publicDealer(d) {
   if (!d) return null;
   return { id: d.id, name: d.name, email: d.email, payouts: !!d.payoutsReady, hasShipFrom: !!(d.shipFrom && d.shipFrom.zip),
+    mall: d.mall ? { name: d.mall.name, booth: d.mall.booth } : null,
     shipFrom: d.shipFrom ? { city: d.shipFrom.city, state: d.shipFrom.state, zip: d.shipFrom.zip, street1: d.shipFrom.street1, street2: d.shipFrom.street2 || '', phone: d.shipFrom.phone || '' } : null };
 }
 
@@ -301,7 +305,7 @@ async function newItemId(env) {
   throw err(500, 'Could not make an item number. Try again.');
 }
 // Keep the public shop listing in step with the item.
-async function listing(env, d, it) {
+export async function listing(env, d, it) {
   const show = it.online && it.status === 'available' && it.price > 0 && it.photos.length;
   if (!show) { await env.TABELLA.delete('pub:' + it.id); return; }
   const ships = !!(it.weightLb && it.box && payoutsOk(env, d) && d.shipFrom && d.shipFrom.zip);
@@ -453,14 +457,14 @@ async function payoutStatus(env, d) {
 }
 
 // ---------- helpers ----------
-async function hashPw(pw, salt) {
+export async function hashPw(pw, salt) {
   const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(pw), 'PBKDF2', false, ['deriveBits']);
   const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt: new TextEncoder().encode(salt), iterations: 100000 }, key, 256);
   return [...new Uint8Array(bits)].map(x => x.toString(16).padStart(2, '0')).join('');
 }
-function rand(n, abc) { abc = abc || 'abcdefghijklmnopqrstuvwxyz0123456789'; const b = crypto.getRandomValues(new Uint8Array(n)); let s = ''; for (const x of b) s += abc[x % abc.length]; return s; }
-function cleanEmail(e) { e = String(e || '').trim().toLowerCase(); return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e) && e.length <= 120 ? e : ''; }
-function clean(s, n) { return String(s == null ? '' : s).replace(/[\u0000-\u001f]/g, ' ').trim().slice(0, n); }
+export function rand(n, abc) { abc = abc || 'abcdefghijklmnopqrstuvwxyz0123456789'; const b = crypto.getRandomValues(new Uint8Array(n)); let s = ''; for (const x of b) s += abc[x % abc.length]; return s; }
+export function cleanEmail(e) { e = String(e || '').trim().toLowerCase(); return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e) && e.length <= 120 ? e : ''; }
+export function clean(s, n) { return String(s == null ? '' : s).replace(/[\u0000-\u001f]/g, ' ').trim().slice(0, n); }
 function money(v, label) { if (v === '' || v == null) return null; const n = Math.round(Number(v) * 100) / 100; if (!isFinite(n) || n < 0 || n > 50000) throw err(400, label + ' looks wrong.'); return n; }
-function err(status, msg) { const e = new Error(msg); e.status = status; return e; }
-async function body(request) { try { return await request.json(); } catch (e) { return {}; } }
+export function err(status, msg) { const e = new Error(msg); e.status = status; return e; }
+export async function body(request) { try { return await request.json(); } catch (e) { return {}; } }

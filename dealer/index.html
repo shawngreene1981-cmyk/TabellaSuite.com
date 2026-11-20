@@ -148,6 +148,11 @@ dialog{max-height:calc(100dvh - 24px);max-height:calc(100vh - 24px)}
    <button class="btn" type="submit" style="margin-top:10px">Save address</button><div id="shipMsg" aria-live="polite"></div>
   </form>
   <div class="step" id="stPay"><span class="dot"></span><div style="flex:1"><b>Get paid</b><div class="meta" id="stPayTxt">Stripe pays your share to your bank after each sale. Tabella never sees your bank details.</div></div><button class="btn sec" type="button" id="payBtn">Set up</button></div>
+  <div class="step" id="stMall"><span class="dot"></span><div style="flex:1"><b>Your mall</b> <span class="meta">optional</span><div class="meta" id="stMallTxt">If your booth is in a mall that uses Tabella, add its join code so the mall's register can sell your pieces.</div></div><button class="btn sec" type="button" id="mallBtn">Join</button></div>
+  <form id="mallForm" hidden novalidate style="margin:4px 0 12px">
+   <div class="row2"><div><label for="mCode">Join code from the mall office</label><input id="mCode" maxlength="8" autocapitalize="characters" autocomplete="off"></div><div><label for="mBooth">Your booth number</label><input id="mBooth" maxlength="20" autocomplete="off"></div></div>
+   <button class="btn" type="submit" style="margin-top:10px">Join mall</button><div id="mallMsg" aria-live="polite"></div>
+  </form>
  </div>
 
  <div class="panel" id="importCard" hidden style="margin-top:14px;max-width:none">
@@ -232,7 +237,12 @@ function drawSetup(){$('shopName').textContent=me.name;$('acctNow').textContent=
   $('stShip').className='step'+(okShip?' done':'');$('stShipTxt').textContent=okShip?me.shipFrom.street1+', '+me.shipFrom.city+', '+me.shipFrom.state+' '+me.shipFrom.zip+(me.shipFrom.phone?'. Never shown to shoppers.':'. Add a phone number: UPS and FedEx need it on labels.'):'Where packages ship from. Never shown to shoppers.';
   $('shipEditBtn').textContent=okShip?'Change':'Add';
   $('stPay').className='step'+(okPay?' done':'');$('stPayTxt').textContent=okPay?'Payouts are set up. Your share goes to your bank after each sale.':'Stripe pays your share to your bank after each sale. Tabella never sees your bank details.';
-  $('payBtn').textContent=okPay?'Update':'Set up';$('setupH').textContent=okShip&&okPay?'Shop setup':'Before your items can sell';$('setup').hidden=false}
+  $('payBtn').textContent=okPay?'Update':'Set up';drawMall();$('setupH').textContent=okShip&&okPay?'Shop setup':'Before your items can sell';$('setup').hidden=false}
+function drawMall(){var m=me.mall;$('stMall').className='step'+(m?' done':'');$('stMallTxt').textContent=m?'Booth '+m.booth+' at '+m.name+'. The mall can ring up your tagged pieces, and they come off the online shop the moment they sell.':'If your booth is in a mall that uses Tabella, add its join code so the mall\'s register can sell your pieces.';$('mallBtn').textContent=m?'Leave':'Join';$('mallForm').hidden=true}
+$('mallBtn').onclick=async function(){if(!me.mall){var f=$('mallForm');f.hidden=!f.hidden;if(!f.hidden)$('mCode').focus();return}
+  if(!confirm('Leave '+me.mall.name+'? Its register will stop selling your pieces.'))return;try{await api('/app/mall/leave',{method:'POST'});me.mall=null;drawMall()}catch(err){alert(err.message)}};
+$('mallForm').addEventListener('submit',async function(e){e.preventDefault();
+  try{var d=await api('/app/mall/join',{json:{code:$('mCode').value,booth:$('mBooth').value}});me.mall=d.mall;msg('mallMsg','');drawMall()}catch(err){msg('mallMsg',err.message,1)}});
 $('shipEditBtn').onclick=function(){var f=$('shipForm');f.hidden=!f.hidden;var s=me.shipFrom||{};$('sSt').value=s.street1||'';$('sSt2').value=s.street2||'';$('sCity').value=s.city||'';$('sState').value=s.state||'';$('sZip').value=s.zip||'';$('sPhone').value=s.phone||''};
 $('shipForm').addEventListener('submit',async function(e){e.preventDefault();
   try{var d=await api('/app/me',{method:'PUT',json:{shipFrom:{street1:$('sSt').value,street2:$('sSt2').value,city:$('sCity').value,state:$('sState').value,zip:$('sZip').value,phone:$('sPhone').value}}});me=d.dealer;$('shipForm').hidden=true;msg('shipMsg','');drawSetup();loadItems()}
@@ -241,7 +251,7 @@ $('payBtn').onclick=async function(){var b=this;b.disabled=true;b.textContent='O
   try{var d=await api('/app/payouts',{method:'POST',json:{}});location.href=d.url}catch(err){b.disabled=false;drawSetup();alertMsg(err.message)}};
 function alertMsg(t){var p=$('setup');var m=document.createElement('div');m.className='msg err';m.textContent=t;p.appendChild(m);setTimeout(function(){m.remove()},8000)}
 // ----- items
-function why(it){if(it.status==='sold')return it.shippedAt?['ok','Shipped']:it.order?['sold','Sold: print the shipping label']:['sold','Sold'];if(!it.online)return['off','Not listed'];if(!(it.price>0))return['warn','Add a price to list it'];
+function why(it){if(it.status==='sold'&&it.store)return['sold','Sold in store at '+it.store.mall];if(it.status==='sold')return it.shippedAt?['ok','Shipped']:it.order?['sold','Sold: print the shipping label']:['sold','Sold'];if(!it.online)return['off','Not listed'];if(!(it.price>0))return['warn','Add a price to list it'];
   var miss=[];if(!(it.weightLb&&it.box))miss.push('ship size');if(!me.hasShipFrom)miss.push('ship-from address');if(!me.payouts)miss.push('payouts');
   return miss.length?['warn','Listed. To sell online, add '+miss.join(', ')]:['ok','Listed and ready to sell']}
 var view='inv';
