@@ -20,7 +20,7 @@
 
 import { session as dealerSession, hashPw, rand, cleanEmail, clean, err, body, newSession, dealerItem, listing, payoutsOk, ITEM_ID } from './app.js';
 import { stripeApi, stripeMode, createRecipient, recipientLink, recipientReady } from './stripe.js';
-import { sendEmail } from './mail.js';
+import { sendEmail, emailFrame } from './mail.js';
 
 const SESSION_TTL = 60 * 60 * 24 * 30;
 const CODE_ABC = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -65,6 +65,10 @@ export async function handleMall(request, env, url, json, cors) {
     if (ms && request.method === 'POST' && ms[2] === '/retry') return json({ sale: await retrySale(env, m.mall, ms[1]) }, 200, cors);
     if (ms && request.method === 'POST' && ms[2] === '/cancel') return json({ sale: await cancelSale(env, m.mall, ms[1]) }, 200, cors);
     if (ms && request.method === 'POST' && ms[2] === '/refund') return json({ sale: await refundSale(env, m.mall, ms[1]) }, 200, cors);
+    if (p === '/mall/statements' && request.method === 'GET') return json(await statements(env, m.mall, url.searchParams.get('month')), 200, cors);
+    if (p === '/mall/statements.csv' && request.method === 'GET') return statementsCsv(env, m.mall, url.searchParams.get('month'), cors);
+    if (p === '/mall/statements/paid' && request.method === 'POST') return json(await markPaid(env, m.mall, await body(request)), 200, cors);
+    if (p === '/mall/statements/send' && request.method === 'POST') return json(await sendStatement(env, m.mall, await body(request)), 200, cors);
     if (p === '/mall/report' && request.method === 'GET') return json(await report(env, m.mall, url.searchParams.get('day')), 200, cors);
     if (p === '/mall/report.csv' && request.method === 'GET') return reportCsv(env, m.mall, url.searchParams.get('day'), cors);
     if (p === '/mall/reader' && request.method === 'POST') return json({ mall: publicMall(env, await setupReader(env, m.mall, await body(request))) }, 200, cors);
@@ -627,4 +631,86 @@ async function payoutStatus(env, m) {
   if (ready !== !!m.payoutsReady) { m.payoutsReady = ready; await env.TABELLA.put('mall:' + m.id, JSON.stringify(m)); }
   const waiting = ready ? await sendWaiting(env, m.id) : null;
   return { ready, started: true, waiting };
+}
+
+// ---------- monthly dealer statements ----------
+//   mpaid:<mall>:<yyyymm>:<dealer>   the mall's note that it paid a dealer for the month { at, amount, note }
+// One statement per booth: every completed sale line for the month, the mall's commission and card fees, the dealer's
+// share, and who pays it (the mall for cash sales and for booths it manages; Tabella straight to the dealer's bank for
+// card sales of dealers on Tabella). Refunded sales are left out.
+function monthOf(m, v) { return /^\d{4}-(0[1-9]|1[0-2])$/.test(String(v || '')) ? v : dayOf(m, Date.now()).slice(0, 7); }
+async function statements(env, m, month) {
+  month = monthOf(m, month);
+  const all = []; let cursor;
+  do {
+    const l = await env.TABELLA.list({ prefix: 'msale:' + m.id + ':' + month.replace('-', ''), cursor });
+    const vals = await Promise.all(l.keys.map(k => env.TABELLA.get(k.name)));
+    vals.forEach(v => { if (v) all.push(JSON.parse(v)); });
+    cursor = l.list_complete ? null : l.cursor;
+  } while (cursor);
+  const booths = await boothList(env, m.id), byId = {};
+  for (const b of booths) {
+    const d = JSON.parse(await env.TABELLA.get('dealer:' + b.dealer) || 'null');
+    byId[b.dealer] = { id: b.dealer, name: d ? d.name : 'Booth ' + b.booth, email: d ? d.email || '' : '', managed: !!(d && d.managed), booth: b.booth, lines: [],
+      sales: 0, commission: 0, cardFees: 0, share: 0, mallOwes: 0, paidByTabella: 0, waiting: 0 };
+  }
+  for (const s of all.filter(x => x.status === 'paid').sort((a, b) => a.at - b.at)) {
+    for (const it of s.items) {
+      const st = byId[it.dealer] || (byId[it.dealer] = { id: it.dealer, name: it.dealerName, email: '', managed: false, booth: it.booth, gone: true, lines: [], sales: 0, commission: 0, cardFees: 0, share: 0, mallOwes: 0, paidByTabella: 0, waiting: 0 });
+      const po = s.method === 'card' ? (s.payouts || {})[it.dealer] : null;
+      const who = s.method === 'cash' || (po && po.status === 'mall') ? 'mall' : po && po.status === 'sent' ? 'tabella' : 'waiting';
+      st.lines.push({ day: s.day, sale: s.id, item: it.manual ? '' : it.id, title: it.title, method: s.method, price: it.price, commission: it.commission, cardFee: it.cardFee, share: it.owed, who });
+      st.sales += it.price; st.commission += it.commission; st.cardFees += it.cardFee; st.share += it.owed;
+      if (who === 'mall') st.mallOwes += it.owed; else if (who === 'tabella') st.paidByTabella += it.owed; else st.waiting += it.owed;
+    }
+  }
+  const list = Object.values(byId);
+  await Promise.all(list.map(async st => { st.paid = JSON.parse(await env.TABELLA.get('mpaid:' + m.id + ':' + month.replace('-', '') + ':' + st.id) || 'null'); }));
+  list.sort((a, b) => String(a.booth).localeCompare(String(b.booth), 'en', { numeric: true }));
+  const tot = list.reduce((t, st) => { for (const k of ['sales', 'commission', 'cardFees', 'share', 'mallOwes', 'paidByTabella', 'waiting']) t[k] += st[k]; return t; },
+    { sales: 0, commission: 0, cardFees: 0, share: 0, mallOwes: 0, paidByTabella: 0, waiting: 0 });
+  return { month, mall: m.name, totals: tot, dealers: list };
+}
+async function markPaid(env, m, b) {
+  const month = monthOf(m, b.month), did = String(b.dealer || '');
+  if (!/^d[a-z0-9]{10}$/.test(did)) throw err(400, 'Pick a dealer.');
+  const key = 'mpaid:' + m.id + ':' + month.replace('-', '') + ':' + did;
+  if (b.undo) { await env.TABELLA.delete(key); return { paid: null }; }
+  const amount = Math.round(Number(b.amount) * 100);
+  if (!isFinite(amount) || amount < 0) throw err(400, 'The amount looks wrong.');
+  const paid = { at: Date.now(), amount, note: clean(b.note, 80) };
+  await env.TABELLA.put(key, JSON.stringify(paid));
+  return { paid };
+}
+async function sendStatement(env, m, b) {
+  const r = await statements(env, m, b.month), st = r.dealers.find(x => x.id === b.dealer);
+  if (!st) throw err(404, 'That dealer isn\u2019t on this month\u2019s statements.');
+  if (!st.email) throw err(400, 'There\u2019s no email for ' + st.name + '. Add one on the Dealers tab, or print the statement.');
+  const c = v => '$' + (v / 100).toFixed(2), e = v => String(v == null ? '' : v).replace(/[&<>"']/g, x => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[x]));
+  const label = new Date(r.month + '-15T12:00:00Z').toLocaleDateString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' });
+  const rows = st.lines.map(l => '<tr><td style="padding:4px 6px 4px 0">' + e(l.day.slice(5)) + '</td><td style="padding:4px 6px">' + e(l.title) + '</td><td style="padding:4px 0;text-align:right">' + c(l.price) + '</td><td style="padding:4px 0 4px 8px;text-align:right">' + c(l.share) + '</td></tr>').join('');
+  const inner = '<p style="margin:0 0 10px">' + e(m.name) + ', booth ' + e(st.booth) + ' &middot; ' + e(label) + '</p>' +
+    (st.lines.length ? '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-size:14px;border-collapse:collapse"><tr style="color:#6A6259;font-size:12px"><td>Date</td><td style="padding:0 6px">Item</td><td style="text-align:right">Sold for</td><td style="text-align:right;padding-left:8px">Your share</td></tr>' + rows + '</table>' : '<p>No sales this month.</p>') +
+    '<p style="margin:14px 0 4px">Sales ' + c(st.sales) + ' &middot; mall commission ' + c(st.commission) + (st.cardFees ? ' &middot; card fees ' + c(st.cardFees) : '') + '</p>' +
+    '<p style="margin:0 0 4px"><b>Your share: ' + c(st.share) + '</b></p>' +
+    (st.mallOwes ? '<p style="margin:0 0 4px">Paid by ' + e(m.name) + ': ' + c(st.mallOwes) + (st.paid ? ' (paid ' + e(new Date(st.paid.at).toLocaleDateString('en-US')) + (st.paid.note ? ', ' + e(st.paid.note) : '') + ')' : '') + '</p>' : '') +
+    (st.paidByTabella ? '<p style="margin:0 0 4px">Already sent to your bank by Tabella (card sales): ' + c(st.paidByTabella) + '</p>' : '') +
+    (st.waiting ? '<p style="margin:0 0 4px">Waiting for you to connect a bank in the Tabella dealer app: ' + c(st.waiting) + '</p>' : '');
+  const text = m.name + ', booth ' + st.booth + ', ' + label + '\n' + st.lines.map(l => l.day + '  ' + l.title + '  ' + c(l.price) + '  share ' + c(l.share)).join('\n') +
+    '\nSales ' + c(st.sales) + ', commission ' + c(st.commission) + ', card fees ' + c(st.cardFees) + '\nYour share ' + c(st.share);
+  const r2 = await sendEmail(env, { to: st.email, replyTo: m.email, subject: m.name + ' statement, ' + label + ', booth ' + st.booth, html: emailFrame('Your ' + label + ' statement', inner), text });
+  if (r2.skipped) throw err(503, 'Email isn\u2019t switched on yet. Print the statement instead.');
+  if (r2.error) throw err(502, 'The email didn\u2019t send: ' + r2.error);
+  return { ok: true, to: st.email };
+}
+async function statementsCsv(env, m, month, cors) {
+  const r = await statements(env, m, month), c = v => (v / 100).toFixed(2);
+  const who = { mall: 'Mall', tabella: 'Tabella (card, to dealer bank)', waiting: 'Waiting for dealer bank' };
+  const rows = [['Booth', 'Dealer', 'Date', 'Sale', 'Item number', 'Item', 'Paid by', 'Sold for', 'Mall commission', 'Card fee', 'Dealer share', 'Who pays the dealer']];
+  for (const st of r.dealers) for (const l of st.lines) rows.push([st.booth, st.name, l.day, l.sale, l.item, l.title, l.method === 'cash' ? 'Cash' : 'Card', c(l.price), c(l.commission), c(l.cardFee), c(l.share), who[l.who]]);
+  rows.push([]);
+  rows.push(['Booth', 'Dealer', 'Sales', 'Commission', 'Card fees', 'Dealer share', 'Mall owes', 'Sent by Tabella', 'Waiting', 'Marked paid']);
+  for (const st of r.dealers) rows.push([st.booth, st.name, c(st.sales), c(st.commission), c(st.cardFees), c(st.share), c(st.mallOwes), c(st.paidByTabella), c(st.waiting), st.paid ? new Date(st.paid.at).toISOString().slice(0, 10) + (st.paid.note ? ' ' + st.paid.note : '') : '']);
+  const csv = rows.map(row => row.map(v => { v = String(v); return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }).join(',')).join('\r\n');
+  return new Response(csv, { headers: Object.assign({ 'content-type': 'text/csv; charset=utf-8', 'content-disposition': 'attachment; filename="' + m.name.replace(/[^A-Za-z0-9]+/g, '-') + '-statements-' + r.month + '.csv"' }, cors) });
 }

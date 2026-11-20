@@ -18,6 +18,7 @@ export function opsEmail(env) { return env.OPS_EMAIL || 'contact@tabellasuite.co
 
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const fm = n => '$' + Number(n || 0).toFixed(2);
+export function emailFrame(title, inner) { return wrap(title, inner); }
 function wrap(title, inner) {
   return '<!doctype html><html><body style="margin:0;background:#F4EFE6;font:16px/1.5 -apple-system,Segoe UI,Helvetica,Arial,sans-serif;color:#231F1A">' +
     '<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:24px 12px">' +

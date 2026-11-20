@@ -106,6 +106,8 @@ dialog{max-height:calc(100dvh - 24px);max-height:calc(100vh - 24px)}
 #salesBar[hidden],#invBar[hidden]{display:none}
 
 [hidden]{display:none!important}
+.stl{list-style:none;padding:0;margin:14px 0 0}.stl li{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-bottom:10px;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center}.stl li.empty{color:var(--muted)}
+.sth{display:flex;flex-direction:column;gap:2px}.stb{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .bybooth{margin-top:8px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:8px 12px}.bybooth summary{cursor:pointer;font-weight:600}
 .bbrow{display:grid;grid-template-columns:1.3fr 1fr 1.6fr auto;gap:8px;align-items:end;margin-top:6px}.bbrow label{margin-top:0}@media(max-width:600px){.bbrow{grid-template-columns:1fr 1fr}.bbdesc{grid-column:1/-1}}
 .msg.warn{background:#FBF0D9;color:#6B4A10}
@@ -165,7 +167,7 @@ dialog{max-height:calc(100dvh - 24px);max-height:calc(100vh - 24px)}
 <section id="appView" hidden>
  <div class="bar"><div><div class="cap">Your mall</div><h1 id="mallName" style="font-size:clamp(2rem,5vw,3rem);margin:4px 0 0"></h1></div><button class="btn sec" id="signOut" type="button">Sign out</button></div>
  <div class="tabs" role="tablist" id="viewTabs" style="margin-top:14px">
-  <button type="button" role="tab" data-v="reg" aria-selected="true">Register</button><button type="button" role="tab" data-v="day" aria-selected="false">Today</button><button type="button" role="tab" data-v="dealers" aria-selected="false">Dealers</button><button type="button" role="tab" data-v="set" aria-selected="false">Settings</button>
+  <button type="button" role="tab" data-v="reg" aria-selected="true">Register</button><button type="button" role="tab" data-v="day" aria-selected="false">Today</button><button type="button" role="tab" data-v="stmt" aria-selected="false">Statements</button><button type="button" role="tab" data-v="dealers" aria-selected="false">Dealers</button><button type="button" role="tab" data-v="set" aria-selected="false">Settings</button>
  </div>
 
  <!-- Register -->
@@ -210,6 +212,15 @@ dialog{max-height:calc(100dvh - 24px);max-height:calc(100vh - 24px)}
   <div class="tblwrap"><table class="tbl" id="dayTbl"></table></div>
   <h2 style="font-size:1.5rem;margin:22px 0 6px">Sales</h2>
   <ul class="sales" id="daySales"></ul>
+ </div>
+
+ <!-- Statements -->
+ <div id="v-stmt" class="view" hidden>
+  <div class="bar"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><label for="monPick" style="margin:0">Month</label><input id="monPick" type="month" style="width:auto"></div><button class="btn sec" type="button" id="stCsv">Download spreadsheet</button></div>
+  <p class="meta" style="margin:0 0 10px">One statement per booth: every sale this month, your commission and card fees, and the dealer's share. Mark a booth paid when you write the check.</p>
+  <div class="stats" id="stStats"></div>
+  <ul class="stl" id="stList"></ul>
+  <div id="stMsg" aria-live="polite"></div>
  </div>
 
  <!-- Dealers -->
@@ -326,7 +337,7 @@ var view='reg';
 document.querySelectorAll('#viewTabs button').forEach(function(b){b.onclick=function(){go(b.dataset.v)}});
 function go(v){view=v;document.querySelectorAll('#viewTabs button').forEach(function(b){b.setAttribute('aria-selected',b.dataset.v===v)});
   document.querySelectorAll('.view').forEach(function(x){x.hidden=x.id!=='v-'+v});
-  if(v==='reg'){drawSetupNote();loadBooths();setTimeout(function(){$('scanIn').focus()},50)}if(v==='day')loadDay();if(v==='dealers')loadDealers();if(v==='set')drawSettings()}
+  if(v==='reg'){drawSetupNote();loadBooths();setTimeout(function(){$('scanIn').focus()},50)}if(v==='day')loadDay();if(v==='dealers')loadDealers();if(v==='stmt')loadStmts();if(v==='set')drawSettings()}
 function enter(){show('app');$('mallName').textContent=me.name;drawCart();go(view);
   if(/payouts=back/.test(location.search)){history.replaceState(null,'',location.pathname);checkPayouts()}}
 function drawSetupNote(){var need=[];if(me.taxRate==null)need.push('your sales tax rate');if(!me.reader)need.push('a card reader');
@@ -450,13 +461,48 @@ $('waitBtn').onclick=async function(){var b=this;b.disabled=true;try{var r=await
 $('csvBtn').onclick=async function(){try{var r=await fetch(API+'/mall/report.csv?day='+($('dayPick').value||today()),{headers:{Authorization:'Bearer '+tok}});if(!r.ok)throw new Error('The spreadsheet could not be made.');
   var u=URL.createObjectURL(await r.blob()),a=document.createElement('a');a.href=u;a.download=me.name.replace(/[^A-Za-z0-9]+/g,'-')+'-'+($('dayPick').value||today())+'.csv';document.body.appendChild(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(u)},2000)}catch(err){alert(err.message)}};
 
+// ----- statements
+var stm=null;
+function thisMonth(){return today().slice(0,7)}
+function monLabel(m){return new Date(m+'-15T12:00:00Z').toLocaleDateString('en-US',{month:'long',year:'numeric',timeZone:'UTC'})}
+$('monPick').onchange=loadStmts;
+async function loadStmts(){if(!$('monPick').value)$('monPick').value=thisMonth();msg('stMsg','');
+  try{stm=await api('/mall/statements?month='+$('monPick').value);var t=stm.totals;
+    $('stStats').innerHTML=[['Sales',fc(t.sales)],['Your commission',fc(t.commission)],['Card fees',fc(t.cardFees)],['Dealers\u2019 share',fc(t.share)],['You owe dealers',fc(t.mallOwes)],['Sent by Tabella',fc(t.paidByTabella)]].map(function(x){return '<div><span class="meta">'+esc(x[0])+'</span><b>'+esc(x[1])+'</b></div>'}).join('');
+    $('stList').innerHTML=stm.dealers.length?stm.dealers.map(function(d){var paid=d.paid;
+      return '<li data-id="'+d.id+'"><div class="sth"><b>Booth '+esc(d.booth)+' &middot; '+esc(d.name)+'</b><span class="meta">'+d.lines.length+' sale'+(d.lines.length===1?'':'s')+' &middot; sales '+fc(d.sales)+' &middot; share '+fc(d.share)+'</span>'+
+        '<span>'+(d.mallOwes?'You owe <b>'+fc(d.mallOwes)+'</b> ':'')+(paid?'<span class="pill ok">Paid '+esc(new Date(paid.at).toLocaleDateString())+(paid.note?' &middot; '+esc(paid.note):'')+'</span>':d.mallOwes?'<span class="pill warn">Not paid yet</span>':'')+(d.paidByTabella?' <span class="meta">'+fc(d.paidByTabella)+' sent to their bank by Tabella</span>':'')+(d.waiting?' <span class="meta">'+fc(d.waiting)+' waiting for their bank</span>':'')+'</span></div>'+
+        '<div class="stb"><button type="button" class="btn sec" data-a="view">View and print</button><button type="button" class="btn sec" data-a="mail"'+(d.email?'':' title="Add an email on the Dealers tab"')+'>Email</button>'+(paid?'<button type="button" class="rm" data-a="undo">Undo paid</button>':d.mallOwes?'<button type="button" class="btn" data-a="paid">Mark paid</button>':'')+'</div></li>'}).join(''):'<li class="empty">No booths yet.</li>';
+    $('stList').querySelectorAll('[data-a]').forEach(function(b){b.onclick=function(){stAction(b.closest('li').dataset.id,b.dataset.a,b)}});
+  }catch(err){msg('stMsg',err.message,1)}}
+async function stAction(id,a,b){var d=stm.dealers.find(function(x){return x.id===id});if(!d)return;
+  if(a==='view'){printStatement(d);return}
+  if(a==='mail'){if(!d.email){msg('stMsg','There\u2019s no email for '+d.name+'. Add one on the Dealers tab, or print the statement.',1);return}
+    if(!confirm('Email the '+monLabel(stm.month)+' statement to '+d.email+'?'))return;b.disabled=true;
+    try{var r=await api('/mall/statements/send',{json:{month:stm.month,dealer:id}});msg('stMsg','Sent to '+r.to+'.')}catch(err){msg('stMsg',err.message,1)}b.disabled=false;return}
+  if(a==='paid'){var note=prompt('Paid '+fc(d.mallOwes)+' to '+d.name+'. Check number or a note (optional):','');if(note===null)return;
+    try{await api('/mall/statements/paid',{json:{month:stm.month,dealer:id,amount:d.mallOwes/100,note:note}});loadStmts()}catch(err){msg('stMsg',err.message,1)}return}
+  if(a==='undo'){try{await api('/mall/statements/paid',{json:{month:stm.month,dealer:id,undo:true}});loadStmts()}catch(err){msg('stMsg',err.message,1)}}}
+function printStatement(d){var who={mall:'You',tabella:'Tabella',waiting:'Waiting'};
+  var rows=d.lines.map(function(l){return '<tr><td>'+esc(l.day.slice(5))+'</td><td>'+esc(l.title)+(l.item?' <span class="m">'+esc(l.item)+'</span>':'')+'</td><td>'+(l.method==='cash'?'Cash':'Card')+'</td><td class="r">'+fc(l.price)+'</td><td class="r">'+fc(l.commission)+'</td><td class="r">'+fc(l.cardFee)+'</td><td class="r">'+fc(l.share)+'</td></tr>'}).join('');
+  var html='<!doctype html><html><head><meta charset="utf-8"><title>Statement</title><style>@page{size:letter;margin:.5in}body{font:11px/1.4 Arial,Helvetica,sans-serif;color:#000;margin:0}h1{font:600 20px Georgia,serif;margin:0}table{width:100%;border-collapse:collapse;margin-top:10px}th,td{text-align:left;padding:4px 6px;border-bottom:1px solid #bbb}th{font-size:10px;color:#444}.r{text-align:right}.m{color:#555;font-size:10px}.sum{margin-top:12px;width:auto;min-width:3.2in;margin-left:auto}.sum td{border:0;padding:2px 6px}.big td{font-weight:700;font-size:13px;border-top:1px solid #000}</style></head><body>'+
+    '<h1>'+esc(me.name)+'</h1><div>Dealer statement &middot; '+esc(monLabel(stm.month))+'</div><div style="margin-top:6px"><b>Booth '+esc(d.booth)+' &middot; '+esc(d.name)+'</b></div>'+
+    (rows?'<table><thead><tr><th>Date</th><th>Item</th><th>Paid by</th><th class="r">Sold for</th><th class="r">Commission</th><th class="r">Card fee</th><th class="r">Your share</th></tr></thead><tbody>'+rows+'</tbody></table>':'<p>No sales this month.</p>')+
+    '<table class="sum"><tr><td>Sales</td><td class="r">'+fc(d.sales)+'</td></tr><tr><td>Mall commission</td><td class="r">&minus;'+fc(d.commission)+'</td></tr><tr><td>Card fees</td><td class="r">&minus;'+fc(d.cardFees)+'</td></tr><tr class="big"><td>Your share</td><td class="r">'+fc(d.share)+'</td></tr>'+
+    (d.paidByTabella?'<tr><td>Sent to your bank by Tabella</td><td class="r">'+fc(d.paidByTabella)+'</td></tr>':'')+(d.waiting?'<tr><td>Waiting for your bank (Tabella app)</td><td class="r">'+fc(d.waiting)+'</td></tr>':'')+
+    '<tr class="big"><td>Paid by '+esc(me.name)+'</td><td class="r">'+fc(d.mallOwes)+'</td></tr>'+(d.paid?'<tr><td colspan="2" class="m">Paid '+esc(new Date(d.paid.at).toLocaleDateString())+(d.paid.note?' &middot; '+esc(d.paid.note):'')+'</td></tr>':'')+'</table></body></html>';
+  var f=document.createElement('iframe');f.style.cssText='position:fixed;width:0;height:0;border:0;right:0;bottom:0';document.body.appendChild(f);var dd=f.contentDocument;dd.open();dd.write(html);dd.close();
+  setTimeout(function(){f.contentWindow.focus();f.contentWindow.print();setTimeout(function(){f.remove()},1000)},150)}
+$('stCsv').onclick=async function(){var mo=$('monPick').value||thisMonth();try{var r=await fetch(API+'/mall/statements.csv?month='+mo,{headers:{Authorization:'Bearer '+tok}});if(!r.ok)throw new Error('The spreadsheet could not be made.');
+  var u=URL.createObjectURL(await r.blob()),a=document.createElement('a');a.href=u;a.download=me.name.replace(/[^A-Za-z0-9]+/g,'-')+'-statements-'+mo+'.csv';document.body.appendChild(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(u)},2000)}catch(err){alert(err.message)}};
+
 // ----- dealers
 $('addBoothForm').addEventListener('submit',async function(e){e.preventDefault();
   try{await api('/mall/dealers',{json:{booth:$('nbBooth').value,name:$('nbName').value,email:$('nbEmail').value}});$('nbBooth').value='';$('nbName').value='';$('nbEmail').value='';msg('nbMsg','Booth added.');loadDealers()}catch(err){msg('nbMsg',err.message,1)}});
 async function loadDealers(){$('joinCode').textContent=me.code;
   try{var ds=(await api('/mall/dealers')).dealers;
     $('dTbl').innerHTML=ds.length?'<thead><tr><th>Booth</th><th>Dealer</th><th>Commission %</th><th>Payouts</th><th></th></tr></thead><tbody>'+ds.map(function(d){
-      return '<tr data-id="'+d.id+'"><td><input class="sm" value="'+esc(d.booth)+'" data-f="booth" aria-label="Booth for '+esc(d.name)+'"></td><td>'+esc(d.name)+'</td><td><input class="sm" type="number" step="0.5" min="0" max="60" value="'+(d.pct==null?'':d.pct)+'" placeholder="'+me.commissionPct+'" data-f="pct" aria-label="Commission for '+esc(d.name)+'"></td><td>'+(d.managed?'<span class="pill">You pay them</span>':d.payouts?'<span class="pill ok">Bank connected</span>':'<span class="pill warn">No bank yet</span>')+'</td><td><button type="button" class="rm" data-del>Remove</button></td></tr>'}).join('')+'</tbody>'
+      return '<tr data-id="'+d.id+'"><td><input class="sm" value="'+esc(d.booth)+'" data-f="booth" aria-label="Booth for '+esc(d.name)+'"></td><td>'+esc(d.name)+(d.managed?'<br><input class="sm" style="width:190px;margin-top:4px" type="email" value="'+esc(d.email||'')+'" placeholder="Email for statements" data-f="email" aria-label="Email for '+esc(d.name)+'">':'')+'</td><td><input class="sm" type="number" step="0.5" min="0" max="60" value="'+(d.pct==null?'':d.pct)+'" placeholder="'+me.commissionPct+'" data-f="pct" aria-label="Commission for '+esc(d.name)+'"></td><td>'+(d.managed?'<span class="pill">You pay them</span>':d.payouts?'<span class="pill ok">Bank connected</span>':'<span class="pill warn">No bank yet</span>')+'</td><td><button type="button" class="rm" data-del>Remove</button></td></tr>'}).join('')+'</tbody>'
       :'<tbody><tr><td class="meta">No dealers yet. Give them the join code above.</td></tr></tbody>';
     $('dTbl').querySelectorAll('input').forEach(function(i){i.onchange=async function(){var id=i.closest('tr').dataset.id,b={};b[i.dataset.f]=i.value;
       try{await api('/mall/dealers/'+id,{method:'PUT',json:b});msg('dMsg','Saved.')}catch(err){msg('dMsg',err.message,1)}}});
