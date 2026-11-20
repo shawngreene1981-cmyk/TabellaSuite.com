@@ -346,10 +346,12 @@ $('cashDone').onclick=async function(){var b=this;b.disabled=true;
   catch(err){msg('payMsg',err.message,1)}b.disabled=false};
 
 // card
-$('cardBtn').onclick=async function(){openPay('Card');$('cardPane').hidden=false;$('cardState').textContent='Sending the total to the card reader...';$('cardTest').hidden=true;$('cardRetry').hidden=true;
-  try{var d=await api('/mall/sale',{json:{items:cart.map(function(i){return i.id}),method:'card'}});sale=d.sale;
+var starting=false;
+$('cardBtn').onclick=async function(){if(starting)return;starting=true;sale=null;openPay('Card');$('cardPane').hidden=false;$('cardState').textContent='Sending the total to the card reader...';$('cardTest').hidden=true;$('cardRetry').hidden=true;
+  try{var d=await api('/mall/sale',{json:{items:cart.map(function(i){return i.id}),method:'card'}});if(!d.sale||!d.sale.id)throw new Error('The reader didn\u2019t get the sale. Tap Cancel and try Card again.');sale=d.sale;
     $('cardState').textContent='Ask the customer to tap, insert or swipe their card on the reader.';$('cardTest').hidden=!(me.reader&&me.reader.simulated);startPoll()}
-  catch(err){$('cardState').textContent='';msg('payMsg',err.message,1)}};
+  catch(err){$('cardState').textContent='The sale didn\u2019t reach the reader: '+err.message}
+  starting=false};
 function startPoll(){stopPoll();poll=setInterval(checkCard,1500)}
 function stopPoll(){if(poll)clearInterval(poll);poll=null}
 function cardResult(s){sale=s;
@@ -357,8 +359,8 @@ function cardResult(s){sale=s;
   if(s.status==='cancelled'){stopPoll();$('payDlg').close();return}
   if(s.readerFailed){stopPoll();$('cardState').textContent='Not paid: '+s.readerFailed;$('cardRetry').hidden=false}}
 async function checkCard(){if(!sale)return;try{cardResult((await api('/mall/sale/'+sale.id)).sale)}catch(e){}}
-$('tapOk').onclick=async function(){try{cardResult((await api('/mall/sale/'+sale.id+'/test-card',{json:{}})).sale)}catch(err){msg('payMsg',err.message,1)}};
-$('tapBad').onclick=async function(){try{cardResult((await api('/mall/sale/'+sale.id+'/test-card',{json:{decline:true}})).sale)}catch(err){msg('payMsg',err.message,1)}};
+$('tapOk').onclick=async function(){if(!sale){msg('payMsg','The sale hasn\u2019t reached the reader yet. Wait a moment, or tap Cancel and try Card again.',1);return}var b=this;b.disabled=true;msg('payMsg','');try{cardResult((await api('/mall/sale/'+sale.id+'/test-card',{json:{}})).sale)}catch(err){msg('payMsg',err.message,1)}b.disabled=false};
+$('tapBad').onclick=async function(){if(!sale){msg('payMsg','The sale hasn\u2019t reached the reader yet. Wait a moment, or tap Cancel and try Card again.',1);return}var b=this;b.disabled=true;msg('payMsg','');try{cardResult((await api('/mall/sale/'+sale.id+'/test-card',{json:{decline:true}})).sale)}catch(err){msg('payMsg',err.message,1)}b.disabled=false};
 $('cardRetry').onclick=async function(){$('cardRetry').hidden=true;msg('payMsg','');$('cardState').textContent='Ask the customer to try their card again, or another card.';
   try{await api('/mall/sale/'+sale.id+'/retry',{json:{}});startPoll()}catch(err){msg('payMsg',err.message,1)}};
 $('cardCancel').onclick=async function(){stopPoll();if(sale){try{var s=(await api('/mall/sale/'+sale.id+'/cancel',{json:{}})).sale;if(s.status==='paid'){$('payDlg').close();done(s);return}}catch(e){}}sale=null;$('payDlg').close()};
