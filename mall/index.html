@@ -400,7 +400,8 @@ function stopPoll(){if(poll)clearInterval(poll);poll=null}
 function cardResult(s){sale=s;
   if(s.status==='paid'){stopPoll();$('payDlg').close();done(s);return}
   if(s.status==='cancelled'){stopPoll();$('payDlg').close();return}
-  if(s.readerFailed){stopPoll();$('cardState').textContent='Not paid: '+s.readerFailed;$('cardRetry').hidden=false}}
+  if(s.readerFailed){stopPoll();var tm=me.reader&&me.reader.simulated,ct=s.total%100,special=[1,5,55,65,75].indexOf(ct)>=0;
+    $('cardState').textContent=tm&&special?'Not paid. In test mode, Stripe\u2019s test reader always declines totals ending in .01, .05, .55, .65 or .75, so stores can practice declines. Cancel, then change the sale so the cents come out different.':'Not paid: '+s.readerFailed;$('cardRetry').hidden=!!(tm&&special)}}
 async function checkCard(){if(!sale)return;try{cardResult((await api('/mall/sale/'+sale.id)).sale)}catch(e){}}
 $('tapOk').onclick=async function(){if(!sale){msg('payMsg','The sale hasn\u2019t reached the reader yet. Wait a moment, or tap Cancel and try Card again.',1);return}var b=this;b.disabled=true;msg('payMsg','');try{cardResult((await api('/mall/sale/'+sale.id+'/test-card',{json:{}})).sale)}catch(err){msg('payMsg',err.message,1)}b.disabled=false};
 $('tapBad').onclick=async function(){if(!sale){msg('payMsg','The sale hasn\u2019t reached the reader yet. Wait a moment, or tap Cancel and try Card again.',1);return}var b=this;b.disabled=true;msg('payMsg','');try{cardResult((await api('/mall/sale/'+sale.id+'/test-card',{json:{decline:true}})).sale)}catch(err){msg('payMsg',err.message,1)}b.disabled=false};
