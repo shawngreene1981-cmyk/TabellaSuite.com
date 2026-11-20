@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Mall pitch | Tabella</title>
+<meta name="robots" content="noindex,nofollow">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Inter:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+/* A pitch deck that fills itself in for the mall being pitched, from the Tabella map.
+   /pitch/                      pick a shop from the map
+   /pitch/?shop=<id>&booths=N   the deck for that shop (id as the map uses it); booths sets the price slide
+   Keys: arrows, space, Home/End. Print or save as PDF for a one-slide-per-page handout. */
+:root{--bg:#F4EFE6;--bg2:#EBE4D6;--ink:#231F1A;--muted:#6A6259;--line:#D5CCBA;--terra:#9A4A2E;--terra-ink:#FFF8F0;--gold:#A8842F;--card:#FBF8F2;--green:#3F6B45}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:#191613;color:var(--ink);font:16px/1.5 Inter,system-ui,sans-serif}
+h1,h2,h3{font-family:'Cormorant Garamond',Georgia,serif;font-weight:600;line-height:1.05;margin:0;text-wrap:balance}
+.cap{font-family:Cinzel,'Times New Roman',serif;letter-spacing:.18em;text-transform:uppercase;font-size:13px;color:var(--gold);font-weight:600}
+a{color:var(--terra)}
+/* picker */
+#pick{max-width:760px;margin:0 auto;padding:40px 20px;color:#EFE8DB}
+#pick h1{font-size:44px;margin:6px 0 10px}#pick p{color:#A89F90}
+#pick input{font:inherit;width:100%;padding:12px 14px;border-radius:10px;border:1px solid #3A342D;background:#25211C;color:#EFE8DB}
+#pick label{display:block;margin:16px 0 6px;font-weight:600}
+#res{list-style:none;padding:0;margin:10px 0 0}#res li button{width:100%;text-align:left;font:inherit;background:#25211C;color:#EFE8DB;border:1px solid #3A342D;border-radius:10px;padding:10px 14px;margin-bottom:6px;cursor:pointer}
+#res li button:hover,#res li button:focus{border-color:#D98A66}#res .t{color:#A89F90;font-size:14px}
+.ours{color:#D2B15E;font-size:12px;margin-left:6px}
+/* deck */
+#deck{position:fixed;inset:0 0 52px 0;display:flex;align-items:center;justify-content:center}
+.slide{position:absolute;width:1280px;height:720px;background:var(--bg);border-radius:6px;overflow:hidden;padding:64px 80px;display:none;transform-origin:center center}
+.slide.on{display:block}
+.slide h2{font-size:58px;margin:10px 0 22px;max-width:15em}
+.slide p.lead{font-size:24px;color:var(--muted);max-width:40em;margin:0 0 22px}
+.slide ul{margin:0;padding:0;list-style:none;font-size:23px;max-width:44em}
+.slide ul li{padding:10px 0 10px 34px;position:relative;border-bottom:1px solid var(--line)}
+.slide ul li::before{content:'';position:absolute;left:4px;top:22px;width:12px;height:12px;border-radius:50%;background:var(--terra)}
+.slide .foot{position:absolute;left:80px;right:80px;bottom:34px;display:flex;justify-content:space-between;font-size:14px;color:var(--muted)}
+.logo{font-family:Cinzel,serif;font-weight:600;letter-spacing:.22em;font-size:18px}
+.cover{background:#231F1A;color:#EFE8DB;display:none}
+.cover.on{display:flex;flex-direction:column;justify-content:center}
+.cover h1{font-size:96px;margin:18px 0 14px;max-width:11em}.cover .sub{font-size:26px;color:#C9BFAE}
+.cover .foot{color:#A89F90}
+.two{display:grid;grid-template-columns:1.15fr 1fr;gap:44px;align-items:start}
+.mapbox{height:470px;border-radius:12px;overflow:hidden;border:1px solid var(--line);background:var(--bg2)}
+.big{font-family:'Cormorant Garamond',serif;font-weight:600;font-size:88px;line-height:1;color:var(--terra)}
+.stat{margin-bottom:22px}.stat .l{font-size:20px;color:var(--muted)}
+.near{font-size:18px;color:var(--muted);margin-top:6px;line-height:1.5}
+.pill{display:inline-block;font-size:16px;padding:4px 12px;border-radius:999px;background:var(--bg2);border:1px solid var(--line)}
+.pill.ok{background:#E3EEDF;border-color:#B9D0B4;color:#2C4F31}
+table.price{border-collapse:collapse;font-size:24px;margin-top:6px;min-width:820px}
+table.price th,table.price td{padding:12px 18px;border-bottom:1px solid var(--line);text-align:left}
+table.price th{font-size:16px;color:var(--muted);font-weight:600}
+table.price td.n{font-family:'Cormorant Garamond',serif;font-size:40px;font-weight:600}
+.note{font-size:18px;color:var(--muted);margin-top:16px;max-width:52em}
+.steps{counter-reset:s}.steps li::before{counter-increment:s;content:counter(s);background:var(--terra);color:var(--terra-ink);width:26px;height:26px;top:14px;left:0;font-size:15px;display:flex;align-items:center;justify-content:center;font-weight:600}
+.steps li{padding-left:44px}
+.money{font-size:22px;margin-top:22px;padding:18px 22px;background:var(--card);border:1px solid var(--line);border-radius:12px;max-width:40em}
+/* controls */
+#bar{position:fixed;left:0;right:0;bottom:0;display:flex;gap:8px;justify-content:center;align-items:center;padding:10px;color:#A89F90;font-size:14px}
+#bar button,#bar a{font:inherit;background:#25211C;color:#EFE8DB;border:1px solid #3A342D;border-radius:8px;padding:6px 12px;cursor:pointer;text-decoration:none}
+@media print{
+  @page{size:13.333in 7.5in;margin:0}
+  html,body{background:#fff;height:auto}
+  #bar,#pick{display:none!important}
+  #deck{position:static;display:block}
+  .slide,.cover{display:block!important;position:relative;transform:none!important;width:13.333in;height:7.5in;border-radius:0;page-break-after:always;padding:.66in .83in}
+  .cover{display:flex!important}
+}
+</style>
+</head>
+<body>
+
+<section id="pick" hidden>
+ <div class="cap">Tabella</div>
+ <h1>Pitch a mall</h1>
+ <p>Pick the shop from the Tabella map, and the deck fills in its name, town, its listing and the shops around it. Then present it, or print it as a handout.</p>
+ <label for="q">Find the shop</label>
+ <input id="q" placeholder="Relics, The Maze, or a town" autocomplete="off">
+ <label for="nb">Booths in the mall <span style="font-weight:400;color:#A89F90">(for the price slide; a guess is fine)</span></label>
+ <input id="nb" type="number" min="1" max="2000" value="100" style="max-width:180px">
+ <ul id="res"></ul>
+ <p id="pmsg"></p>
+</section>
+
+<div id="deck" hidden></div>
+<div id="bar" hidden><button type="button" id="prev" aria-label="Previous slide">&larr;</button><span id="pos"></span><button type="button" id="next" aria-label="Next slide">&rarr;</button>
+ <button type="button" id="full">Full screen</button><button type="button" id="prt">Print or PDF</button><a href="./" id="other">Another mall</a></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+(function(){
+var API='https://tabella-shipping.shawn-greene1981.workers.dev',$=function(i){return document.getElementById(i)};
+function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
+function slug(t){return t.toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,120)}
+function hav(a,b){var R=3958.8,r=Math.PI/180,x=(b[0]-a[0])*r,y=(b[1]-a[1])*r,h=Math.sin(x/2)*Math.sin(x/2)+Math.cos(a[0]*r)*Math.cos(b[0]*r)*Math.sin(y/2)*Math.sin(y/2);return 2*R*Math.asin(Math.sqrt(h))}
+var qs=new URLSearchParams(location.search);
+
+// ---------- the map's data: our own shops (map.html), saved trip details (Worker) and the nationwide list (data/shops)
+var SHOPS={};
+async function loadOurs(){
+  var html=await (await fetch('../map.html',{cache:'no-cache'})).text();
+  var T=Function('return '+html.match(/var T=(\{[\s\S]*?\});/)[1])(),M=Function('return '+html.match(/var M=(\[[\s\S]*?\]);/)[1])();
+  M.forEach(function(m){if(!T[m[1]])return;var id=slug(m[0]+' '+m[1]);SHOPS[id]={id:id,name:m[0],town:m[1],ll:T[m[1]].slice(),best:m[3]||'',ours:true,trip:m[2]}});
+  try{var r=await (await fetch(API+'/trip/shops')).json();(r.shops||[]).forEach(function(e){if(e.s==='x'){delete SHOPS[e.id];return}
+    var p=SHOPS[e.id]||(e.ll||T[e.town]?SHOPS[e.id]={id:e.id,name:e.name,town:e.town,ll:(e.ll||T[e.town]).slice(),best:'',ours:e.s!=='o'}:null);if(!p)return;
+    if(e.ll)p.ll=e.ll.slice();if(e.best)p.best=e.best;if(e.addr)p.addr=e.addr;if(e.verified){p.verified=true;p.website=e.website||''}})}catch(e){}
+}
+var IDX=null,TILES={};
+async function tile(k){if(!TILES[k])TILES[k]=fetch('../data/shops/'+k+'.json').then(function(r){return r.ok?r.json():[]}).catch(function(){return[]});return TILES[k]}
+async function index(){if(!IDX)IDX=await (await fetch('../data/shops/index.json')).json();return IDX}
+function tkey(lat,lon,sz){return Math.floor(lat/sz)*sz+'_'+Math.floor(lon/sz)*sz}
+async function osmNear(ll,miles){var ix=await index(),sz=ix.tile||4,keys={};
+  [-1,0,1].forEach(function(a){[-1,0,1].forEach(function(b){var k=tkey(ll[0]+a*sz*.5,ll[1]+b*sz*.5,sz);if((Array.isArray(ix.tiles)?ix.tiles.some(function(t){return t[0]===k}):ix.tiles[k]))keys[k]=1})});
+  var lists=await Promise.all(Object.keys(keys).map(tile)),out=[];
+  lists.forEach(function(l){l.forEach(function(s){var d=hav(ll,[s[1],s[2]]);if(d<=miles)out.push({id:s[0],name:s[3],town:s[4]||'',ll:[s[1],s[2]],d:d})})});return out}
+function core(n){return n.toLowerCase().normalize('NFKD').replace(/['’]/g,'').replace(/&/g,' and ').replace(/[^a-z0-9 ]+/g,' ').split(/\s+/).filter(function(w){return w&&!/^(the|and|antiques?|mall|market(place)?|vintage|co|llc|inc|shoppes?|shops?|store|of|at)$/.test(w)}).join(' ')}
+
+// ---------- picker
+async function picker(){$('pick').hidden=false;$('pmsg').textContent='Loading the map...';
+  await loadOurs();$('pmsg').textContent='';var all=null;
+  function draw(list){$('res').innerHTML=list.slice(0,30).map(function(p){return '<li><button type="button" data-id="'+esc(p.id)+'"><b>'+esc(p.name)+'</b>'+(p.ours?'<span class="ours">ON OUR MAP</span>':'')+'<br><span class="t">'+esc(p.town||'')+'</span></button></li>'}).join('')||'<li class="t">No match. Try the town.</li>';
+    $('res').querySelectorAll('button').forEach(function(b){b.onclick=function(){location.search='?shop='+encodeURIComponent(b.dataset.id)+'&booths='+encodeURIComponent($('nb').value||100)}})}
+  function list(){var q=$('q').value.trim().toLowerCase(),ours=Object.values(SHOPS);
+    if(!q){draw(ours.filter(function(p){return p.ours}).sort(function(a,b){return a.town.localeCompare(b.town)}));return}
+    var m=ours.concat(all||[]).filter(function(p){return (p.name+' '+p.town).toLowerCase().indexOf(q)>=0});draw(m)}
+  $('q').oninput=list;list();
+  // the nationwide list, for shops we haven't been to
+  index().then(function(ix){var ks=Array.isArray(ix.tiles)?ix.tiles.map(function(t){return t[0]}):Object.keys(ix.tiles);
+    return Promise.all(ks.map(tile))}).then(function(ls){all=[];ls.forEach(function(l){l.forEach(function(s){all.push({id:s[0],name:s[3],town:s[4]||'',ll:[s[1],s[2]]})})});if($('q').value)list()});
+}
+
+// ---------- pricing (same as pricing.html): first 30 booths at the top rate, next 30 at the middle, the rest at the lowest
+var TIERS=[['Basic',[1.30,.80,.50],'$199'],['Plus',[1.80,1.10,.70],'$99'],['Complete',[2.20,1.40,.90],'free']];
+function cost(n,r){return Math.min(n,30)*r[0]+Math.min(Math.max(n-30,0),30)*r[1]+Math.max(n-60,0)*r[2]}
+function $m(v){return '$'+(Math.round(v*100)/100).toFixed(v%1?2:0)}
+
+// ---------- the deck
+async function deck(id){
+  await loadOurs();var p=SHOPS[id];
+  if(!p&&/^osm-/.test(id)){var ix=await index(),ks=Array.isArray(ix.tiles)?ix.tiles.map(function(t){return t[0]}):Object.keys(ix.tiles);
+    for(var i=0;i<ks.length&&!p;i++){(await tile(ks[i])).forEach(function(s){if(s[0]===id)p={id:s[0],name:s[3],town:s[4]||'',ll:[s[1],s[2]],ours:false}})}}
+  if(!p){$('pick').hidden=false;$('pmsg').textContent='That shop isn’t on the map anymore. Pick it again.';picker();return}
+  var booths=Math.max(1,Math.min(2000,parseInt(qs.get('booths'),10)||100));
+  var town=p.town.replace(/,\s*[A-Z]{2}$/,''),name=p.name,short=name;
+  // nearby shops: ours plus the nationwide list, without counting the same shop twice
+  var osm=await osmNear(p.ll,25),near=[];Object.values(SHOPS).forEach(function(s){if(s.id!==p.id){var d=hav(p.ll,s.ll);if(d<=25)near.push({name:s.name,town:s.town,ll:s.ll,d:d})}});
+  osm.forEach(function(o){var c=core(o.name);if(o.id===p.id||core(p.name)===c)return;if(!near.some(function(n){return core(n.name)===c}))near.push(o)});
+  near.sort(function(a,b){return a.d-b.d});var within10=near.filter(function(n){return n.d<=10}).length;
+  var date=new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'});
+  var foot='<div class="foot"><span class="logo">TABELLA</span><span>Prepared for '+esc(name)+'</span></div>';
+  var S=[];
+  S.push('<section class="slide cover"><div class="cap">Prepared for</div><h1>'+esc(name)+'</h1><div class="sub">'+esc(p.town)+' &middot; '+esc(date)+'</div><div class="foot"><span class="logo">TABELLA</span><span>tabellasuite.com</span></div></section>');
+  S.push('<section class="slide"><div class="cap">Already on the map</div><h2>Shoppers can find '+esc(name)+' on Tabella today.</h2><div class="two"><div class="mapbox" id="mbox"></div><div>'+
+    '<div class="stat"><div class="big">'+near.length+'</div><div class="l">other antique and vintage shops within 25 miles'+(within10?', '+within10+' of them within 10':'')+'</div></div>'+
+    '<p style="font-size:21px;margin:0 0 12px">Road-trippers plan their routes through '+esc(town)+' on the Tabella map. '+(p.verified?esc(name)+'’s listing is <span class="pill ok">Verified</span>.':'Your free listing is ready to claim.')+'</p>'+
+    (near.length?'<div class="near">Nearby: '+near.slice(0,6).map(function(n){return esc(n.name)}).join(', ')+(near.length>6?', and more':'')+'</div>':'')+'</div></div>'+foot+'</section>');
+  S.push('<section class="slide"><div class="cap">The problem</div><h2>Shoppers want to see the booths before they drive.</h2><ul>'+
+    '<li>Most malls can’t show what’s on the shelves, so shoppers guess, or don’t come.</li>'+
+    '<li>Dealers sell their best pieces online elsewhere, and the mall earns nothing from it.</li>'+
+    '<li>Month end is paper tags, a register tape and an evening of math for every booth.</li></ul>'+foot+'</section>');
+  S.push('<section class="slide"><div class="cap">Online</div><h2>Every booth at '+esc(short)+', online.</h2><ul>'+
+    '<li>Dealers photograph a piece and it’s in the Tabella shop, with the booth it sits in.</li>'+
+    '<li><b>'+esc(name)+' earns 4% of every online sale</b> from its booths, without lifting a finger.</li>'+
+    '<li>Shoppers can pick up at your counter, so online orders bring people through your door.</li></ul>'+
+    '<div class="money">If your dealers sell $2,500 a month online, '+esc(name)+' earns <b>$100 a month</b>. That alone covers the Plus plan for about '+(function(){for(var n=200;n>0;n--)if(cost(n,TIERS[1][1])<=100)return n;return 0})()+' booths.</div>'+foot+'</section>');
+  S.push('<section class="slide"><div class="cap">In the mall</div><h2>A register made for booths.</h2><ul>'+
+    '<li>Scan the tag: price, booth and dealer come up. Paper tags work too, by booth number and price.</li>'+
+    '<li>Cash or card on the Tabella reader. The piece comes off the website the moment it sells.</li>'+
+    '<li>Card money for dealers on Tabella goes straight to their bank. No more checks for those booths.</li>'+
+    '<li>Runs on a tablet in the browser. Nothing to install.</li></ul>'+foot+'</section>');
+  S.push('<section class="slide"><div class="cap">Month end</div><h2>Month end takes minutes, not an evening.</h2><ul>'+
+    '<li>A statement for every booth: each sale, your commission, card fees and booth rent.</li>'+
+    '<li>Rent can come out of card sales first, so you aren’t chasing it.</li>'+
+    '<li>Statements email themselves on the day you pick. Mark a booth paid when you write the check.</li>'+
+    '<li>A spreadsheet of the month for your books.</li></ul>'+foot+'</section>');
+  S.push('<section class="slide"><div class="cap">What it costs</div><h2>For '+booths+' booths at '+esc(short)+'.</h2>'+
+    '<table class="price"><thead><tr><th></th>'+TIERS.map(function(t){return '<th>'+t[0]+'</th>'}).join('')+'</tr></thead><tbody>'+
+    '<tr><td>Per month</td>'+TIERS.map(function(t){return '<td class="n">'+$m(cost(booths,t[1]))+'</td>'}).join('')+'</tr>'+
+    '<tr><td>Per booth, on average</td>'+TIERS.map(function(t){return '<td>'+$m(cost(booths,t[1])/booths)+'</td>'}).join('')+'</tr>'+
+    '<tr><td>Concierge setup</td>'+TIERS.map(function(t){return '<td>'+t[2]+'</td>'}).join('')+'</tr></tbody></table>'+
+    '<p class="note"><b>The first 6 months are free on any plan.</b> Plus adds rent taken from payouts, dealer statements and 1099s; Complete adds a punch card and sync with the register you already use. Free for dealers to join; 9% commission on their online sales only.</p>'+foot+'</section>');
+  S.push('<section class="slide"><div class="cap">Start small</div><h2>Keep what works. Add what doesn’t.</h2><ul>'+
+    '<li>Keep the register you have, if you like. Tabella works alongside it.</li>'+
+    '<li>Start with a few dealers who already sell online, then add booths as they ask.</li>'+
+    '<li>Your paper tags work on day one. Dealers move to Tabella tags as they restock.</li></ul>'+foot+'</section>');
+  S.push('<section class="slide"><div class="cap">Next steps</div><h2>Next steps for '+esc(name)+'.</h2><ul class="steps">'+
+    '<li>'+(p.verified?'Your listing is verified. Add photos and your hours at tabellasuite.com.':'Claim your free listing on the Tabella map and add your website.')+'</li>'+
+    '<li>A 30-minute demo at your counter: a sale, a statement and the map, on a tablet.</li>'+
+    '<li>Pick a few dealers to start, and a date.</li></ul>'+
+    '<p class="lead" style="margin-top:30px">contact@tabellasuite.com &middot; tabellasuite.com</p>'+foot+'</section>');
+  $('deck').innerHTML=S.join('');$('deck').hidden=false;$('bar').hidden=false;document.title=name+' | Tabella pitch';
+  var slides=[].slice.call(document.querySelectorAll('.slide')),cur=0;
+  function fit(){var s=Math.min((innerWidth-16)/1280,(innerHeight-64)/720);slides.forEach(function(x){x.style.transform='scale('+s+')'})}
+  function show(i){cur=Math.max(0,Math.min(slides.length-1,i));slides.forEach(function(x,j){x.classList.toggle('on',j===cur)});$('pos').textContent=(cur+1)+' / '+slides.length;if(cur===1)drawMap()}
+  addEventListener('resize',fit);fit();show(0);
+  $('prev').onclick=function(){show(cur-1)};$('next').onclick=function(){show(cur+1)};
+  document.addEventListener('keydown',function(e){if(e.key==='ArrowRight'||e.key===' '||e.key==='PageDown'){e.preventDefault();show(cur+1)}else if(e.key==='ArrowLeft'||e.key==='PageUp')show(cur-1);else if(e.key==='Home')show(0);else if(e.key==='End')show(slides.length-1)});
+  $('deck').addEventListener('click',function(e){if(e.target.closest('.leaflet-container'))return;show(cur+(e.clientX<innerWidth/3?-1:1))});
+  $('full').onclick=function(){if(document.fullscreenElement)document.exitFullscreen();else document.documentElement.requestFullscreen().catch(function(){})};
+  $('prt').onclick=function(){drawMap();setTimeout(function(){print()},700)};
+  var drawn=false;function drawMap(){if(drawn||!window.L)return;drawn=true;
+    var mp=L.map('mbox',{zoomControl:false,attributionControl:true,scrollWheelZoom:false});L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:18,attribution:'&copy; OpenStreetMap contributors'}).addTo(mp);
+    var pts=[p.ll];near.slice(0,40).forEach(function(n){pts.push(n.ll);L.circleMarker(n.ll,{radius:6,color:'#6A6259',weight:1,fillColor:'#A8842F',fillOpacity:.85}).addTo(mp).bindTooltip(esc(n.name))});
+    L.circleMarker(p.ll,{radius:11,color:'#fff',weight:3,fillColor:'#9A4A2E',fillOpacity:1}).addTo(mp).bindTooltip(esc(name),{permanent:true,direction:'top',offset:[0,-10]});
+    if(pts.length>1)mp.fitBounds(pts,{padding:[30,30],maxZoom:12});else mp.setView(p.ll,11)}
+}
+
+var id=qs.get('shop');if(id)deck(id);else picker();
+})();
+</script>
+</body>
+</html>
