@@ -13,6 +13,7 @@ import { handleMall, autoStatements } from './mall.js';
 import { handleOffers } from './offers.js';
 import { handleTrips, auth as adminAuth } from './trips.js';
 import { billingDaily, opsList, opsSetOff } from './billing.js';
+import { handleWaitlist } from './waitlist.js';
 import { handlePlaces } from './places.js';
 
 const SHIPPO = 'https://api.goshippo.com';
@@ -52,6 +53,9 @@ export default {
         return json({ error: 'Not found' }, 404, cors);
       } catch (e) { return json({ error: e.message }, e.status || 500, cors); }
     }
+
+    const wl = await handleWaitlist(request, env, url, json, cors);
+    if (wl) return wl;
 
     const mall = await handleMall(request, env, url, json, cors);
     if (mall) return mall;

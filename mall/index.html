@@ -113,6 +113,11 @@ dialog{max-height:calc(100dvh - 24px);max-height:calc(100vh - 24px)}
 .bybooth{margin-top:8px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:8px 12px}.bybooth summary{cursor:pointer;font-weight:600}
 .bbrow{display:grid;grid-template-columns:1.3fr 1fr 1.6fr auto;gap:8px;align-items:end;margin-top:6px}.bbrow label{margin-top:0}@media(max-width:600px){.bbrow{grid-template-columns:1fr 1fr}.bbdesc{grid-column:1/-1}}
 .msg.warn{background:#FBF0D9;color:#6B4A10}
+.terms{margin:14px 0 0;padding:12px 14px;border:1px solid var(--line);border-radius:10px;background:var(--bg);font-size:.88rem}.terms ul{margin:6px 0 0;padding-left:18px}.terms li{margin:0 0 4px}
+.wl{display:grid;grid-template-columns:72px 1fr auto;gap:12px;align-items:start;padding:12px 0;border-top:1px solid var(--line)}.wl:first-child{border-top:0}
+.wl img,.wl .ph{width:72px;height:72px;object-fit:cover;border-radius:8px;background:var(--bg2,#EBE4D6)}.wl .acts{display:flex;flex-direction:column;gap:6px}
+.ins2{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;margin-top:14px}.ins2 ol{margin:0;padding-left:20px}.ins2 li{margin:0 0 6px}
+.old{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}.old div{font-size:.85rem}.old img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:8px;background:var(--bg2,#EBE4D6)}
 .plansteps{margin:12px 0 0;padding-left:20px}.plansteps li{margin:0 0 6px}.plansteps li.done{opacity:.55}#planPanel[hidden]{display:none!important}
 .reg{display:grid;grid-template-columns:1fr 320px;gap:18px;align-items:start;margin-top:12px}
 @media(max-width:820px){.reg{grid-template-columns:1fr}}
@@ -151,6 +156,18 @@ dialog{max-height:calc(100dvh - 24px);max-height:calc(100vh - 24px)}
   <div id="upRows" hidden>
    <label for="aName">Mall name</label><input id="aName" autocomplete="organization">
    <div class="row2"><div><label for="aCity">City</label><input id="aCity" autocomplete="address-level2"></div><div><label for="aState">State</label><input id="aState" maxlength="2" placeholder="MO" autocomplete="address-level1"></div></div>
+   <div class="terms" id="termsBox">
+    <b>Your Tabella plan</b>
+    <ul>
+     <li>One price per booth, the same for every mall: $1.80 a booth a month for booths 1 to 30, $1.10 for 31 to 60, $0.70 after that. Or pay yearly and get 2 months free.</li>
+     <li>Months 1 to 3 are free, with no card.</li>
+     <li>Months 4 to 6 are still free. We ask for a card by the end of month 3.</li>
+     <li>A week before your first charge is your decision date. We email you and you can add it to your calendar. Cancel by then and you pay nothing.</li>
+     <li>After that, your card is charged automatically each month (or year) for the booths in your account, until you cancel in Settings.</li>
+     <li>If a payment fails, nothing switches off. We'll let you know and sort it out with you.</li>
+    </ul>
+   </div>
+   <label class="check" style="margin-top:8px"><input type="checkbox" id="aAgree"> I've read the plan above and agree to it</label>
   </div>
   <label for="aEmail">Email</label><input id="aEmail" type="email" autocomplete="email" required>
   <label for="aPw">Password</label><input id="aPw" type="password" autocomplete="current-password" minlength="8" required>
@@ -170,7 +187,7 @@ dialog{max-height:calc(100dvh - 24px);max-height:calc(100vh - 24px)}
 <section id="appView" hidden>
  <div class="bar"><div><div class="cap">Your mall</div><h1 id="mallName" style="font-size:clamp(2rem,5vw,3rem);margin:4px 0 0"></h1></div><button class="btn sec" id="signOut" type="button">Sign out</button></div>
  <div class="tabs" role="tablist" id="viewTabs" style="margin-top:14px">
-  <button type="button" role="tab" data-v="reg" aria-selected="true">Register</button><button type="button" role="tab" data-v="pick" aria-selected="false">Pickups <span id="nPick"></span></button><button type="button" role="tab" data-v="day" aria-selected="false">Today</button><button type="button" role="tab" data-v="month" aria-selected="false">This month</button><button type="button" role="tab" data-v="stmt" aria-selected="false">Statements</button><button type="button" role="tab" data-v="dealers" aria-selected="false">Dealers</button><button type="button" role="tab" data-v="set" aria-selected="false">Settings</button>
+  <button type="button" role="tab" data-v="reg" aria-selected="true">Register</button><button type="button" role="tab" data-v="pick" aria-selected="false">Pickups <span id="nPick"></span></button><button type="button" role="tab" data-v="day" aria-selected="false">Today</button><button type="button" role="tab" data-v="month" aria-selected="false">This month</button><button type="button" role="tab" data-v="ins" aria-selected="false">Insights</button><button type="button" role="tab" data-v="stmt" aria-selected="false">Statements</button><button type="button" role="tab" data-v="dealers" aria-selected="false">Dealers</button><button type="button" role="tab" data-v="set" aria-selected="false">Settings</button>
  </div>
 
  <!-- Register -->
@@ -225,6 +242,19 @@ dialog{max-height:calc(100dvh - 24px);max-height:calc(100vh - 24px)}
  </div>
 
  <!-- Statements -->
+ <div id="v-ins" class="view" hidden>
+  <div class="bar" style="margin:0 0 12px"><div><h2 style="font-size:1.6rem;margin:0">Insights</h2><p class="meta" style="margin:2px 0 0">What sells, what sits, and what online sales bring your mall.</p></div>
+   <div class="tabs" role="tablist" id="insDays"><button type="button" role="tab" data-d="30" aria-selected="true">30 days</button><button type="button" role="tab" data-d="90" aria-selected="false">90 days</button><button type="button" role="tab" data-d="365" aria-selected="false">Year</button></div></div>
+  <div class="stats" id="insStats"></div>
+  <div class="ins2">
+   <div class="panel"><h3 style="margin:0 0 8px">Selling best</h3><ol id="insHot"></ol></div>
+   <div class="panel"><h3 style="margin:0 0 8px">Selling slowest</h3><p class="meta" style="margin:0 0 6px">Booths with pieces on the floor and the fewest sales. A nudge to mark down or restock.</p><ol id="insSlow"></ol></div>
+   <div class="panel"><h3 style="margin:0 0 8px">What sells</h3><div id="insCats"></div></div>
+  </div>
+  <div class="panel" style="max-width:none;margin-top:14px"><h3 style="margin:0 0 8px">Longest on the floor</h3><div class="old" id="insOld"></div></div>
+  <div class="tblwrap" style="margin-top:14px"><table class="tbl" id="insTbl"></table></div>
+  <p class="meta" id="insNote"></p>
+ </div>
  <div id="v-stmt" class="view" hidden>
   <div class="bar"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><label for="monPick" style="margin:0">Month</label><input id="monPick" type="month" style="width:auto"></div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" type="button" id="stAll">Email all statements</button><button class="btn sec" type="button" id="stCsv">Download spreadsheet</button></div></div>
   <form id="autoForm" class="autorow" novalidate><label class="check" style="margin:0"><input type="checkbox" id="autoOn"> Email every booth its statement automatically</label>
@@ -242,6 +272,11 @@ dialog{max-height:calc(100dvh - 24px);max-height:calc(100vh - 24px)}
    <div class="code" id="joinCode"></div>
    <p class="meta" style="margin:4px 0 0">Give this code to your dealers. In the Tabella dealer app they open <b>Your mall</b>, type the code and their booth number. Then the register can sell their tagged pieces.</p>
   </div>
+  <div class="panel" style="max-width:none;margin-top:14px" id="wlPanel">
+   <div class="cap">Booth waitlist <span id="nWl"></span></div>
+   <p class="meta" style="margin:4px 0 8px">Dealers who asked for a booth here through Tabella. Look at their pieces and prices first, then invite them (we email them your join code) or take them off the list.</p>
+   <div id="wlList"></div><div id="wlMsg" aria-live="polite"></div>
+  </div>
   <div class="tblwrap" style="margin-top:14px"><table class="tbl" id="dTbl"></table></div>
   <div id="dMsg" aria-live="polite"></div>
   <form id="addBoothForm" class="panel" novalidate style="margin-top:14px;max-width:640px">
@@ -258,6 +293,9 @@ dialog{max-height:calc(100dvh - 24px);max-height:calc(100vh - 24px)}
   <div class="panel" id="planPanel" style="max-width:640px;margin-bottom:14px">
    <h2 style="font-size:1.5rem;margin:0 0 6px">Tabella plan</h2>
    <p class="meta" style="margin:0 0 10px">Transparent pricing: one price per booth, the same for every mall, with everything included.</p>
+   <div id="agreePanel" class="msg warn" hidden><b>Please review your plan terms.</b> <span class="meta" style="color:inherit">Tabella now asks every mall to agree to them.</span>
+    <div class="terms" id="termsCopy"></div>
+    <label class="check"><input type="checkbox" id="agreeChk"> I've read the plan and agree to it</label><button class="btn" type="button" id="agreeBtn" style="margin-top:8px">Agree</button><div id="agreeMsg"></div></div>
    <div id="planNow" aria-live="polite"></div>
    <ol class="plansteps" id="planSteps"></ol>
    <fieldset style="border:0;padding:0;margin:10px 0 0"><legend class="meta" style="padding:0">Pay</legend>
@@ -355,7 +393,7 @@ function setMode(m){mode=m;$('tabIn').setAttribute('aria-selected',m==='in');$('
   $('authBtn').textContent=m==='up'?'Create mall account':'Sign in';$('aPw').autocomplete=m==='up'?'new-password':'current-password';msg('authMsg','')}
 $('tabIn').onclick=function(){setMode('in')};$('tabUp').onclick=function(){setMode('up')};
 $('authForm').addEventListener('submit',async function(e){e.preventDefault();var b=$('authBtn');b.disabled=true;
-  try{var d=await api(mode==='up'?'/mall/signup':'/mall/login',{json:{email:$('aEmail').value,password:$('aPw').value,name:$('aName').value,city:$('aCity').value,state:$('aState').value}});
+  try{var d=await api(mode==='up'?'/mall/signup':'/mall/login',{json:{email:$('aEmail').value,password:$('aPw').value,name:$('aName').value,city:$('aCity').value,state:$('aState').value,agree:$('aAgree').checked}});
     setTok(d.token);me=d.mall;$('aPw').value='';enter()}
   catch(err){msg('authMsg',err.message,1)}b.disabled=false});
 $('signOut').onclick=async function(){try{await api('/mall/logout',{method:'POST'})}catch(e){}setTok(null);me=null;show('auth')};
@@ -372,8 +410,8 @@ var view='reg';
 document.querySelectorAll('#viewTabs button').forEach(function(b){b.onclick=function(){go(b.dataset.v)}});
 function go(v){view=v;document.querySelectorAll('#viewTabs button').forEach(function(b){b.setAttribute('aria-selected',b.dataset.v===v)});
   var pane=v==='month'?'day':v;document.querySelectorAll('.view').forEach(function(x){x.hidden=x.id!=='v-'+pane});
-  if(v==='reg'){drawSetupNote();loadBooths();setTimeout(function(){$('scanIn').focus()},50)}if(v==='day'||v==='month'){dayMode=v;loadDay()}if(v==='dealers')loadDealers();if(v==='pick')loadPickups();if(v==='stmt')loadStmts();if(v==='set')drawSettings()}
-function enter(){show('app');$('mallName').textContent=me.name;drawCart();go(view);loadPickups();loadBill();
+  if(v==='reg'){drawSetupNote();loadBooths();setTimeout(function(){$('scanIn').focus()},50)}if(v==='day'||v==='month'){dayMode=v;loadDay()}if(v==='dealers')loadDealers();if(v==='ins')loadIns();if(v==='pick')loadPickups();if(v==='stmt')loadStmts();if(v==='set')drawSettings()}
+function enter(){$('termsCopy').innerHTML=$('termsBox').innerHTML;show('app');$('mallName').textContent=me.name;drawCart();go(view);loadPickups();loadBill();
   if(/billing=(done|back)/.test(location.search)){var done=/billing=done/.test(location.search);history.replaceState(null,'',location.pathname);go('set');if(done)setTimeout(function(){loadBill();msg('plMsg','Card saved. Nothing is charged until your first charge date.')},1500)}
   if(/payouts=back/.test(location.search)){history.replaceState(null,'',location.pathname);checkPayouts()}}
 function drawSetupNote(){var need=[];if(me.taxRate==null)need.push('your sales tax rate');if(!me.reader)need.push('a card reader');
@@ -567,7 +605,7 @@ $('stCsv').onclick=async function(){var mo=$('monPick').value||thisMonth();try{v
 // ----- dealers
 $('addBoothForm').addEventListener('submit',async function(e){e.preventDefault();
   try{await api('/mall/dealers',{json:{booth:$('nbBooth').value,name:$('nbName').value,email:$('nbEmail').value,rent:$('nbRent').value}});$('nbRent').value='';$('nbBooth').value='';$('nbName').value='';$('nbEmail').value='';msg('nbMsg','Booth added.');loadDealers()}catch(err){msg('nbMsg',err.message,1)}});
-async function loadDealers(){$('joinCode').textContent=me.code;
+async function loadDealers(){loadWl();$('joinCode').textContent=me.code;
   try{var ds=(await api('/mall/dealers')).dealers;
     $('dTbl').innerHTML=ds.length?'<thead><tr><th>Booth</th><th>Dealer</th><th>Commission %</th><th>Rent / month</th><th>Payouts</th><th></th></tr></thead><tbody>'+ds.map(function(d){
       return '<tr data-id="'+d.id+'"><td><input class="sm" value="'+esc(d.booth)+'" data-f="booth" aria-label="Booth for '+esc(d.name)+'"></td><td>'+esc(d.name)+(d.managed?'<br><input class="sm" style="width:190px;margin-top:4px" type="email" value="'+esc(d.email||'')+'" placeholder="Email for statements" data-f="email" aria-label="Email for '+esc(d.name)+'">':'')+'</td><td><input class="sm" type="number" step="0.5" min="0" max="60" value="'+(d.pct==null?'':d.pct)+'" placeholder="'+me.commissionPct+'" data-f="pct" aria-label="Commission for '+esc(d.name)+'"></td><td><input class="sm" type="number" step="1" min="0" value="'+(d.rent?(d.rent/100).toFixed(2):'')+'" placeholder="0" data-f="rent" aria-label="Monthly rent for '+esc(d.name)+'"></td><td>'+(d.managed?'<span class="pill">You pay them</span>':d.payouts?'<span class="pill ok">Bank connected</span>':'<span class="pill warn">No bank yet</span>')+'</td><td><button type="button" class="rm" data-del>Remove</button></td></tr>'}).join('')+'</tbody>'
@@ -587,6 +625,7 @@ async function loadBill(){try{bill=await api('/mall/billing')}catch(e){bill=null
 function drawPlanNote(){var b=bill,t='',cls='warn';if(!b){$('planNote').innerHTML='';return}
   if(b.status==='off'){t=b.offNote||'Your Tabella account is paused.';cls='err'}
   else if(b.status==='past_due'||b.status==='unpaid')t='Your last Tabella payment didn’t go through. Everything keeps working; please update your card in Settings.';
+  else if(!me.agreed)t='Please review and agree to your Tabella plan terms in Settings.';
   else if(b.status==='card_due')t='Please add a card for your Tabella plan in Settings. Nothing is charged until '+dd(b.firstCharge)+'.';
   $('planNote').innerHTML=t?'<div class="msg '+cls+'">'+esc(t)+' <button type="button" class="linkbtn" id="toPlan">Open</button></div>':'';var o=$('toPlan');if(o)o.onclick=function(){go('set')}}
 function drawBill(){var b=bill;if(!b){$('planPanel').hidden=true;return}$('planPanel').hidden=false;
@@ -613,7 +652,38 @@ $('plCard').onclick=async function(){var b=this;b.disabled=true;msg('plMsg','');
 $('plCancel').onclick=async function(){var undo=!!bill.cancelAt;if(!undo&&!confirm(bill.status==='trialing'?'Cancel your Tabella plan? You won’t be charged anything.':'Cancel your Tabella plan? It stays on until the end of what you’ve paid for.'))return;
   try{bill=await api(undo?'/mall/billing/resume':'/mall/billing/cancel',{json:{}});drawBill();drawPlanNote();msg('plMsg',undo?'You’re back on.':'Canceled. We’d love to hear what we could do better: reply to any Tabella email.')}catch(err){msg('plMsg',err.message,1)}};
 $('plRent').onchange=async function(){try{me=(await api('/mall/me',{method:'PUT',json:{feeInRent:this.checked}})).mall;msg('plMsg',this.checked?'The booth fee will be added to rent on statements.':'The booth fee won’t be added to rent.');await loadBill()}catch(err){msg('plMsg',err.message,1)}};
-function drawSettings(){drawBill();loadBill();var a=me.address||{};$('sName').value=me.name;$('sCity').value=me.city||'';$('sState').value=me.state||'';$('sTz').value=me.tz||'America/Chicago';
+
+// ----- waitlist
+async function loadWl(){try{var r=await api('/mall/waitlist');drawWl(r.waitlist)}catch(e){$('wlList').innerHTML='<p class="meta">'+esc(e.message)+'</p>'}}
+function drawWl(w){$('nWl').textContent=w.length?'('+w.length+')':'';
+  $('wlList').innerHTML=w.length?w.map(function(x){return '<div class="wl">'+(x.photo?'<img alt="" src="'+API+'/img/'+esc(x.photo)+'">':'<div class="ph"></div>')+
+    '<div><b>'+esc(x.name)+'</b> <span class="meta">asked '+esc(new Date(x.at).toLocaleDateString('en-US'))+'</span>'+(x.status==='invited'?' <span class="pill ok">Invited '+esc(new Date(x.invitedAt).toLocaleDateString('en-US'))+'</span>':'')+
+    '<br><span class="meta">'+x.pieces+' piece'+(x.pieces===1?'':'s')+' in their shop'+(x.pieces?', $'+x.low+' to $'+x.high+' (typical $'+x.median+')':'')+(x.sold?' &middot; '+x.sold+' sold on Tabella':'')+'</span>'+
+    (x.categories.length?'<br><span class="meta">'+esc(x.categories.join(', '))+'</span>':'')+(x.elsewhere?'<br><span class="meta">Has a booth at '+esc(x.elsewhere)+' now</span>':'')+
+    (x.note?'<p style="margin:6px 0 0">“'+esc(x.note)+'”</p>':'')+'</div>'+
+    '<div class="acts"><a class="btn sec" href="'+esc(x.shop)+'" target="_blank" rel="noopener">See their pieces</a><button class="btn" type="button" data-inv="'+x.dealer+'">'+(x.status==='invited'?'Invite again':'Invite')+'</button><button class="btn sec" type="button" data-rm="'+x.dealer+'" data-n="'+esc(x.name)+'">Take off list</button></div></div>'}).join(''):'<p class="meta" style="margin:0">No one yet. Dealers find you in the Tabella dealer app under <b>Find a booth</b>.</p>'}
+$('wlList').onclick=async function(e){var b=e.target.closest('button');if(!b)return;msg('wlMsg','');
+  if(b.dataset.inv){var note=prompt('Add a short note for the invite (optional), like when the booth opens:','');if(note===null)return;b.disabled=true;
+    try{var r=await api('/mall/waitlist/'+b.dataset.inv+'/invite',{json:{note:note}});drawWl(r.waitlist);msg('wlMsg',r.emailed?'Invite emailed with your join code '+me.code+'. They also see it in their Tabella app.':'Invited. They see your join code '+me.code+' in their Tabella app.')}catch(err){msg('wlMsg',err.message,1);b.disabled=false}}
+  if(b.dataset.rm){if(!confirm('Take '+b.dataset.n+' off your waitlist? They won’t be told.'))return;b.disabled=true;try{drawWl((await api('/mall/waitlist/'+b.dataset.rm+'/remove',{json:{}})).waitlist)}catch(err){msg('wlMsg',err.message,1);b.disabled=false}}};
+
+// ----- insights
+var insDays=30;
+$('insDays').onclick=function(e){var b=e.target.closest('[data-d]');if(!b)return;insDays=+b.dataset.d;this.querySelectorAll('[data-d]').forEach(function(x){x.setAttribute('aria-selected',x===b)});loadIns()};
+function bn(r){return 'Booth '+esc(r.booth)+' <span class="meta">'+esc(r.name)+'</span>'}
+async function loadIns(){var r;try{r=await api('/mall/insights?days='+insDays)}catch(e){$('insStats').innerHTML='<div class="msg err">'+esc(e.message)+'</div>';return}
+  var t=r.totals;$('insStats').innerHTML=[['Sales',fc(t.sales)],['In the store',fc(t.store)],['Online',fc(t.online)],['Your 4% of online',fc(t.mallShare)],['Pieces sold',t.sold],['Average days to sell',t.avgDays==null?'—':t.avgDays],['Pieces on the floor',t.onHand],['Their value',fc(t.onHandValue)]].map(function(x){return '<div><span class="meta">'+esc(x[0])+'</span><b>'+esc(x[1])+'</b></div>'}).join('');
+  $('insHot').innerHTML=r.hot.length?r.hot.map(function(x){return '<li>'+bn(x)+'<br><span class="meta">'+fc(x.sales)+' &middot; '+x.sold+' sold'+(x.avgDays!=null?' &middot; '+x.avgDays+' days to sell':'')+'</span></li>'}).join(''):'<li class="meta" style="list-style:none;margin-left:-20px">No sales yet in this period.</li>';
+  $('insSlow').innerHTML=r.slow.length?r.slow.map(function(x){return '<li>'+bn(x)+'<br><span class="meta">'+x.onHand+' on the floor ('+fc(x.onHandValue)+'), '+(x.sales?fc(x.sales)+' sold':'no sales')+(x.lastSale?' &middot; last sale '+new Date(x.lastSale).toLocaleDateString('en-US'):'')+'</span></li>'}).join(''):'<li class="meta" style="list-style:none;margin-left:-20px">Nothing stands out.</li>';
+  $('insCats').innerHTML=r.categories.length?'<table class="sum">'+r.categories.map(function(c){return '<tr><td>'+esc(c.category)+'</td><td class="r">'+c.sold+' sold</td><td class="r">'+fc(c.sales)+'</td><td class="r meta">'+(c.avgDays!=null?c.avgDays+' days':'')+'</td></tr>'}).join('')+'</table>':'<p class="meta" style="margin:0">Shows once Tabella dealers’ tagged pieces sell.</p>';
+  $('insOld').innerHTML=r.oldest.length?r.oldest.map(function(o){return '<div>'+(o.photo?'<img alt="" src="'+API+'/img/'+esc(o.photo)+'">':'')+'<b>'+esc(o.title)+'</b><br><span class="meta">Booth '+esc(o.booth)+' &middot; '+fc(o.price)+' &middot; '+o.days+' days</span></div>'}).join(''):'<p class="meta" style="margin:0">No tagged pieces on the floor yet.</p>';
+  $('insTbl').innerHTML='<thead><tr><th>Booth</th><th>Dealer</th><th class="r">Sales</th><th class="r">Online</th><th class="r">Sold</th><th class="r">On the floor</th><th class="r">Days to sell</th></tr></thead><tbody>'+r.booths.map(function(x){return '<tr><td>'+esc(x.booth)+'</td><td>'+esc(x.name)+'</td><td class="r">'+fc(x.sales)+'</td><td class="r">'+fc(x.online)+'</td><td class="r">'+x.sold+'</td><td class="r">'+(x.onHand==null?'<span class="meta">not on Tabella</span>':x.onHand)+'</td><td class="r">'+(x.avgDays==null?'':x.avgDays)+'</td></tr>'}).join('')+'</tbody>';
+  $('insNote').textContent='In-store sales come from your register. Online sales, days to sell and pieces on the floor cover dealers on Tabella. Your 4% is paid to your bank once it’s connected in Settings.'}
+
+// ----- plan terms for malls that signed up before the sign-up step
+function drawAgree(){var need=!me.agreed;$('agreePanel').hidden=!need}
+$('agreeBtn').onclick=async function(){if(!$('agreeChk').checked){msg('agreeMsg','Tick the box to agree.',1);return}try{me=(await api('/mall/agree',{json:{agree:true}})).mall;drawAgree();msg('plMsg','Thanks. Your agreement is saved.')}catch(err){msg('agreeMsg',err.message,1)}};
+function drawSettings(){drawAgree();drawBill();loadBill();var a=me.address||{};$('sName').value=me.name;$('sCity').value=me.city||'';$('sState').value=me.state||'';$('sTz').value=me.tz||'America/Chicago';
   $('sComm').value=me.commissionPct;$('sRent').checked=!!me.rentFromPayouts;$('sCard').value=me.cardFeePct;$('sTax').value=me.taxRate==null?'':me.taxRate;
   $('aSt').value=a.street1||'';$('aCity2').value=a.city||'';$('aSt2').value=a.state||'';$('aZip').value=a.zip||'';
   var test=me.mode==='test';$('rdTest').hidden=!test;$('rdForm').hidden=test;

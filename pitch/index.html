@@ -76,6 +76,19 @@ table.price td.n{font-family:'Cormorant Garamond',serif;font-size:40px;font-weig
   .slide,.cover{display:block!important;position:relative;transform:none!important;width:13.333in;height:7.5in;border-radius:0;page-break-after:always;padding:.66in .83in}
   .cover{display:flex!important}
 }
+
+/* one-page leave-behind (letter size), printed on its own */
+#leave{background:#fff;color:#231F1A;width:8.5in;min-height:11in;margin:0 auto;padding:.55in .6in;font:12.5px/1.45 Inter,system-ui,sans-serif}
+#leave .lt{font-family:Cinzel,serif;letter-spacing:.22em;font-weight:600;font-size:15px}#leave h1{font-family:'Cormorant Garamond',Georgia,serif;font-size:32px;line-height:1.05;margin:14px 0 4px}
+#leave .sub{color:#6A6259;margin:0 0 14px;font-size:13.5px}#leave .g{display:grid;grid-template-columns:1fr 1fr;gap:12px 22px}
+#leave h3{font-family:'Cormorant Garamond',Georgia,serif;font-size:19px;margin:0 0 4px}#leave ul{margin:0;padding-left:16px}#leave li{margin:0 0 3px}
+#leave .box{border:1px solid #D5CCBA;border-radius:10px;padding:10px 12px}#leave .price{background:#F4EFE6}#leave table{border-collapse:collapse;width:100%}#leave td{padding:3px 0}#leave td.n{text-align:right;font-weight:600}
+#leave .foot{margin-top:14px;padding-top:10px;border-top:1px solid #D5CCBA;display:flex;justify-content:space-between;gap:12px;font-size:12px}
+#leave .cap{color:#A8842F}
+body.lbmode #deck,body.lbmode #bar{display:none!important}
+body.lbmode{background:#EBE4D6;overflow:auto;height:auto}
+#lbbar{position:fixed;top:10px;right:10px;display:flex;gap:8px}#lbbar button{font:inherit;background:#25211C;color:#EFE8DB;border:1px solid #3A342D;border-radius:8px;padding:6px 12px;cursor:pointer}
+@media print{ body.lbmode #leave{page:leave;margin:0;width:auto;min-height:0;padding:0} body.lbmode #lbbar{display:none} @page leave{size:letter;margin:.5in} }
 </style>
 </head>
 <body>
@@ -95,8 +108,9 @@ table.price td.n{font-family:'Cormorant Garamond',serif;font-size:40px;font-weig
 </section>
 
 <div id="deck" hidden></div>
+<div id="leave" hidden></div>
 <div id="bar" hidden><button type="button" id="prev" aria-label="Previous slide">&larr;</button><span id="pos"></span><button type="button" id="next" aria-label="Next slide">&rarr;</button>
- <button type="button" id="full">Full screen</button><button type="button" id="prt">Print or PDF</button><a href="./" id="other">Another mall</a></div>
+ <button type="button" id="full">Full screen</button><button type="button" id="prt">Print or PDF</button><button type="button" id="lb">One-page leave-behind</button><a href="./" id="other">Another mall</a></div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
@@ -220,6 +234,22 @@ async function deck(id){
   $('deck').addEventListener('click',function(e){if(e.target.closest('.leaflet-container'))return;show(cur+(e.clientX<innerWidth/3?-1:1))});
   $('full').onclick=function(){if(document.fullscreenElement)document.exitFullscreen();else document.documentElement.requestFullscreen().catch(function(){})};
   $('prt').onclick=function(){drawMap();setTimeout(function(){print()},700)};
+  // one-page leave-behind for this mall
+  $('lb').onclick=function(){var per=cost(booths,RATES)/booths;
+    $('leave').innerHTML='<div class="lt">TABELLA</div><h1>Prepared for '+esc(name)+'</h1><p class="sub">'+esc(town)+' &middot; Software for antique malls and their dealers, built by people who run a booth.</p>'+
+    '<div class="g">'+
+     '<div class="box"><div class="cap">Online</div><h3>Every booth, online</h3><ul><li>Dealers photograph a piece and it is in the Tabella shop, with the booth it sits in.</li><li><b>'+esc(name)+' earns 4% of every online sale</b> from its booths.</li><li>Shoppers can pay online and pick up at your counter.</li></ul></div>'+
+     '<div class="box"><div class="cap">In the mall</div><h3>A register made for booths</h3><ul><li>Scan a Tabella tag, or ring up any booth by number and price.</li><li>Cash or card. Card money for dealers on Tabella goes straight to their bank.</li><li>Runs in a browser on a tablet. Keep your current register if you like.</li></ul></div>'+
+     '<div class="box"><div class="cap">Month end</div><h3>Statements in minutes</h3><ul><li>A statement for every booth: sales, commission, card fees and rent.</li><li>Rent can come out of card sales first.</li><li>Statements email themselves on the day you pick.</li></ul></div>'+
+     '<div class="box"><div class="cap">Booth finder</div><h3>Fill empty booths faster</h3><ul><li>Dealers ask for a booth through Tabella and join your waitlist.</li><li>See their pieces and prices before you say yes.</li>'+(dealer?'<li><b>'+esc(dealer)+'</b> is looking for a booth in '+esc(town)+'.</li>':'<li>Insights show which booths sell and which sit.</li>')+'</ul></div>'+
+     '<div class="box price"><div class="cap">What it costs</div><h3>For '+booths+' booths</h3><table><tr><td>Per month</td><td class="n">'+$m(cost(booths,RATES))+'</td></tr><tr><td>Per year (2 months free)</td><td class="n">'+$m(cost(booths,RATES)*YEAR_MONTHS)+'</td></tr><tr><td>Per booth, on average</td><td class="n">'+$m(per)+'</td></tr></table><p style="margin:6px 0 0;font-size:11.5px;color:#6A6259">One price for every mall, every feature included: $1.80 a booth for the first 30, $1.10 for the next 30, $0.70 after that. Free for dealers to join.</p></div>'+
+     '<div class="box"><div class="cap">How it starts</div><h3>6 months free</h3><ul><li>Months 1 to 3 free, no card.</li><li>Months 4 to 6 free, with a card on file.</li><li>A decision date before the first charge: cancel by then and pay nothing.</li><li>Nothing ever switches off without a conversation.</li></ul></div>'+
+    '</div>'+
+    '<div class="foot"><div><b>Next step:</b> a 30-minute demo at your counter, on a tablet: a sale, a statement and the map.</div><div style="text-align:right">tabellasuite.com/pricing.html<br>contact@tabellasuite.com</div></div>'+
+    '<div id="lbbar"><button type="button" id="lbPrint">Print</button><button type="button" id="lbBack">Back to the deck</button></div>';
+    document.body.classList.add('lbmode');$('leave').hidden=false;scrollTo(0,0);
+    $('lbPrint').onclick=function(){print()};$('lbBack').onclick=function(){document.body.classList.remove('lbmode');$('leave').hidden=true}};
+
   var drawn=false;function drawMap(){if(drawn||!window.L)return;drawn=true;
     var mp=L.map('mbox',{zoomControl:false,attributionControl:true,scrollWheelZoom:false});L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:18,attribution:'&copy; OpenStreetMap contributors'}).addTo(mp);
     var pts=[p.ll];near.slice(0,40).forEach(function(n){pts.push(n.ll);L.circleMarker(n.ll,{radius:6,color:'#6A6259',weight:1,fillColor:'#A8842F',fillOpacity:.85}).addTo(mp).bindTooltip(esc(n.name))});

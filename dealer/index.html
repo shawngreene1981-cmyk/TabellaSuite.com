@@ -110,6 +110,9 @@ dialog{max-height:calc(100dvh - 24px);max-height:calc(100vh - 24px)}
 .ofa{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:12px}.ctr{display:flex;gap:6px;align-items:center}.ctr input{width:90px}
 .chips.sm{margin-top:10px}.chips.sm button{font-size:.85rem;padding:6px 10px}
 .tglist{list-style:none;padding:0;margin:0;max-height:46vh;overflow:auto;border:1px solid var(--line);border-radius:10px}.tglist li{border-bottom:1px solid var(--line)}.tglist label{display:flex;gap:10px;align-items:center;margin:0;padding:8px 10px;cursor:pointer}.tglist input{width:20px;height:20px;flex:none}.tglist .meta{margin-left:auto;white-space:nowrap}
+
+.fm{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;justify-content:space-between;padding:10px 0;border-top:1px solid var(--line)}.fm:first-child{border-top:0}.fm textarea{width:100%;min-height:60px;font:inherit;padding:8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
 </style>
 </head>
 <body>
@@ -159,6 +162,14 @@ dialog{max-height:calc(100dvh - 24px);max-height:calc(100vh - 24px)}
    <div class="row2"><div><label for="mCode">Join code from the mall office</label><input id="mCode" maxlength="8" autocapitalize="characters" autocomplete="off"></div><div><label for="mBooth">Your booth number</label><input id="mBooth" maxlength="20" autocomplete="off"></div></div>
    <button class="btn" type="submit" style="margin-top:10px">Join mall</button><div id="mallMsg" aria-live="polite"></div>
   </form>
+ </div>
+
+ <div class="panel" id="findCard" style="margin-top:14px;max-width:none">
+  <h2 style="font-size:1.5rem;margin:0 0 4px">Find a booth</h2>
+  <p class="meta" style="margin:0 0 10px">Looking for a booth in a mall that uses Tabella? Ask to join its waitlist. The mall sees your Tabella shop, your pieces and prices, and can invite you with its join code.</p>
+  <div id="myLists"></div>
+  <form id="findForm" class="scanrow" novalidate style="display:flex;gap:8px;margin-top:8px"><label for="findQ" class="sr">Mall name or town</label><input id="findQ" placeholder="Mall name or town, like Springfield" autocomplete="off" style="flex:1"><button class="btn sec" type="submit">Search</button></form>
+  <div id="findRes" style="margin-top:8px"></div><div id="findMsg" aria-live="polite"></div>
  </div>
 
  <div class="panel" id="importCard" hidden style="margin-top:14px;max-width:none">
@@ -260,11 +271,29 @@ function drawSetup(){$('shopName').textContent=me.name;$('acctNow').textContent=
   $('shipEditBtn').textContent=okShip?'Change':'Add';
   $('stPay').className='step'+(okPay?' done':'');$('stPayTxt').textContent=okPay?'Payouts are set up. Your share goes to your bank after each sale.':'Stripe pays your share to your bank after each sale. Tabella never sees your bank details.';
   $('payBtn').textContent=okPay?'Update':'Set up';drawMall();$('setupH').textContent=okShip&&okPay?'Shop setup':'Before your items can sell';$('setup').hidden=false}
-function drawMall(){var m=me.mall;$('stMall').className='step'+(m?' done':'');$('stMallTxt').textContent=m?'Booth '+m.booth+' at '+m.name+'. The mall can ring up your tagged pieces, and they come off the online shop the moment they sell.':'If your booth is in a mall that uses Tabella, add its join code. Looking for a booth? Send a mall your shop: tabellasuite.com/shop/?dealer='+String(me.name||'').toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');$('mallBtn').textContent=m?'Leave':'Join';$('mallForm').hidden=true}
+
+// ----- find a booth (mall waitlists)
+async function loadLists(){try{drawLists((await api('/app/waitlist')).lists)}catch(e){}}
+function drawLists(l){$('myLists').innerHTML=l.length?'<b>Your waitlists</b>'+l.map(function(w){return '<div class="fm"><div><b>'+esc(w.name)+'</b> <span class="meta">'+esc(w.city)+', '+esc(w.state)+'</span><br>'+
+  (w.status==='invited'?'<span class="pill ok">Invited</span> <span class="meta">Join code <b>'+esc(w.code)+'</b>. Check your email for their note.</span>':'<span class="meta">Waiting since '+esc(new Date(w.at).toLocaleDateString('en-US'))+'</span>')+'</div>'+
+  '<div style="display:flex;gap:6px">'+(w.status==='invited'&&!me.mall?'<button class="btn" type="button" data-use="'+esc(w.code)+'">Use join code</button>':'')+'<button class="btn sec" type="button" data-leave="'+w.mall+'">Leave list</button></div></div>'}).join(''):''}
+$('myLists').onclick=async function(e){var b=e.target.closest('button');if(!b)return;
+  if(b.dataset.use){$('mallForm').hidden=false;$('mCode').value=b.dataset.use;$('mBooth').focus();$('stMall').scrollIntoView({behavior:'smooth',block:'center'});return}
+  if(b.dataset.leave){b.disabled=true;try{drawLists((await api('/app/waitlist/'+b.dataset.leave,{method:'DELETE'})).lists);findMalls()}catch(err){msg('findMsg',err.message,1);b.disabled=false}}};
+async function findMalls(){var q=$('findQ').value.trim();msg('findMsg','');
+  try{var r=await api('/app/malls?q='+encodeURIComponent(q));$('findRes').innerHTML=r.malls.length?r.malls.map(function(m){return '<div class="fm" data-m="'+m.id+'"><div><b>'+esc(m.name)+'</b> <span class="meta">'+esc(m.city)+', '+esc(m.state)+' &middot; '+m.booths+' booth'+(m.booths===1?'':'s')+' on Tabella</span></div>'+
+    (m.yours?'<span class="meta">Your mall</span>':m.waiting?'<span class="pill ok">On the waitlist</span>':'<button class="btn" type="button" data-ask="'+m.id+'">Ask for a booth</button>')+'</div>'}).join(''):'<p class="meta">No Tabella malls match'+(q?' “'+esc(q)+'”':'')+' yet. More malls are joining; check back, or send a mall your shop link.</p>'}catch(err){msg('findMsg',err.message,1)}}
+$('findForm').addEventListener('submit',function(e){e.preventDefault();findMalls()});
+$('findRes').onclick=async function(e){var b=e.target.closest('button');if(!b)return;var row=b.closest('.fm');
+  if(b.dataset.ask){if(row.querySelector('textarea'))return;b.textContent='Send';b.dataset.send=b.dataset.ask;delete b.dataset.ask;
+    var t=document.createElement('textarea');t.maxLength=300;t.placeholder='A short note for the mall (optional): what you sell, the booth size you want, when you could start.';t.setAttribute('aria-label','Note for the mall');row.appendChild(t);t.focus();return}
+  if(b.dataset.send){b.disabled=true;var note=(row.querySelector('textarea')||{}).value||'';
+    try{drawLists((await api('/app/waitlist',{json:{mall:b.dataset.send,note:note}})).lists);await findMalls();msg('findMsg','You\u2019re on the waitlist. The mall gets an email with a link to your shop.')}catch(err){msg('findMsg',err.message,1);b.disabled=false}}};
+function drawMall(){var m=me.mall;$('stMall').className='step'+(m?' done':'');$('stMallTxt').textContent=m?'Booth '+m.booth+' at '+m.name+'. The mall can ring up your tagged pieces, and they come off the online shop the moment they sell.':'If your booth is in a mall that uses Tabella, add its join code. Looking for a booth? Use Find a booth below, or send a mall your shop: tabellasuite.com/shop/?dealer='+me.id;$('mallBtn').textContent=m?'Leave':'Join';$('mallForm').hidden=true}
 $('mallBtn').onclick=async function(){if(!me.mall){var f=$('mallForm');f.hidden=!f.hidden;if(!f.hidden)$('mCode').focus();return}
   if(!confirm('Leave '+me.mall.name+'? Its register will stop selling your pieces.'))return;try{await api('/app/mall/leave',{method:'POST'});me.mall=null;drawMall()}catch(err){alert(err.message)}};
 $('mallForm').addEventListener('submit',async function(e){e.preventDefault();
-  try{var d=await api('/app/mall/join',{json:{code:$('mCode').value,booth:$('mBooth').value}});me.mall=d.mall;msg('mallMsg','');drawMall()}catch(err){msg('mallMsg',err.message,1)}});
+  try{var d=await api('/app/mall/join',{json:{code:$('mCode').value,booth:$('mBooth').value}});me.mall=d.mall;msg('mallMsg','');drawMall();loadLists()}catch(err){msg('mallMsg',err.message,1)}});
 $('shipEditBtn').onclick=function(){var f=$('shipForm');f.hidden=!f.hidden;var s=me.shipFrom||{};$('sSt').value=s.street1||'';$('sSt2').value=s.street2||'';$('sCity').value=s.city||'';$('sState').value=s.state||'';$('sZip').value=s.zip||'';$('sPhone').value=s.phone||''};
 $('shipForm').addEventListener('submit',async function(e){e.preventDefault();
   try{var d=await api('/app/me',{method:'PUT',json:{shipFrom:{street1:$('sSt').value,street2:$('sSt2').value,city:$('sCity').value,state:$('sState').value,zip:$('sZip').value,phone:$('sPhone').value}}});me=d.dealer;$('shipForm').hidden=true;msg('shipMsg','');drawSetup();loadItems()}
@@ -422,7 +451,7 @@ $('csvBtn').onclick=async function(){var b=this;b.disabled=true;
     var blob=await r.blob(),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=(me.name||'items').replace(/[^A-Za-z0-9]+/g,'-')+'-items.csv';document.body.appendChild(a);a.click();a.remove()}
   catch(err){alertMsg(err.message)}b.disabled=false};
 // ----- start
-async function enter(){show('app');drawSetup();loadItems();checkImport();loadOffers();if(location.hash==='#offers'){view='offers';drawItems()}
+async function enter(){show('app');drawSetup();loadItems();checkImport();loadOffers();loadLists();if(location.hash==='#offers'){view='offers';drawItems()}
   if(/payouts=back/.test(location.search)){try{var s=await api('/app/payouts');me.payouts=s.ready;drawSetup();drawItems()}catch(e){}history.replaceState(null,'',location.pathname)}}
 (async function(){if(resetTok){show('auth');setMode('in');$('authForm').hidden=true;$('resetForm').hidden=false;document.querySelector('.tabs').hidden=true;return}
   if(!tok){show('auth');setMode('in');return}try{var d=await api('/app/me');me=d.dealer;await enter()}catch(e){show('auth');setMode('in')}})();

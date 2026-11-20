@@ -22,6 +22,10 @@ import { session as dealerSession, hashPw, rand, cleanEmail, clean, err, body, n
 import { stripeApi, stripeMode, createRecipient, recipientLink, recipientReady } from './stripe.js';
 import { sendEmail, emailFrame } from './mail.js';
 import { handleBilling, mallPaused, boothFee } from './billing.js';
+import { joinedMall } from './waitlist.js';
+
+// The plan terms a mall agrees to when it signs up (see the sign-up form). Bump the version when they change.
+export const PLAN_TERMS_VERSION = '2026-11-20';
 
 const SESSION_TTL = 60 * 60 * 24 * 30;
 const CODE_ABC = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -51,6 +55,7 @@ export async function handleMall(request, env, url, json, cors) {
     if (!m) return json({ error: 'Please sign in again.', signin: true }, 401, cors);
 
     if (p.startsWith('/mall/billing')) { const r = await handleBilling(env, m.mall, p, request.method, () => body(request)); if (r) return json(r, 200, cors); }
+    if (p === '/mall/agree' && request.method === 'POST') { const b = await body(request); if (b.agree !== true) return json({ error: 'Tick the box to agree.' }, 400, cors); m.mall.agreed = { at: Date.now(), version: PLAN_TERMS_VERSION }; await env.TABELLA.put('mall:' + m.mall.id, JSON.stringify(m.mall)); return json({ mall: publicMall(env, m.mall) }, 200, cors); }
     if (p === '/mall/logout' && request.method === 'POST') { await env.TABELLA.delete('sess:' + m.token); return json({ ok: true }, 200, cors); }
     if (p === '/mall/me' && request.method === 'GET') return json({ mall: publicMall(env, m.mall) }, 200, cors);
     if (p === '/mall/me' && request.method === 'PUT') return json({ mall: publicMall(env, await updateMall(env, m.mall, await body(request))) }, 200, cors);
@@ -97,9 +102,10 @@ async function signup(env, b) {
   if (!name) throw err(400, 'Enter the mall’s name.');
   if (!city || !/^[A-Z]{2}$/.test(state)) throw err(400, 'Enter the city and the two-letter state, like MO.');
   if (pw.length < 8) throw err(400, 'Use a password of at least 8 characters.');
+  if (b.agree !== true) throw err(400, 'Please read the plan terms and tick the box to agree.');
   if (await env.TABELLA.get('user:' + email)) throw err(409, 'There is already an account for that email. Sign in instead, or use a different email for the mall.');
   const id = 'm' + rand(10), salt = rand(16);
-  const mall = { id, email, name, city, state, commissionPct: 10, cardFeePct: 3, taxRate: null, tz: 'America/Chicago', code: await newCode(env, id), created: Date.now() };
+  const mall = { id, email, name, city, state, commissionPct: 10, cardFeePct: 3, taxRate: null, tz: 'America/Chicago', code: await newCode(env, id), created: Date.now(), agreed: { at: Date.now(), version: PLAN_TERMS_VERSION } };
   await env.TABELLA.put('user:' + email, JSON.stringify({ id, kind: 'mall', email, salt, hash: await hashPw(pw, salt), created: Date.now() }));
   await env.TABELLA.put('mall:' + id, JSON.stringify(mall));
   return { token: await newSession(env, id), mall: publicMall(env, mall) };
@@ -119,7 +125,7 @@ async function login(env, b) {
   const mall = JSON.parse(await env.TABELLA.get('mall:' + u.id) || 'null');
   return { token: await newSession(env, u.id), mall: publicMall(env, mall) };
 }
-async function mallSession(env, request) {
+export async function mallSession(env, request) {
   const t = (request.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '').trim();
   if (!/^[a-z0-9]{40}$/.test(t)) return null;
   const id = await env.TABELLA.get('sess:' + t);
@@ -137,7 +143,7 @@ function publicMall(env, m) {
   if (!m) return null;
   const r = readerFor(env, m);
   return { id: m.id, name: m.name, email: m.email, city: m.city, state: m.state, commissionPct: m.commissionPct, cardFeePct: m.cardFeePct, taxRate: m.taxRate,
-    tz: m.tz, code: m.code, autoStatements: m.autoStatements || { on: false, day: 1 }, rentFromPayouts: !!m.rentFromPayouts, feeInRent: !!m.feeInRent, address: m.address || null, payouts: mallPayoutsOk(env, m), reader: r ? { label: r.label, simulated: !!r.simulated } : null,
+    tz: m.tz, code: m.code, autoStatements: m.autoStatements || { on: false, day: 1 }, rentFromPayouts: !!m.rentFromPayouts, feeInRent: !!m.feeInRent, agreed: m.agreed && m.agreed.version === PLAN_TERMS_VERSION ? m.agreed.at : null, address: m.address || null, payouts: mallPayoutsOk(env, m), reader: r ? { label: r.label, simulated: !!r.simulated } : null,
     mode: stripeMode(env), live: stripeMode(env) === 'live' && String(env.ALLOW_LIVE_PAYMENTS).toLowerCase() === 'true' };
 }
 async function updateMall(env, m, b) {
@@ -190,6 +196,7 @@ async function joinMall(env, d, b) {
   d.mall = { id: mid, name: m.name, booth };
   await env.TABELLA.put('dealer:' + d.id, JSON.stringify(d));
   await refreshListings(env, d); // pieces can now be picked up at this mall
+  await joinedMall(env, mid, d.id); // off this mall's waitlist
   return { mall: { name: m.name, booth } };
 }
 async function leaveMall(env, d) {
